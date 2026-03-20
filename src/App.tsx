@@ -257,6 +257,7 @@ export default function App() {
                 images={capturedImages}
                 onSave={handleSaveFind}
                 onBack={() => setCurrentScreen('home')}
+                onUpgrade={setPlan}
                 plan={plan}
               />
             )}
