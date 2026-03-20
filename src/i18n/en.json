@@ -37,6 +37,7 @@
     "style": "Aesthetic",
     "confidence": "Certainty",
     "explanation": "The Verdict",
+    "preliminary_findings": "Initial Scan Results",
     "checklist": "Field Inspection",
     "red_flags": "Deal Breakers",
     "market_insight": "Market Heat",
@@ -51,12 +52,12 @@
     "disclaimer": "AI analysis is probabilistic. Always verify in person before purchasing."
   },
   "paywall": {
-    "title": "What would a dealer actually pay for this?",
-    "subtitle": "Avoid overpaying by hundreds — or thousands — on a single purchase.",
+    "title": "Stop. You're missing the commercial reality.",
+    "subtitle": "Unlock the full valuation, negotiation strategy, and walk-away price to protect your capital.",
     "description": "Don’t commit to this item without seeing the real value.",
-    "cta": "See Dealer Price & Strategy",
-    "urgency": "Risk Detected",
-    "tension_line": "There may be risks that materially affect value."
+    "cta": "Unlock Dealer View (£7)",
+    "urgency": "Warning: High Stakes",
+    "tension_line": "This item could be overpriced. Unlock the dealer view before you buy."
   },
   "collection": {
     "title": "Your Hunting Log",
