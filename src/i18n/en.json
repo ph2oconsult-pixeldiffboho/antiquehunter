@@ -51,11 +51,11 @@
     "disclaimer": "AI analysis is probabilistic. Always verify in person before purchasing."
   },
   "paywall": {
-    "title": "What would a dealer actually pay?",
-    "subtitle": "Avoid overpaying on this item",
-    "description": "Unlock pricing, negotiation strategy, and walk-away triggers",
-    "cta": "Unlock Full Analysis",
-    "urgency": "Don't lose money on a bad buy."
+    "title": "What would a dealer actually pay for this?",
+    "subtitle": "Avoid overpaying by hundreds — or thousands — on a single purchase.",
+    "description": "Don’t commit to this item without seeing the real value.",
+    "cta": "See Dealer Price & Strategy",
+    "urgency": "Risk Detected"
   },
   "collection": {
     "title": "Your Hunting Log",
