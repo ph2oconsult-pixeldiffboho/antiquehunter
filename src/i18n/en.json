@@ -54,8 +54,9 @@
     "title": "What would a dealer actually pay for this?",
     "subtitle": "Avoid overpaying by hundreds — or thousands — on a single purchase.",
     "description": "Don’t commit to this item without seeing the real value.",
-    "cta": "Unlock Dealer View (£7)",
-    "urgency": "Risk Detected"
+    "cta": "See Dealer Price & Strategy",
+    "urgency": "Risk Detected",
+    "tension_line": "There may be risks that materially affect value."
   },
   "collection": {
     "title": "Your Hunting Log",
