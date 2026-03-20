@@ -1,0 +1,85 @@
+{
+  "common": {
+    "scan": "Escanear objeto",
+    "upload": "Subir foto",
+    "describe": "Describir",
+    "history": "Historial",
+    "settings": "Ajustes",
+    "back": "Atrás",
+    "save": "Guardar en el registro",
+    "saved": "Guardado",
+    "analyzing": "Analizando...",
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "view_all": "Ver todo",
+    "items": "Artículos"
+  },
+  "home": {
+    "hero_badge": "Tu compañero de campo inteligente",
+    "hero_title": "Caza con confianza",
+    "hero_desc": "Soporte de decisiones en tiempo real para cazadores de antigüedades. Identifica, inspecciona y valora hallazgos en segundos.",
+    "scan_subtitle": "Usar cámara",
+    "upload_subtitle": "Desde la galería",
+    "describe_subtitle": "Análisis de texto",
+    "history_subtitle": "Tu registro de caza",
+    "quick_tips": "Consejos rápidos",
+    "tip_joints_title": "Comprobación de juntas",
+    "tip_joints_desc": "Busca colas de milano. El corte a máquina frente al corte a mano indica la época.",
+    "tip_glass_title": "Desgaste del vidrio",
+    "tip_glass_desc": "Los patrones de desgaste auténticos deben estar en la base, no en los lados."
+  },
+  "analysis": {
+    "title": "Resultados del análisis",
+    "identification": "Identificación",
+    "origin": "Origen",
+    "period": "Periodo",
+    "style": "Estilo",
+    "confidence": "Confianza",
+    "explanation": "Evaluación del experto",
+    "checklist": "Lista de verificación de inspección",
+    "red_flags": "Banderas rojas y advertencias",
+    "market_insight": "Información del mercado",
+    "price_guidance": "Guía de precios",
+    "buy_score": "Puntuación de compra",
+    "value_range": "Rango de valor de mercado",
+    "resale_potential": "Potencial de reventa",
+    "price_assessment": "Evaluación del precio",
+    "disclaimer": "El análisis de IA es probabilístico. Siempre verifique en persona antes de comprar."
+  },
+  "collection": {
+    "title": "Tu registro de caza",
+    "search_placeholder": "Busca tus hallazgos...",
+    "empty": "Aún no hay hallazgos. ¡Empieza a cazar!",
+    "delete_confirm": "¿Estás seguro de que quieres eliminar este hallazgo?"
+  },
+  "describe": {
+    "title": "Describe tu hallazgo",
+    "placeholder": "ej: Un buró de caoba con juntas de cola de milano y tiradores de latón originales...",
+    "asking_price": "Precio solicitado (opcional)",
+    "seller_type": "Tipo de vendedor",
+    "seller_dealer": "Anticuario",
+    "seller_private": "Vendedor privado",
+    "seller_auction": "Subasta",
+    "analyze_button": "Analizar objeto",
+    "images": "Imágenes subidas",
+    "add_more": "Añadir más",
+    "suggested_shots": "Fotos sugeridas",
+    "shot_overall": "Vista general",
+    "shot_mark": "Marcas del fabricante / Sellos",
+    "shot_back": "Parte trasera / Inferior",
+    "shot_detail": "Juntas / Construcción"
+  },
+  "upload_choice": {
+    "title": "¿Listo para analizar?",
+    "desc": "¿Desea añadir más detalles para una mejor tasación o pasar directamente al análisis experto?",
+    "analyze_now": "Analizar ahora",
+    "add_details": "Añadir más detalles"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "language": "Idioma",
+    "profile": "Perfil",
+    "sign_out": "Cerrar sesión",
+    "about": "Acerca de Antique Hunter"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "common": {
+    "scan": "Gegenstand scannen",
+    "upload": "Foto hochladen",
+    "describe": "Beschreiben",
+    "history": "Verlauf",
+    "settings": "Einstellungen",
+    "back": "Zurück",
+    "save": "Im Protokoll speichern",
+    "saved": "Gespeichert",
+    "analyzing": "Analyse läuft...",
+    "loading": "Laden...",
+    "error": "Ein Fehler ist aufgetreten",
+    "view_all": "Alle anzeigen",
+    "items": "Gegenstände"
+  },
+  "home": {
+    "hero_badge": "Ihr smarter Feldbegleiter",
+    "hero_title": "Mit Vertrauen jagen",
+    "hero_desc": "Echtzeit-Entscheidungshilfe für Antiquitätenjäger. Funde in Sekunden identifizieren, prüfen und bewerten.",
+    "scan_subtitle": "Kamera verwenden",
+    "upload_subtitle": "Aus der Galerie",
+    "describe_subtitle": "Textanalyse",
+    "history_subtitle": "Ihr Jagdprotokoll",
+    "quick_tips": "Kurztipps",
+    "tip_joints_title": "Verbindungen prüfen",
+    "tip_joints_desc": "Suchen Sie nach Schwalbenschwanzverbindungen. Maschinenschnitt vs. Handschnitt verrät die Ära.",
+    "tip_glass_title": "Glasabnutzung",
+    "tip_glass_desc": "Authentische Abnutzungsmuster sollten sich am Boden befinden, nicht an den Seiten."
+  },
+  "analysis": {
+    "title": "Analyseergebnisse",
+    "identification": "Identifizierung",
+    "origin": "Herkunft",
+    "period": "Zeitraum",
+    "style": "Stil",
+    "confidence": "Vertrauen",
+    "explanation": "Expertenbewertung",
+    "checklist": "Inspektionscheckliste",
+    "red_flags": "Warnsignale & Warnungen",
+    "market_insight": "Markteinblick",
+    "price_guidance": "Preisberatung",
+    "buy_score": "Kaufbewertung",
+    "value_range": "Marktwertspanne",
+    "resale_potential": "Wiederverkaufspotenzial",
+    "price_assessment": "Preisbewertung",
+    "disclaimer": "Die KI-Analyse ist probabilistisch. Vor dem Kauf immer persönlich überprüfen."
+  },
+  "collection": {
+    "title": "Ihr Jagdprotokoll",
+    "search_placeholder": "Ihre Funde durchsuchen...",
+    "empty": "Noch keine Funde. Fangen Sie an zu jagen!",
+    "delete_confirm": "Sind Sie sicher, dass Sie diesen Fund löschen möchten?"
+  },
+  "describe": {
+    "title": "Beschreiben Sie Ihren Fund",
+    "placeholder": "z.B. Ein Mahagoni-Sekretär mit Schwalbenschwanzverbindungen und originalen Messinggriffen...",
+    "asking_price": "Angebotspreis (optional)",
+    "seller_type": "Verkäufertyp",
+    "seller_dealer": "Händler",
+    "seller_private": "Privatverkäufer",
+    "seller_auction": "Auktion",
+    "analyze_button": "Gegenstand analysieren",
+    "images": "Hochgeladene Bilder",
+    "add_more": "Mehr hinzufügen",
+    "suggested_shots": "Vorgeschlagene Aufnahmen",
+    "shot_overall": "Gesamtansicht",
+    "shot_mark": "Herstellermarken / Stempel",
+    "shot_back": "Rückseite / Unterseite",
+    "shot_detail": "Verbindungen / Konstruktion"
+  },
+  "upload_choice": {
+    "title": "Bereit zur Analyse?",
+    "desc": "Möchten Sie weitere Details für eine bessere Bewertung hinzufügen oder direkt zur Expertenanalyse übergehen?",
+    "analyze_now": "Jetzt analysieren",
+    "add_details": "Weitere Details hinzufügen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "profile": "Profil",
+    "sign_out": "Abmelden",
+    "about": "Über Antique Hunter"
+  }
+}

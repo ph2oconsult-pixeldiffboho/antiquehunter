@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "Find": {
+      "title": "Find",
+      "description": "A saved antique item with analysis and buy decision.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "askingPrice": { "type": "number" },
+        "currency": { "type": "string" },
+        "sellerType": { "type": "string" },
+        "analysis": {
+          "type": "object",
+          "properties": {
+            "identification": { "type": "string" },
+            "origin": { "type": "string" },
+            "period": { "type": "string" },
+            "style": { "type": "string" },
+            "confidence": { "type": "number" },
+            "explanation": { "type": "string" },
+            "checklist": { "type": "array", "items": { "type": "string" } },
+            "redFlags": { "type": "array", "items": { "type": "string" } },
+            "buyScore": { "type": "number" },
+            "buyLabel": { "type": "string" },
+            "valueRange": { "type": "string" },
+            "resalePotential": { "type": "string" }
+          }
+        },
+        "status": { "type": "string", "enum": ["watching", "bought", "passed", "sold"] },
+        "location": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "analysis", "status", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/finds/{findId}": {
+      "schema": "Find",
+      "description": "Collection of saved antique finds."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles."
+    }
+  }
+}

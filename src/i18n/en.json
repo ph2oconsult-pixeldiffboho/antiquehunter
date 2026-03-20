@@ -1,0 +1,85 @@
+{
+  "common": {
+    "scan": "Scan Item",
+    "upload": "Upload Photo",
+    "describe": "Describe",
+    "history": "History",
+    "settings": "Settings",
+    "back": "Back",
+    "save": "Save to Log",
+    "saved": "Saved",
+    "analyzing": "Analyzing...",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "view_all": "View All",
+    "items": "Items"
+  },
+  "home": {
+    "hero_badge": "Your Smart Field Companion",
+    "hero_title": "Hunt with Confidence",
+    "hero_desc": "Real-time decision support for antique hunters. Identify, inspect, and value finds in seconds.",
+    "scan_subtitle": "Use Camera",
+    "upload_subtitle": "From Gallery",
+    "describe_subtitle": "Text Analysis",
+    "history_subtitle": "Your Hunting Log",
+    "quick_tips": "Quick Tips",
+    "tip_joints_title": "Checking Joints",
+    "tip_joints_desc": "Look for dovetails. Machine-cut vs hand-cut tells the era.",
+    "tip_glass_title": "Glass Wear",
+    "tip_glass_desc": "Authentic wear patterns should be on the base, not the sides."
+  },
+  "analysis": {
+    "title": "Analysis Results",
+    "identification": "Identification",
+    "origin": "Origin",
+    "period": "Period",
+    "style": "Style",
+    "confidence": "Confidence",
+    "explanation": "Expert Assessment",
+    "checklist": "Inspection Checklist",
+    "red_flags": "Red Flags & Warnings",
+    "market_insight": "Market Insight",
+    "price_guidance": "Price Guidance",
+    "buy_score": "Buy Score",
+    "value_range": "Market Value Range",
+    "resale_potential": "Resale Potential",
+    "price_assessment": "Price Assessment",
+    "disclaimer": "AI analysis is probabilistic. Always verify in person before purchasing."
+  },
+  "collection": {
+    "title": "Your Hunting Log",
+    "search_placeholder": "Search your finds...",
+    "empty": "No finds yet. Start hunting!",
+    "delete_confirm": "Are you sure you want to delete this find?"
+  },
+  "describe": {
+    "title": "Describe Your Find",
+    "placeholder": "e.g., A mahogany bureau with dovetail joints and original brass handles...",
+    "asking_price": "Asking Price (Optional)",
+    "seller_type": "Seller Type",
+    "seller_dealer": "Dealer",
+    "seller_private": "Private Seller",
+    "seller_auction": "Auction",
+    "analyze_button": "Analyze Item",
+    "images": "Uploaded Images",
+    "add_more": "Add More",
+    "suggested_shots": "Suggested Shots",
+    "shot_overall": "Overall View",
+    "shot_mark": "Maker's Marks / Stamps",
+    "shot_back": "Back / Underside",
+    "shot_detail": "Joints / Construction"
+  },
+  "upload_choice": {
+    "title": "Ready to Analyze?",
+    "desc": "Would you like to add more details for a better appraisal, or go straight to the expert analysis?",
+    "analyze_now": "Analyze Now",
+    "add_details": "Add More Details"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "profile": "Profile",
+    "sign_out": "Sign Out",
+    "about": "About Antique Hunter"
+  }
+}

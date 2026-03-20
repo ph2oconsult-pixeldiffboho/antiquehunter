@@ -1,0 +1,85 @@
+{
+  "common": {
+    "scan": "Scanner l'objet",
+    "upload": "Télécharger une photo",
+    "describe": "Décrire",
+    "history": "Historique",
+    "settings": "Paramètres",
+    "back": "Retour",
+    "save": "Enregistrer dans le journal",
+    "saved": "Enregistré",
+    "analyzing": "Analyse en cours...",
+    "loading": "Chargement...",
+    "error": "Une erreur s'est produite",
+    "view_all": "Voir tout",
+    "items": "Articles"
+  },
+  "home": {
+    "hero_badge": "Votre compagnon de terrain intelligent",
+    "hero_title": "Chassez en toute confiance",
+    "hero_desc": "Soutien à la décision en temps réel pour les chasseurs d'antiquités. Identifiez, inspectez et évaluez les trouvailles en quelques secondes.",
+    "scan_subtitle": "Utiliser l'appareil photo",
+    "upload_subtitle": "Depuis la galerie",
+    "describe_subtitle": "Analyse de texte",
+    "history_subtitle": "Votre journal de chasse",
+    "quick_tips": "Conseils rapides",
+    "tip_joints_title": "Vérification des joints",
+    "tip_joints_desc": "Cherchez les queues d'aronde. La coupe à la machine par rapport à la coupe à la main indique l'époque.",
+    "tip_glass_title": "Usure du verre",
+    "tip_glass_desc": "Les motifs d'usure authentiques doivent être sur la base, pas sur les côtés."
+  },
+  "analysis": {
+    "title": "Résultats de l'analyse",
+    "identification": "Identification",
+    "origin": "Origine",
+    "period": "Période",
+    "style": "Style",
+    "confidence": "Confiance",
+    "explanation": "Évaluation de l'expert",
+    "checklist": "Liste de contrôle d'inspection",
+    "red_flags": "Drapeaux rouges et avertissements",
+    "market_insight": "Aperçu du marché",
+    "price_guidance": "Conseils sur les prix",
+    "buy_score": "Score d'achat",
+    "value_range": "Gamme de valeur marchande",
+    "resale_potential": "Potentiel de revente",
+    "price_assessment": "Évaluation du prix",
+    "disclaimer": "L'analyse par IA est probabiliste. Vérifiez toujours en personne avant d'acheter."
+  },
+  "collection": {
+    "title": "Votre journal de chasse",
+    "search_placeholder": "Rechercher vos trouvailles...",
+    "empty": "Pas encore de trouvailles. Commencez à chasser !",
+    "delete_confirm": "Êtes-vous sûr de vouloir supprimer cette trouvaille ?"
+  },
+  "describe": {
+    "title": "Décrivez votre trouvaille",
+    "placeholder": "ex: Un bureau en acajou avec des joints en queue d'aronde et des poignées en laiton d'origine...",
+    "asking_price": "Prix demandé (facultatif)",
+    "seller_type": "Type de vendeur",
+    "seller_dealer": "Antiquaire",
+    "seller_private": "Vendeur privé",
+    "seller_auction": "Enchères",
+    "analyze_button": "Analyser l'objet",
+    "images": "Images téléchargées",
+    "add_more": "Ajouter plus",
+    "suggested_shots": "Photos suggérées",
+    "shot_overall": "Vue d'ensemble",
+    "shot_mark": "Marques du fabricant / Timbres",
+    "shot_back": "Dos / Dessous",
+    "shot_detail": "Joints / Construction"
+  },
+  "upload_choice": {
+    "title": "Prêt pour l'analyse ?",
+    "desc": "Souhaitez-vous ajouter plus de détails pour une meilleure évaluation, ou passer directement à l'analyse d'expert ?",
+    "analyze_now": "Analyser maintenant",
+    "add_details": "Ajouter plus de détails"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "profile": "Profil",
+    "sign_out": "Se déconnecter",
+    "about": "À propos d'Antique Hunter"
+  }
+}
