@@ -72,7 +72,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       <div className="space-y-1">
         <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{title}</h3>
         <p className="text-sm font-medium text-zinc-900 leading-tight">{description}</p>
-        <p className="text-[10px] text-zinc-500 pt-1">Available in <span className="text-amber-600 font-bold">{requiredPlan}</span></p>
+        <p className="text-[10px] text-amber-600 font-bold pt-1 uppercase tracking-tighter">Unlock {title}</p>
       </div>
     </div>
   );
@@ -180,38 +180,45 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 3. Teaser Insight for Free Users */}
       {isFree && (
-        <div className="space-y-4">
-          {currentItem.teaser_insight && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="px-6 py-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3"
-            >
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-sm font-medium text-amber-900 leading-relaxed">
-                {currentItem.teaser_insight}
-              </p>
-            </motion.div>
-          )}
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 px-1">{t('analysis.preliminary_findings')}</h3>
+            
+            {currentItem.teaser_insight && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="px-6 py-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3"
+              >
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-[9px] uppercase tracking-widest font-bold text-amber-600">Dealer's Warning</p>
+                  <p className="text-sm font-medium text-amber-900 leading-relaxed">
+                    {currentItem.teaser_insight}
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
-          {/* Trust Builders: One Check & One Red Flag */}
-          <div className="grid grid-cols-1 gap-4">
-            {currentItem.top_checks?.[0] && (
-              <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
-                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                <p className="text-xs font-medium text-zinc-600">
-                  <span className="text-zinc-400 mr-1">Inspection:</span> {currentItem.top_checks[0]}
-                </p>
-              </div>
-            )}
-            {currentItem.red_flags?.[0] && (
-              <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
-                <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0" />
-                <p className="text-xs font-medium text-zinc-600">
-                  <span className="text-zinc-400 mr-1">Flag:</span> {currentItem.red_flags[0].issue}
-                </p>
-              </div>
-            )}
+            {/* Trust Builders: One Check & One Red Flag */}
+            <div className="grid grid-cols-1 gap-3">
+              {currentItem.top_checks?.[0] && (
+                <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <p className="text-xs font-medium text-zinc-600">
+                    <span className="text-zinc-400 mr-1">Inspection:</span> {currentItem.top_checks[0]}
+                  </p>
+                </div>
+              )}
+              {currentItem.red_flags?.[0] && (
+                <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
+                  <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0" />
+                  <p className="text-xs font-medium text-zinc-600">
+                    <span className="text-zinc-400 mr-1">Flag:</span> {currentItem.red_flags[0].issue}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
