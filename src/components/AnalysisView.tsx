@@ -9,11 +9,12 @@ interface AnalysisViewProps {
   images?: string[];
   onSave?: (status: string) => void;
   onBack: () => void;
+  onUpgrade?: (plan: 'pro') => void;
   isSaved?: boolean;
   plan?: 'free' | 'pro' | 'dealer';
 }
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, isSaved, plan = 'free' }) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free' }) => {
   const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = React.useState(0);
 
@@ -24,6 +25,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   const isPro = plan === 'pro' || plan === 'dealer';
   const isDealer = plan === 'dealer';
+  const isFree = plan === 'free';
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-emerald-400';
@@ -32,14 +34,47 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     return 'text-rose-400';
   };
 
+  const PaywallCard = () => (
+    <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-6 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 blur-[100px] rounded-full -mr-32 -mt-32" />
+      
+      <div className="relative z-10 space-y-4 text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 rounded-full border border-amber-500/30">
+          <ShieldAlert className="w-3 h-3 text-amber-500" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">{t('paywall.urgency')}</span>
+        </div>
+        
+        <div className="space-y-2">
+          <h2 className="serif text-3xl font-light leading-tight">
+            {t('paywall.title')}
+          </h2>
+          <p className="text-zinc-400 text-sm">
+            {t('paywall.description')}
+          </p>
+        </div>
+
+        <button 
+          onClick={() => onUpgrade?.('pro')}
+          className="w-full py-4 bg-amber-500 text-zinc-900 rounded-full font-bold hover:bg-amber-400 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-500/20"
+        >
+          {t('paywall.cta')}
+        </button>
+        
+        <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+          {t('paywall.subtitle')}
+        </p>
+      </div>
+    </section>
+  );
+
   const UpgradePlaceholder = ({ title, icon: Icon, requiredPlan }: { title: string, icon: any, requiredPlan: string }) => (
-    <div className="p-6 bg-zinc-50 border border-zinc-100 border-dashed rounded-[32px] flex flex-col items-center justify-center gap-3 text-center">
+    <div className="p-6 bg-zinc-50 border border-zinc-100 border-dashed rounded-[32px] flex flex-col items-center justify-center gap-3 text-center opacity-60">
       <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
         <Icon className="w-5 h-5 text-zinc-300" />
       </div>
       <div className="space-y-1">
         <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{title}</h3>
-        <p className="text-xs text-zinc-500">Upgrade to <span className="text-amber-600 font-bold">{requiredPlan}</span> to unlock</p>
+        <p className="text-[10px] text-zinc-500">Available in <span className="text-amber-600 font-bold">{requiredPlan}</span></p>
       </div>
     </div>
   );
@@ -146,74 +181,88 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       </section>
 
       {/* 3. Buy Score Card - Visually Dominant */}
-      <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full -mr-24 -mt-24" />
-        
-        <div className="flex items-center justify-between relative z-10">
-          <div className="space-y-1">
-            <p className="text-[10px] text-zinc-400 uppercase tracking-[0.2em] font-bold">{t('analysis.buy_score')}</p>
-            <h2 className={`serif text-4xl font-light ${getScoreColor(currentItem.buy_decision.score)}`}>{currentItem.buy_decision.label}</h2>
-            <div className="flex items-center gap-2 pt-1">
-              <div className={`w-1.5 h-1.5 rounded-full ${currentItem.buy_decision.confidence === 'high' ? 'bg-emerald-500' : currentItem.buy_decision.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
-              <span className="text-[9px] uppercase tracking-widest font-bold text-zinc-500">{currentItem.buy_decision.confidence} Confidence</span>
+      {isFree ? (
+        <PaywallCard />
+      ) : (
+        <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full -mr-24 -mt-24" />
+          
+          <div className="flex items-center justify-between relative z-10">
+            <div className="space-y-1">
+              <p className="text-[10px] text-zinc-400 uppercase tracking-[0.2em] font-bold">{t('analysis.buy_score')}</p>
+              <h2 className={`serif text-4xl font-light ${getScoreColor(currentItem.buy_decision.score)}`}>{currentItem.buy_decision.label}</h2>
+              <div className="flex items-center gap-2 pt-1">
+                <div className={`w-1.5 h-1.5 rounded-full ${currentItem.buy_decision.confidence === 'high' ? 'bg-emerald-500' : currentItem.buy_decision.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                <span className="text-[9px] uppercase tracking-widest font-bold text-zinc-500">{currentItem.buy_decision.confidence} Confidence</span>
+              </div>
+            </div>
+            <BuyScoreGauge 
+              score={currentItem.buy_decision.score} 
+              confidence={currentItem.buy_decision.confidence}
+            />
+          </div>
+
+          <div className="space-y-4 relative z-10">
+            <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-amber-500 mb-1">Dealer Action Line</p>
+              <p className="text-lg font-medium">Do not pay above {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}</p>
+            </div>
+            <div className="space-y-3">
+              {currentItem.buy_decision.decision_summary.slice(0, 3).map((point: string, i: number) => (
+                <div key={i} className="flex gap-3 items-start">
+                  <div className="w-1 h-1 rounded-full bg-amber-500/50 mt-2 shrink-0" />
+                  <p className="text-sm text-zinc-300 leading-relaxed italic">
+                    {point}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
-          <BuyScoreGauge 
-            score={currentItem.buy_decision.score} 
-            confidence={currentItem.buy_decision.confidence}
-          />
-        </div>
-
-        <div className="space-y-3 relative z-10">
-          {currentItem.buy_decision.decision_summary.slice(0, 3).map((point: string, i: number) => (
-            <div key={i} className="flex gap-3 items-start">
-              <div className="w-1 h-1 rounded-full bg-amber-500/50 mt-2 shrink-0" />
-              <p className="text-sm text-zinc-300 leading-relaxed italic">
-                {point}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 4. Price Guidance Card */}
-      <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-6">
-        <div className="flex items-center gap-2 text-zinc-400">
-          <Info className="w-4 h-4" />
-          <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.price_guidance')}</h3>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-1">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Market Range</p>
-            <p className="text-xl font-medium text-zinc-900">
-              {currentItem.price_guidance.currency}{currentItem.price_guidance.estimated_market_range_low} - {currentItem.price_guidance.estimated_market_range_high}
-            </p>
+      {isFree ? (
+        <UpgradePlaceholder title={t('analysis.price_guidance')} icon={Info} requiredPlan="Pro" />
+      ) : (
+        <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-6">
+          <div className="flex items-center gap-2 text-zinc-400">
+            <Info className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.price_guidance')}</h3>
           </div>
-          <div className="space-y-1">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-emerald-500/70">Good Buy Below</p>
-            <p className="text-xl font-medium text-emerald-600">
-              {currentItem.price_guidance.currency}{currentItem.price_guidance.good_buy_below}
-            </p>
+          
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Market Range</p>
+              <p className="text-xl font-medium text-zinc-900">
+                {currentItem.price_guidance.currency}{currentItem.price_guidance.estimated_market_range_low} - {currentItem.price_guidance.estimated_market_range_high}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-emerald-500/70">Good Buy Below</p>
+              <p className="text-xl font-medium text-emerald-600">
+                {currentItem.price_guidance.currency}{currentItem.price_guidance.good_buy_below}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Fair Price Range</p>
+              <p className="text-lg font-medium text-zinc-700">
+                {currentItem.price_guidance.currency}{currentItem.price_guidance.fair_price_low} - {currentItem.price_guidance.fair_price_high}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-rose-500/70">Overpaying Above</p>
+              <p className="text-lg font-medium text-rose-600">
+                {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}
+              </p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Fair Price Range</p>
-            <p className="text-lg font-medium text-zinc-700">
-              {currentItem.price_guidance.currency}{currentItem.price_guidance.fair_price_low} - {currentItem.price_guidance.fair_price_high}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-rose-500/70">Overpaying Above</p>
-            <p className="text-lg font-medium text-rose-600">
-              {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}
-            </p>
-          </div>
-        </div>
 
-        <p className="text-xs text-zinc-500 leading-relaxed border-t border-zinc-50 pt-4 italic">
-          {currentItem.price_guidance.pricing_reasoning}
-        </p>
-      </section>
+          <p className="text-xs text-zinc-500 leading-relaxed border-t border-zinc-50 pt-4 italic">
+            {currentItem.price_guidance.pricing_reasoning}
+          </p>
+        </section>
+      )}
 
       {/* 5. Dealer Take Card */}
       {isDealer ? (
@@ -278,31 +327,35 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 7. Walk Away Card */}
-      <section className="p-6 bg-rose-50/50 border border-rose-100 rounded-[32px] space-y-4">
-        <div className="flex items-center gap-2 text-rose-600">
-          <OctagonX className="w-4 h-4" />
-          <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.when_to_walk_away')}</h3>
-        </div>
-        <div className="space-y-3">
-          <p className="text-sm font-bold text-rose-900">Walk away if price exceeds {currentItem.price_guidance.currency}{currentItem.negotiation_strategy.walk_away_price}</p>
-          <div className="space-y-2">
-            {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
-              <p key={i} className="text-sm text-rose-800 leading-relaxed flex gap-2">
-                <span className="text-rose-400 font-bold">!</span> {condition}
-              </p>
-            ))}
+      {isFree ? (
+        <UpgradePlaceholder title={t('analysis.when_to_walk_away')} icon={OctagonX} requiredPlan="Pro" />
+      ) : (
+        <section className="p-6 bg-rose-50/50 border border-rose-100 rounded-[32px] space-y-4">
+          <div className="flex items-center gap-2 text-rose-600">
+            <OctagonX className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.when_to_walk_away')}</h3>
           </div>
-        </div>
-      </section>
+          <div className="space-y-3">
+            <p className="text-sm font-bold text-rose-900">Walk away if price exceeds {currentItem.price_guidance.currency}{currentItem.negotiation_strategy.walk_away_price}</p>
+            <div className="space-y-2">
+              {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
+                <p key={i} className="text-sm text-rose-800 leading-relaxed flex gap-2">
+                  <span className="text-rose-400 font-bold">!</span> {condition}
+                </p>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 8. Top 3 Checks Card */}
       <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
         <div className="flex items-center gap-2 text-zinc-400">
           <CheckCircle className="w-4 h-4" />
-          <h3 className="text-[10px] uppercase tracking-widest font-bold">Top 3 Quick Checks</h3>
+          <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.checklist')}</h3>
         </div>
         <div className="space-y-3">
-          {currentItem.top_checks.slice(0, 3).map((check: string, i: number) => (
+          {currentItem.top_checks.slice(0, isFree ? 1 : 3).map((check: string, i: number) => (
             <div key={i} className="flex items-center gap-4 p-3 bg-zinc-50 rounded-2xl">
               <div className="w-6 h-6 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-[10px] font-bold text-zinc-400">
                 {i + 1}
@@ -310,6 +363,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <p className="text-sm font-medium text-zinc-700">{check}</p>
             </div>
           ))}
+          {isFree && (
+            <div className="p-3 border border-zinc-100 border-dashed rounded-2xl flex items-center justify-center">
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">2 more checks locked</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -321,7 +379,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.red_flags')}</h3>
           </div>
           <div className="space-y-3">
-            {currentItem.red_flags.map((flag: any, i: number) => (
+            {currentItem.red_flags.slice(0, isFree ? 1 : undefined).map((flag: any, i: number) => (
               <div key={i} className="p-4 bg-zinc-50 rounded-2xl space-y-2">
                 <div className="flex items-center justify-between">
                   <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest ${
@@ -336,6 +394,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <p className="text-xs text-zinc-500 leading-relaxed">{flag.reason}</p>
               </div>
             ))}
+            {isFree && currentItem.red_flags.length > 1 && (
+              <div className="p-4 border border-zinc-100 border-dashed rounded-2xl flex items-center justify-center">
+                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{currentItem.red_flags.length - 1} more flags locked</p>
+              </div>
+            )}
           </div>
         </section>
       )}
