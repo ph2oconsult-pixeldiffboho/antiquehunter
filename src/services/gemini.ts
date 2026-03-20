@@ -242,12 +242,13 @@ ${getGlossaryPrompt(language)}`;
                   },
                   required: ["identification_confidence", "authenticity_signals", "condition_and_restoration", "price_vs_market", "resale_liquidity", "rarity_desirability", "risk_penalty"]
                 },
-                disclaimer: { type: Type.STRING }
+                disclaimer: { type: Type.STRING },
+                teaser_insight: { type: Type.STRING, description: "A short, commercially sharp dealer warning or hint at risk/value impact for free users. e.g. 'There are signs this may not be a fully original set.'" }
               },
               required: [
                 "item_summary", "buy_decision", "price_guidance", "dealer_take",
                 "negotiation_strategy", "walk_away_if", "top_checks", "red_flags",
-                "market_insight", "scoring_inputs", "disclaimer"
+                "market_insight", "scoring_inputs", "disclaimer", "teaser_insight"
               ]
             }
           }
