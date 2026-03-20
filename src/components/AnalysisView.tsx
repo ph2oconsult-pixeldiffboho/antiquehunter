@@ -180,7 +180,21 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </section>
 
-      {/* 3. Buy Score Card - Visually Dominant */}
+      {/* 3. Teaser Insight for Free Users */}
+      {isFree && currentItem.teaser_insight && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="px-6 py-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3"
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-sm font-medium text-amber-900 leading-relaxed">
+            {currentItem.teaser_insight}
+          </p>
+        </motion.div>
+      )}
+
+      {/* 4. Buy Score Card - Visually Dominant */}
       {isFree ? (
         <PaywallCard />
       ) : (
