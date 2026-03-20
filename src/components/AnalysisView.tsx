@@ -88,7 +88,34 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </header>
 
-      {/* 2. Item Summary Card */}
+      {/* 2. Image Gallery */}
+      {images.length > 0 && (
+        <section className="relative group">
+          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
+            {images.map((img, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.1 }}
+                className="relative flex-shrink-0 w-full aspect-[4/3] rounded-[32px] overflow-hidden bg-zinc-100 snap-center border border-zinc-100"
+              >
+                <img 
+                  src={img} 
+                  alt={`Analysis ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute bottom-4 left-4 px-3 py-1 bg-black/50 backdrop-blur-md rounded-full text-[10px] text-white font-bold uppercase tracking-widest">
+                  {i + 1} / {images.length}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 3. Item Summary Card */}
       <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
         <h1 className="serif text-3xl font-light tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
         <div className="grid grid-cols-2 gap-y-3 gap-x-4">
