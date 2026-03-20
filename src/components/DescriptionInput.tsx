@@ -1,242 +1,540 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX } from 'lucide-react';
+import { BuyScoreGauge } from './BuyScoreGauge';
 import { useTranslation } from 'react-i18next';
-import { AntiqueCategory } from '../services/gemini';
 
-interface DescriptionInputProps {
+interface AnalysisViewProps {
+  result: any; // Can be a single object or an array of objects
+  images?: string[];
+  onSave?: (status: string) => void;
   onBack: () => void;
-  onAnalyze: (description: string, details: any) => void;
-  isAnalyzing: boolean;
-  images: string[];
-  isDetailedScan?: boolean;
-  onAddImage: () => void;
-  onRemoveImage: (index: number) => void;
+  onUpgrade?: (plan: 'pro') => void;
+  isSaved?: boolean;
+  plan?: 'free' | 'pro' | 'dealer';
 }
 
-export const DescriptionInput: React.FC<DescriptionInputProps> = ({ 
-  onBack, 
-  onAnalyze, 
-  isAnalyzing,
-  images,
-  isDetailedScan,
-  onAddImage,
-  onRemoveImage
-}) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free' }) => {
   const { t } = useTranslation();
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
-  const [currency, setCurrency] = useState('USD');
-  const [sellerType, setSellerType] = useState('Market/Fair');
-  const [category, setCategory] = useState<AntiqueCategory>('unknown');
-  const [location, setLocation] = useState('');
+  const [currentIndex, setCurrentIndex] = React.useState(0);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!description.trim()) return;
-    onAnalyze(description, { 
-      askingPrice: price ? parseFloat(price) : undefined, 
-      priceType,
-      currency, 
-      sellerType,
-      category,
-      location
-    });
+  const items = Array.isArray(result) ? result : [result];
+  const currentItem = items[currentIndex];
+
+  if (!currentItem) return null;
+
+  const isPro = plan === 'pro' || plan === 'dealer';
+  const isDealer = plan === 'dealer';
+  const isFree = plan === 'free';
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-400';
+    if (score >= 65) return 'text-amber-400';
+    if (score >= 50) return 'text-orange-400';
+    return 'text-rose-400';
   };
 
-  const categories: AntiqueCategory[] = [
-    'furniture', 
-    'chandelier_lighting', 
-    'painting_art', 
-    'sculpture_object', 
-    'rug_textile', 
-    'china_ceramic', 
-    'decorative_object', 
-    'unknown'
-  ];
-
-  return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
-      <button 
-        onClick={onBack}
-        className="flex items-center gap-2 text-zinc-500 hover:text-zinc-900 transition-colors mb-8"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm font-medium">{t('common.back')}</span>
-      </button>
-
-      <div className="mb-8">
-        <h1 className="serif text-3xl mb-2 tracking-tight">{t('describe.title')}</h1>
-        <p className="text-zinc-500 text-sm">{t('home.describe_subtitle')}</p>
-      </div>
-
-      <div className="mb-8 space-y-4">
-        <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('describe.images')}</label>
-        <div className="flex flex-wrap gap-3">
-          {images.map((img, index) => (
-            <div key={index} className="relative w-20 h-20 rounded-xl overflow-hidden group">
-              <img src={img} alt="" className="w-full h-full object-cover" />
-              <button 
-                onClick={() => onRemoveImage(index)}
-                className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-          <button 
-            onClick={onAddImage}
-            className="w-20 h-20 rounded-xl border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center gap-1 text-zinc-400 hover:border-amber-500 hover:text-amber-500 transition-all"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="text-[8px] font-bold uppercase tracking-tighter">{t('describe.add_more')}</span>
-          </button>
+  const PaywallCard = () => (
+    <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-8 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 blur-[100px] rounded-full -mr-32 -mt-32" />
+      
+      <div className="relative z-10 space-y-6 text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 rounded-full border border-amber-500/30">
+          <ShieldAlert className="w-3 h-3 text-amber-500" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">{t('paywall.urgency')}</span>
+        </div>
+        
+        <div className="space-y-3">
+          <h2 className="serif text-3xl font-light leading-tight">
+            {t('paywall.title')}
+          </h2>
+          <p className="text-zinc-400 text-sm font-light italic leading-relaxed">
+            {t('paywall.benefit_line')}
+          </p>
+          <p className="text-zinc-300 text-sm font-medium">
+            {t('paywall.subtitle')}
+          </p>
         </div>
 
-        {isDetailedScan && (
-          <div className="bg-amber-50/50 rounded-2xl p-4 border border-amber-100/50">
-            <div className="flex items-center gap-2 mb-3">
-              <Camera className="w-4 h-4 text-amber-600" />
-              <span className="text-xs font-bold text-amber-900 uppercase tracking-wider">{t('describe.suggested_shots')}</span>
+        <div className="space-y-1 py-2">
+          <p className="text-rose-400 text-lg font-bold leading-tight">
+            {t('paywall.tension_line_title')}
+          </p>
+          <p className="text-zinc-400 text-xs font-medium">
+            {t('paywall.tension_line_subtitle')}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <button 
+            onClick={() => onUpgrade?.('pro')}
+            className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-900 rounded-full font-bold hover:from-amber-400 hover:to-amber-500 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-amber-500/30 border border-amber-400/20 flex items-center justify-center gap-2 group"
+          >
+            <span>{t('paywall.cta')}</span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+          </button>
+          <p className="text-[10px] text-zinc-500 font-medium tracking-wide">
+            {t('paywall.cta_footer')}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+
+  const UpgradePlaceholder = ({ title, description, icon: Icon, requiredPlan }: { title: string, description: string, icon: any, requiredPlan: string }) => (
+    <div className="p-6 bg-zinc-50 border border-zinc-100 border-dashed rounded-[32px] flex flex-col items-center justify-center gap-3 text-center opacity-60">
+      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+        <Icon className="w-5 h-5 text-zinc-300" />
+      </div>
+      <div className="space-y-1">
+        <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{title}</h3>
+        <p className="text-sm font-medium text-zinc-900 leading-tight">{description}</p>
+        <p className="text-[10px] text-amber-600 font-bold pt-1 uppercase tracking-tighter">Unlock {title}</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-2xl mx-auto px-6 py-8 space-y-6 pb-32">
+      {/* 1. Header & Navigation */}
+      <header className="flex items-center justify-between">
+        <button 
+          onClick={onBack}
+          className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        
+        <div className="flex items-center gap-3">
+          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-bold uppercase tracking-widest rounded-full">{plan}</span>
+          {items.length > 1 ? (
+            <div className="flex items-center gap-4 bg-zinc-100 px-4 py-2 rounded-full">
+              <button 
+                onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
+                disabled={currentIndex === 0}
+                className="disabled:opacity-30"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                {currentIndex + 1} / {items.length}
+              </span>
+              <button 
+                onClick={() => setCurrentIndex(prev => Math.min(items.length - 1, prev + 1))}
+                disabled={currentIndex === items.length - 1}
+                className="disabled:opacity-30"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                t('describe.shot_overall'),
-                t('describe.shot_mark'),
-                t('describe.shot_back'),
-                t('describe.shot_detail')
-              ].map((shot, i) => (
-                <div key={i} className="flex items-center gap-2 text-[11px] text-amber-800/70">
-                  <div className="w-1 h-1 rounded-full bg-amber-400" />
-                  {shot}
+          ) : (
+            <div className="px-4 py-1.5 bg-zinc-100 rounded-full flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
+              <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">
+                {currentItem.item_summary.confidence} {t('analysis.confidence')}
+              </span>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* 2. Image Gallery */}
+      {images.length > 0 && (
+        <section className="relative group">
+          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
+            {images.map((img, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.1 }}
+                className="relative flex-shrink-0 w-full aspect-[4/3] rounded-[32px] overflow-hidden bg-zinc-100 snap-center border border-zinc-100"
+              >
+                <img 
+                  src={img} 
+                  alt={`Analysis ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute bottom-4 left-4 px-3 py-1 bg-black/50 backdrop-blur-md rounded-full text-[10px] text-white font-bold uppercase tracking-widest">
+                  {i + 1} / {images.length}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 3. Item Summary Card */}
+      <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
+        <h1 className="serif text-3xl font-light tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
+        <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Type</p>
+            <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.category}</p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Provenance</p>
+            <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.likely_origin}</p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Aesthetic</p>
+            <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.likely_style}</p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Era</p>
+            <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.likely_period}</p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Certainty</p>
+            <div className="flex items-center gap-1.5">
+              <div className={`w-1.5 h-1.5 rounded-full ${currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
+              <p className="text-sm font-medium text-zinc-900 capitalize">{currentItem.item_summary.confidence}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Teaser Insight for Free Users */}
+      {isFree && (
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 px-1">{t('analysis.preliminary_findings')}</h3>
+            
+            {currentItem.teaser_insight && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="px-6 py-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3"
+              >
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-[9px] uppercase tracking-widest font-bold text-amber-600">Dealer's Warning</p>
+                  <p className="text-sm font-medium text-amber-900 leading-relaxed">
+                    {currentItem.teaser_insight}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Trust Builders: One Check & One Red Flag */}
+            <div className="grid grid-cols-1 gap-3">
+              {currentItem.top_checks?.[0] && (
+                <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <p className="text-xs font-medium text-zinc-600">
+                    <span className="text-zinc-400 mr-1">Inspection:</span> {currentItem.top_checks[0]}
+                  </p>
+                </div>
+              )}
+              {currentItem.red_flags?.[0] && (
+                <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
+                  <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0" />
+                  <p className="text-xs font-medium text-zinc-600">
+                    <span className="text-zinc-400 mr-1">Flag:</span> {currentItem.red_flags[0].issue}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Buy Score Card - Visually Dominant */}
+      {isFree ? (
+        <PaywallCard />
+      ) : (
+        <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full -mr-24 -mt-24" />
+          
+          <div className="flex items-center justify-between relative z-10">
+            <div className="space-y-1">
+              <p className="text-[10px] text-zinc-400 uppercase tracking-[0.2em] font-bold">{t('analysis.buy_score')}</p>
+              <h2 className={`serif text-4xl font-light ${getScoreColor(currentItem.buy_decision.score)}`}>{currentItem.buy_decision.label}</h2>
+              <div className="flex items-center gap-2 pt-1">
+                <div className={`w-1.5 h-1.5 rounded-full ${currentItem.buy_decision.confidence === 'high' ? 'bg-emerald-500' : currentItem.buy_decision.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                <span className="text-[9px] uppercase tracking-widest font-bold text-zinc-500">{currentItem.buy_decision.confidence} Certainty</span>
+              </div>
+            </div>
+            <BuyScoreGauge 
+              score={currentItem.buy_decision.score} 
+              confidence={currentItem.buy_decision.confidence}
+            />
+          </div>
+
+          <div className="space-y-4 relative z-10">
+            <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-amber-500 mb-1">Hard Limit</p>
+              <p className="text-lg font-medium">Hard ceiling: {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}</p>
+            </div>
+            <div className="space-y-3">
+              {currentItem.buy_decision.decision_summary.slice(0, 3).map((point: string, i: number) => (
+                <div key={i} className="flex gap-3 items-start">
+                  <div className="w-1 h-1 rounded-full bg-amber-500/50 mt-2 shrink-0" />
+                  <p className="text-sm text-zinc-300 leading-relaxed italic">
+                    {point}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
-        )}
-      </div>
+        </section>
+      )}
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-2">
-              <Tag className="w-3 h-3" />
-              {t('describe.category')}
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as AntiqueCategory)}
-              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm appearance-none cursor-pointer"
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{t(`categories.${cat}`)}</option>
+      {/* 4. Price Guidance Card */}
+      {isFree ? (
+        <UpgradePlaceholder 
+          title={t('analysis.price_guidance')} 
+          description="See the real price vs what sellers ask"
+          icon={Info} 
+          requiredPlan="Pro" 
+        />
+      ) : (
+        <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-6">
+          <div className="flex items-center gap-2 text-zinc-400">
+            <Info className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.price_guidance')}</h3>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Market Reality</p>
+              <p className="text-xl font-medium text-zinc-900">
+                {currentItem.price_guidance.currency}{currentItem.price_guidance.estimated_market_range_low} - {currentItem.price_guidance.estimated_market_range_high}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-emerald-500/70">Safe Entry</p>
+              <p className="text-xl font-medium text-emerald-600">
+                {currentItem.price_guidance.currency}{currentItem.price_guidance.good_buy_below}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Retail Range</p>
+              <p className="text-lg font-medium text-zinc-700">
+                {currentItem.price_guidance.currency}{currentItem.price_guidance.fair_price_low} - {currentItem.price_guidance.fair_price_high}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-rose-500/70">Danger Zone</p>
+              <p className="text-lg font-medium text-rose-600">
+                {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-zinc-500 leading-relaxed border-t border-zinc-50 pt-4 italic">
+            {currentItem.price_guidance.pricing_reasoning}
+          </p>
+        </section>
+      )}
+
+      {/* 5. Dealer Take Card */}
+      {isDealer ? (
+        <section className="p-6 bg-zinc-50 rounded-[32px] space-y-4">
+          <div className="flex items-center gap-2 text-amber-600/70">
+            <Gavel className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.dealer_perspective')}</h3>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Dealer's Buy</p>
+              <p className="text-lg font-medium text-zinc-900">
+                {currentItem.price_guidance.currency}{currentItem.dealer_take.target_buy_price_low} - {currentItem.dealer_take.target_buy_price_high}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Exit Strategy</p>
+              <p className="text-sm text-zinc-600 leading-relaxed">{currentItem.dealer_take.resale_strategy}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Trade Assessment</p>
+              {currentItem.dealer_take.dealer_view.map((view: string, i: number) => (
+                <p key={i} className="text-sm text-zinc-600 leading-relaxed flex gap-2">
+                  <span className="text-amber-500">•</span> {view}
+                </p>
               ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-2">
-              <MapPin className="w-3 h-3" />
-              {t('describe.location')}
-            </label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder={t('describe.location_placeholder')}
-              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('common.describe')}</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t('describe.placeholder')}
-            className="w-full h-40 p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all resize-none text-sm leading-relaxed"
-            required
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('describe.asking_price')}</label>
-              <div className="flex bg-zinc-100 rounded-lg p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setPriceType('offered')}
-                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${priceType === 'offered' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}
-                >
-                  {t('describe.price_offered')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPriceType('paid')}
-                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${priceType === 'paid' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}
-                >
-                  {t('describe.price_paid')}
-                </button>
-              </div>
-            </div>
-            <div className="relative">
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0.00"
-                className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm"
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                <select 
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-zinc-400 focus:outline-none cursor-pointer"
-                >
-                  <option>USD</option>
-                  <option>GBP</option>
-                  <option>EUR</option>
-                  <option>JPY</option>
-                </select>
-              </div>
             </div>
           </div>
+        </section>
+      ) : (
+        <UpgradePlaceholder 
+          title={t('analysis.dealer_perspective')} 
+          description="How a dealer would actually position this piece"
+          icon={Gavel} 
+          requiredPlan="Dealer" 
+        />
+      )}
 
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('describe.seller_type')}</label>
-            <select
-              value={sellerType}
-              onChange={(e) => setSellerType(e.target.value)}
-              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm appearance-none cursor-pointer"
-            >
-              <option value="Market/Fair">{t('describe.seller_private')}</option>
-              <option value="Antique Shop">{t('describe.seller_dealer')}</option>
-              <option value="Auction">{t('describe.seller_auction')}</option>
-            </select>
+      {/* 6. Negotiation Strategy Card */}
+      {isPro ? (
+        <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
+          <div className="flex items-center gap-2 text-emerald-600/70">
+            <Handshake className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.negotiation_strategy')}</h3>
           </div>
-        </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 bg-emerald-50/50 rounded-2xl">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-emerald-600/70 mb-1">First Bid</p>
+              <p className="text-lg font-bold text-emerald-700">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.opening_offer}</p>
+            </div>
+            <div className="p-4 bg-zinc-50 rounded-2xl">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Closing Target</p>
+              <p className="text-lg font-bold text-zinc-700">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.target_price_low}-{currentItem.negotiation_strategy.target_price_high}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Leverage Points</p>
+            {currentItem.negotiation_strategy.points_to_raise.map((point: string, i: number) => (
+              <p key={i} className="text-sm text-zinc-600 leading-relaxed flex gap-2">
+                <span className="text-emerald-500">→</span> {point}
+              </p>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <UpgradePlaceholder 
+          title={t('analysis.negotiation_strategy')} 
+          description="Exact offer range and negotiation strategy"
+          icon={Handshake} 
+          requiredPlan="Pro" 
+        />
+      )}
 
-        <button
-          type="submit"
-          disabled={isAnalyzing || !description.trim()}
-          className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-900/10"
-        >
-          {isAnalyzing ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-              <span>{t('common.analyzing')}</span>
-            </>
-          ) : (
-            <>
-              <Send className="w-4 h-4" />
-              <span>{t('describe.analyze_button')}</span>
-            </>
-          )}
-        </button>
-      </form>
+      {/* 7. Walk Away Card */}
+      {isFree ? (
+        <UpgradePlaceholder 
+          title={t('analysis.when_to_walk_away')} 
+          description="Conditions that make this a bad buy"
+          icon={OctagonX} 
+          requiredPlan="Pro" 
+        />
+      ) : (
+        <section className="p-6 bg-rose-50/50 border border-rose-100 rounded-[32px] space-y-4">
+          <div className="flex items-center gap-2 text-rose-600">
+            <OctagonX className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.when_to_walk_away')}</h3>
+          </div>
+          <div className="space-y-3">
+            <p className="text-sm font-bold text-rose-900">Walk-away price: {currentItem.price_guidance.currency}{currentItem.negotiation_strategy.walk_away_price}</p>
+            <div className="space-y-2">
+              {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
+                <p key={i} className="text-sm text-rose-800 leading-relaxed flex gap-2">
+                  <span className="text-rose-400 font-bold">!</span> {condition}
+                </p>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 8. Top 3 Checks Card */}
+      {!isFree && (
+        <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
+          <div className="flex items-center gap-2 text-zinc-400">
+            <CheckCircle className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.checklist')}</h3>
+          </div>
+          <div className="space-y-3">
+            {currentItem.top_checks.slice(0, 3).map((check: string, i: number) => (
+              <div key={i} className="flex items-center gap-4 p-3 bg-zinc-50 rounded-2xl">
+                <div className="w-6 h-6 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-[10px] font-bold text-zinc-400">
+                  {i + 1}
+                </div>
+                <p className="text-sm font-medium text-zinc-700">{check}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 9. Red Flags Card */}
+      {!isFree && currentItem.red_flags.length > 0 && (
+        <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
+          <div className="flex items-center gap-2 text-rose-500">
+            <ShieldAlert className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.red_flags')}</h3>
+          </div>
+          <div className="space-y-3">
+            {currentItem.red_flags.map((flag: any, i: number) => (
+              <div key={i} className="p-4 bg-zinc-50 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest ${
+                    flag.severity === 'high' ? 'bg-rose-100 text-rose-600' :
+                    flag.severity === 'medium' ? 'bg-amber-100 text-amber-600' :
+                    'bg-zinc-200 text-zinc-600'
+                  }`}>
+                    {flag.severity}
+                  </span>
+                </div>
+                <p className="text-sm font-bold text-zinc-900">{flag.issue}</p>
+                <p className="text-xs text-zinc-500 leading-relaxed">{flag.reason}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 10. Market Insight Card */}
+      {isPro ? (
+        <section className="p-6 bg-zinc-50 rounded-[32px] space-y-4">
+          <div className="flex items-center gap-2 text-zinc-400">
+            <Info className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.market_insight')}</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Appetite</p>
+              <p className="text-sm font-medium text-zinc-900 capitalize">{currentItem.market_insight.demand}</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Liquidity</p>
+              <p className="text-sm font-medium text-zinc-900 capitalize">{currentItem.market_insight.resale_ease.replace('_', ' ')}</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">What Sells This</p>
+            <div className="flex flex-wrap gap-2">
+              {currentItem.market_insight.drivers_of_value.map((driver: string, i: number) => (
+                <span key={i} className="px-3 py-1 bg-white border border-zinc-100 rounded-full text-[10px] text-zinc-600">
+                  {driver}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <UpgradePlaceholder 
+          title={t('analysis.market_insight')} 
+          description="How strong demand is and what actually drives value"
+          icon={Info} 
+          requiredPlan="Pro" 
+        />
+      )}
+
+      {/* 11. Disclaimer */}
+      <p className="text-[10px] text-zinc-400 leading-relaxed text-center px-8 pt-4">
+        {currentItem.disclaimer}
+      </p>
+
+      {/* 12. Sticky Bottom Action Bar */}
+      {!isSaved && onSave && (
+        <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-zinc-100 flex gap-4 z-50">
+          <button
+            onClick={onBack}
+            className="flex-1 py-4 bg-zinc-100 text-zinc-900 rounded-full font-medium hover:bg-zinc-200 transition-colors"
+          >
+            {t('common.back')}
+          </button>
+          <button
+            onClick={() => onSave('watching')}
+            className="flex-1 py-4 bg-zinc-900 text-white rounded-full font-medium hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20"
+          >
+            <Save className="w-5 h-5" />
+            {t('common.save')}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
