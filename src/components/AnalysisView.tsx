@@ -51,16 +51,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <p className="text-zinc-300 text-sm font-medium">
             {t('paywall.subtitle')}
           </p>
-          <p className="text-zinc-500 text-xs italic">
-            {t('paywall.description')}
-          </p>
         </div>
 
         <button 
           onClick={() => onUpgrade?.('pro')}
-          className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-900 rounded-full font-bold hover:from-amber-400 hover:to-amber-500 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-amber-500/30 border border-amber-400/20"
+          className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-900 rounded-full font-bold hover:from-amber-400 hover:to-amber-500 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-amber-500/30 border border-amber-400/20 flex items-center justify-center gap-2 group"
         >
-          {t('paywall.cta')}
+          <span>{t('paywall.cta')}</span>
+          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
         </button>
       </div>
     </section>
@@ -181,22 +179,51 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       </section>
 
       {/* 3. Teaser Insight for Free Users */}
-      {isFree && currentItem.teaser_insight && (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="px-6 py-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3"
-        >
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-sm font-medium text-amber-900 leading-relaxed">
-            {currentItem.teaser_insight}
-          </p>
-        </motion.div>
+      {isFree && (
+        <div className="space-y-4">
+          {currentItem.teaser_insight && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="px-6 py-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3"
+            >
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-amber-900 leading-relaxed">
+                {currentItem.teaser_insight}
+              </p>
+            </motion.div>
+          )}
+
+          {/* Trust Builders: One Check & One Red Flag */}
+          <div className="grid grid-cols-1 gap-4">
+            {currentItem.top_checks?.[0] && (
+              <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
+                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                <p className="text-xs font-medium text-zinc-600">
+                  <span className="text-zinc-400 mr-1">Check:</span> {currentItem.top_checks[0]}
+                </p>
+              </div>
+            )}
+            {currentItem.red_flags?.[0] && (
+              <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
+                <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0" />
+                <p className="text-xs font-medium text-zinc-600">
+                  <span className="text-zinc-400 mr-1">Risk:</span> {currentItem.red_flags[0].issue}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* 4. Buy Score Card - Visually Dominant */}
       {isFree ? (
-        <PaywallCard />
+        <div className="space-y-4">
+          <PaywallCard />
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-zinc-400 text-center">
+            {t('paywall.tension_line')}
+          </p>
+        </div>
       ) : (
         <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full -mr-24 -mt-24" />
@@ -383,37 +410,34 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 8. Top 3 Checks Card */}
-      <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-zinc-400">
-          <CheckCircle className="w-4 h-4" />
-          <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.checklist')}</h3>
-        </div>
-        <div className="space-y-3">
-          {currentItem.top_checks.slice(0, isFree ? 1 : 3).map((check: string, i: number) => (
-            <div key={i} className="flex items-center gap-4 p-3 bg-zinc-50 rounded-2xl">
-              <div className="w-6 h-6 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-[10px] font-bold text-zinc-400">
-                {i + 1}
+      {!isFree && (
+        <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
+          <div className="flex items-center gap-2 text-zinc-400">
+            <CheckCircle className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.checklist')}</h3>
+          </div>
+          <div className="space-y-3">
+            {currentItem.top_checks.slice(0, 3).map((check: string, i: number) => (
+              <div key={i} className="flex items-center gap-4 p-3 bg-zinc-50 rounded-2xl">
+                <div className="w-6 h-6 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-[10px] font-bold text-zinc-400">
+                  {i + 1}
+                </div>
+                <p className="text-sm font-medium text-zinc-700">{check}</p>
               </div>
-              <p className="text-sm font-medium text-zinc-700">{check}</p>
-            </div>
-          ))}
-          {isFree && (
-            <div className="p-3 border border-zinc-100 border-dashed rounded-2xl flex items-center justify-center">
-              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">2 more checks locked</p>
-            </div>
-          )}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 9. Red Flags Card */}
-      {currentItem.red_flags.length > 0 && (
+      {!isFree && currentItem.red_flags.length > 0 && (
         <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
           <div className="flex items-center gap-2 text-rose-500">
             <ShieldAlert className="w-4 h-4" />
             <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.red_flags')}</h3>
           </div>
           <div className="space-y-3">
-            {currentItem.red_flags.slice(0, isFree ? 1 : undefined).map((flag: any, i: number) => (
+            {currentItem.red_flags.map((flag: any, i: number) => (
               <div key={i} className="p-4 bg-zinc-50 rounded-2xl space-y-2">
                 <div className="flex items-center justify-between">
                   <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest ${
@@ -428,11 +452,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <p className="text-xs text-zinc-500 leading-relaxed">{flag.reason}</p>
               </div>
             ))}
-            {isFree && currentItem.red_flags.length > 1 && (
-              <div className="p-4 border border-zinc-100 border-dashed rounded-2xl flex items-center justify-center">
-                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{currentItem.red_flags.length - 1} more flags locked</p>
-              </div>
-            )}
           </div>
         </section>
       )}
