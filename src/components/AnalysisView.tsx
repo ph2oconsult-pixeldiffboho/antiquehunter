@@ -35,20 +35,23 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   };
 
   const PaywallCard = () => (
-    <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-6 relative overflow-hidden">
+    <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-8 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 blur-[100px] rounded-full -mr-32 -mt-32" />
       
-      <div className="relative z-10 space-y-4 text-center">
+      <div className="relative z-10 space-y-6 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 rounded-full border border-amber-500/30">
           <ShieldAlert className="w-3 h-3 text-amber-500" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">{t('paywall.urgency')}</span>
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h2 className="serif text-3xl font-light leading-tight">
             {t('paywall.title')}
           </h2>
-          <p className="text-zinc-400 text-sm">
+          <p className="text-zinc-300 text-sm font-medium">
+            {t('paywall.subtitle')}
+          </p>
+          <p className="text-zinc-500 text-xs italic">
             {t('paywall.description')}
           </p>
         </div>
@@ -59,10 +62,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         >
           {t('paywall.cta')}
         </button>
-        
-        <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
-          {t('paywall.subtitle')}
-        </p>
       </div>
     </section>
   );
