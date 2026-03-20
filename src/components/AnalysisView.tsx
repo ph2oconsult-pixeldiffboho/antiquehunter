@@ -58,7 +58,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
         <button 
           onClick={() => onUpgrade?.('pro')}
-          className="w-full py-4 bg-amber-500 text-zinc-900 rounded-full font-bold hover:bg-amber-400 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-500/20"
+          className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-900 rounded-full font-bold hover:from-amber-400 hover:to-amber-500 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-amber-500/30 border border-amber-400/20"
         >
           {t('paywall.cta')}
         </button>
@@ -66,14 +66,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     </section>
   );
 
-  const UpgradePlaceholder = ({ title, icon: Icon, requiredPlan }: { title: string, icon: any, requiredPlan: string }) => (
+  const UpgradePlaceholder = ({ title, description, icon: Icon, requiredPlan }: { title: string, description: string, icon: any, requiredPlan: string }) => (
     <div className="p-6 bg-zinc-50 border border-zinc-100 border-dashed rounded-[32px] flex flex-col items-center justify-center gap-3 text-center opacity-60">
       <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
         <Icon className="w-5 h-5 text-zinc-300" />
       </div>
       <div className="space-y-1">
         <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{title}</h3>
-        <p className="text-[10px] text-zinc-500">Available in <span className="text-amber-600 font-bold">{requiredPlan}</span></p>
+        <p className="text-sm font-medium text-zinc-900 leading-tight">{description}</p>
+        <p className="text-[10px] text-zinc-500 pt-1">Available in <span className="text-amber-600 font-bold">{requiredPlan}</span></p>
       </div>
     </div>
   );
@@ -236,7 +237,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 4. Price Guidance Card */}
       {isFree ? (
-        <UpgradePlaceholder title={t('analysis.price_guidance')} icon={Info} requiredPlan="Pro" />
+        <UpgradePlaceholder 
+          title={t('analysis.price_guidance')} 
+          description="See true market range and safe buying level"
+          icon={Info} 
+          requiredPlan="Pro" 
+        />
       ) : (
         <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-6">
           <div className="flex items-center gap-2 text-zinc-400">
@@ -306,7 +312,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
         </section>
       ) : (
-        <UpgradePlaceholder title={t('analysis.dealer_perspective')} icon={Gavel} requiredPlan="Dealer" />
+        <UpgradePlaceholder 
+          title={t('analysis.dealer_perspective')} 
+          description="What a dealer sees here: resale potential, positioning, and risks"
+          icon={Gavel} 
+          requiredPlan="Dealer" 
+        />
       )}
 
       {/* 6. Negotiation Strategy Card */}
@@ -336,12 +347,22 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
         </section>
       ) : (
-        <UpgradePlaceholder title={t('analysis.negotiation_strategy')} icon={Handshake} requiredPlan="Pro" />
+        <UpgradePlaceholder 
+          title={t('analysis.negotiation_strategy')} 
+          description="Exact offer range and how to approach the seller"
+          icon={Handshake} 
+          requiredPlan="Pro" 
+        />
       )}
 
       {/* 7. Walk Away Card */}
       {isFree ? (
-        <UpgradePlaceholder title={t('analysis.when_to_walk_away')} icon={OctagonX} requiredPlan="Pro" />
+        <UpgradePlaceholder 
+          title={t('analysis.when_to_walk_away')} 
+          description="Conditions that make this a bad buy"
+          icon={OctagonX} 
+          requiredPlan="Pro" 
+        />
       ) : (
         <section className="p-6 bg-rose-50/50 border border-rose-100 rounded-[32px] space-y-4">
           <div className="flex items-center gap-2 text-rose-600">
@@ -445,7 +466,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
         </section>
       ) : (
-        <UpgradePlaceholder title={t('analysis.market_insight')} icon={Info} requiredPlan="Pro" />
+        <UpgradePlaceholder 
+          title={t('analysis.market_insight')} 
+          description="How strong demand is and what actually drives value"
+          icon={Info} 
+          requiredPlan="Pro" 
+        />
       )}
 
       {/* 11. Disclaimer */}
