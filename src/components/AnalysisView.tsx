@@ -153,23 +153,23 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         <h1 className="serif text-3xl font-light tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
         <div className="grid grid-cols-2 gap-y-3 gap-x-4">
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Category</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Type</p>
             <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.category}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Origin</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Provenance</p>
             <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.likely_origin}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Style</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Aesthetic</p>
             <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.likely_style}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Period</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Era</p>
             <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.likely_period}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Confidence</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Certainty</p>
             <div className="flex items-center gap-1.5">
               <div className={`w-1.5 h-1.5 rounded-full ${currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
               <p className="text-sm font-medium text-zinc-900 capitalize">{currentItem.item_summary.confidence}</p>
@@ -200,7 +200,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
                 <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
                 <p className="text-xs font-medium text-zinc-600">
-                  <span className="text-zinc-400 mr-1">Check:</span> {currentItem.top_checks[0]}
+                  <span className="text-zinc-400 mr-1">Inspection:</span> {currentItem.top_checks[0]}
                 </p>
               </div>
             )}
@@ -208,7 +208,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <div className="p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3">
                 <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0" />
                 <p className="text-xs font-medium text-zinc-600">
-                  <span className="text-zinc-400 mr-1">Risk:</span> {currentItem.red_flags[0].issue}
+                  <span className="text-zinc-400 mr-1">Flag:</span> {currentItem.red_flags[0].issue}
                 </p>
               </div>
             )}
@@ -234,7 +234,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <h2 className={`serif text-4xl font-light ${getScoreColor(currentItem.buy_decision.score)}`}>{currentItem.buy_decision.label}</h2>
               <div className="flex items-center gap-2 pt-1">
                 <div className={`w-1.5 h-1.5 rounded-full ${currentItem.buy_decision.confidence === 'high' ? 'bg-emerald-500' : currentItem.buy_decision.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
-                <span className="text-[9px] uppercase tracking-widest font-bold text-zinc-500">{currentItem.buy_decision.confidence} Confidence</span>
+                <span className="text-[9px] uppercase tracking-widest font-bold text-zinc-500">{currentItem.buy_decision.confidence} Certainty</span>
               </div>
             </div>
             <BuyScoreGauge 
@@ -245,8 +245,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
           <div className="space-y-4 relative z-10">
             <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-amber-500 mb-1">Dealer Action Line</p>
-              <p className="text-lg font-medium">Do not pay above {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}</p>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-amber-500 mb-1">Hard Limit</p>
+              <p className="text-lg font-medium">Hard ceiling: {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}</p>
             </div>
             <div className="space-y-3">
               {currentItem.buy_decision.decision_summary.slice(0, 3).map((point: string, i: number) => (
@@ -279,25 +279,25 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Market Range</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Market Reality</p>
               <p className="text-xl font-medium text-zinc-900">
                 {currentItem.price_guidance.currency}{currentItem.price_guidance.estimated_market_range_low} - {currentItem.price_guidance.estimated_market_range_high}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-emerald-500/70">Good Buy Below</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-emerald-500/70">Safe Entry</p>
               <p className="text-xl font-medium text-emerald-600">
                 {currentItem.price_guidance.currency}{currentItem.price_guidance.good_buy_below}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Fair Price Range</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Retail Range</p>
               <p className="text-lg font-medium text-zinc-700">
                 {currentItem.price_guidance.currency}{currentItem.price_guidance.fair_price_low} - {currentItem.price_guidance.fair_price_high}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-rose-500/70">Overpaying Above</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-rose-500/70">Danger Zone</p>
               <p className="text-lg font-medium text-rose-600">
                 {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}
               </p>
@@ -319,17 +319,17 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
           <div className="space-y-4">
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Target Buy Range</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Dealer's Buy</p>
               <p className="text-lg font-medium text-zinc-900">
                 {currentItem.price_guidance.currency}{currentItem.dealer_take.target_buy_price_low} - {currentItem.dealer_take.target_buy_price_high}
               </p>
             </div>
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Resale Strategy</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Exit Strategy</p>
               <p className="text-sm text-zinc-600 leading-relaxed">{currentItem.dealer_take.resale_strategy}</p>
             </div>
             <div className="space-y-2">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Commercial View</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Trade Assessment</p>
               {currentItem.dealer_take.dealer_view.map((view: string, i: number) => (
                 <p key={i} className="text-sm text-zinc-600 leading-relaxed flex gap-2">
                   <span className="text-amber-500">•</span> {view}
@@ -356,16 +356,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-emerald-50/50 rounded-2xl">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-emerald-600/70 mb-1">Opening Offer</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-emerald-600/70 mb-1">First Bid</p>
               <p className="text-lg font-bold text-emerald-700">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.opening_offer}</p>
             </div>
             <div className="p-4 bg-zinc-50 rounded-2xl">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Target Range</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-1">Closing Target</p>
               <p className="text-lg font-bold text-zinc-700">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.target_price_low}-{currentItem.negotiation_strategy.target_price_high}</p>
             </div>
           </div>
           <div className="space-y-3">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Key Points to Raise</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Leverage Points</p>
             {currentItem.negotiation_strategy.points_to_raise.map((point: string, i: number) => (
               <p key={i} className="text-sm text-zinc-600 leading-relaxed flex gap-2">
                 <span className="text-emerald-500">→</span> {point}
@@ -397,7 +397,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.when_to_walk_away')}</h3>
           </div>
           <div className="space-y-3">
-            <p className="text-sm font-bold text-rose-900">Walk away if price exceeds {currentItem.price_guidance.currency}{currentItem.negotiation_strategy.walk_away_price}</p>
+            <p className="text-sm font-bold text-rose-900">Walk-away price: {currentItem.price_guidance.currency}{currentItem.negotiation_strategy.walk_away_price}</p>
             <div className="space-y-2">
               {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
                 <p key={i} className="text-sm text-rose-800 leading-relaxed flex gap-2">
@@ -465,16 +465,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Demand</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Appetite</p>
               <p className="text-sm font-medium text-zinc-900 capitalize">{currentItem.market_insight.demand}</p>
             </div>
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Resale Ease</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Liquidity</p>
               <p className="text-sm font-medium text-zinc-900 capitalize">{currentItem.market_insight.resale_ease.replace('_', ' ')}</p>
             </div>
           </div>
           <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Value Drivers</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">What Sells This</p>
             <div className="flex flex-wrap gap-2">
               {currentItem.market_insight.drivers_of_value.map((driver: string, i: number) => (
                 <span key={i} className="px-3 py-1 bg-white border border-zinc-100 rounded-full text-[10px] text-zinc-600">
