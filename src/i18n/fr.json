@@ -1,5 +1,6 @@
 {
   "common": {
+    "app_name": "Antique Hunter",
     "scan": "Scanner l'objet",
     "upload": "Télécharger une photo",
     "describe": "Décrire",
