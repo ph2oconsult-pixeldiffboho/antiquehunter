@@ -48,18 +48,35 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <h2 className="serif text-3xl font-light leading-tight">
             {t('paywall.title')}
           </h2>
+          <p className="text-zinc-400 text-sm font-light italic leading-relaxed">
+            {t('paywall.benefit_line')}
+          </p>
           <p className="text-zinc-300 text-sm font-medium">
             {t('paywall.subtitle')}
           </p>
         </div>
 
-        <button 
-          onClick={() => onUpgrade?.('pro')}
-          className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-900 rounded-full font-bold hover:from-amber-400 hover:to-amber-500 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-amber-500/30 border border-amber-400/20 flex items-center justify-center gap-2 group"
-        >
-          <span>{t('paywall.cta')}</span>
-          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-        </button>
+        <div className="space-y-1 py-2">
+          <p className="text-rose-400 text-lg font-bold leading-tight">
+            {t('paywall.tension_line_title')}
+          </p>
+          <p className="text-zinc-400 text-xs font-medium">
+            {t('paywall.tension_line_subtitle')}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <button 
+            onClick={() => onUpgrade?.('pro')}
+            className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 text-zinc-900 rounded-full font-bold hover:from-amber-400 hover:to-amber-500 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-amber-500/30 border border-amber-400/20 flex items-center justify-center gap-2 group"
+          >
+            <span>{t('paywall.cta')}</span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+          </button>
+          <p className="text-[10px] text-zinc-500 font-medium tracking-wide">
+            {t('paywall.cta_footer')}
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -225,12 +242,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 4. Buy Score Card - Visually Dominant */}
       {isFree ? (
-        <div className="space-y-4">
-          <PaywallCard />
-          <p className="text-xs font-bold uppercase tracking-[0.1em] text-zinc-400 text-center">
-            {t('paywall.tension_line')}
-          </p>
-        </div>
+        <PaywallCard />
       ) : (
         <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full -mr-24 -mt-24" />
@@ -273,7 +285,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       {isFree ? (
         <UpgradePlaceholder 
           title={t('analysis.price_guidance')} 
-          description="See true market range and safe buying level"
+          description="See the real price vs what sellers ask"
           icon={Info} 
           requiredPlan="Pro" 
         />
@@ -348,7 +360,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       ) : (
         <UpgradePlaceholder 
           title={t('analysis.dealer_perspective')} 
-          description="What a dealer sees here: resale potential, positioning, and risks"
+          description="How a dealer would actually position this piece"
           icon={Gavel} 
           requiredPlan="Dealer" 
         />
@@ -383,7 +395,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       ) : (
         <UpgradePlaceholder 
           title={t('analysis.negotiation_strategy')} 
-          description="Exact offer range and how to approach the seller"
+          description="Exact offer range and negotiation strategy"
           icon={Handshake} 
           requiredPlan="Pro" 
         />
