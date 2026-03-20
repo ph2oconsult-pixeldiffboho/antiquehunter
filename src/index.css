@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
-@import "tailwindcss";
 
-@theme {
+:root {
   --font-serif: "Cormorant Garamond", serif;
   --font-sans: "Inter", sans-serif;
   --color-paper: #f5f2ed;
@@ -10,6 +9,7 @@
 }
 
 body {
+  margin: 0;
   font-family: var(--font-sans);
   background-color: var(--color-paper);
   color: var(--color-ink);
@@ -38,3 +38,11 @@ body {
   border-right: 1px solid rgba(26, 26, 26, 0.1);
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
