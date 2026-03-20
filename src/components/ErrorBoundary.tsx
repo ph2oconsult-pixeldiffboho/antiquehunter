@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
       
       try {
         // Check if it's a Firestore error JSON
-        if (this.state.error?.message.startsWith('{')) {
+        if (this.state.error && this.state.error.message.startsWith('{')) {
           const errorData = JSON.parse(this.state.error.message);
           if (errorData.error.includes('insufficient permissions')) {
             errorMessage = 'You do not have permission to perform this action. Please sign in or check your account status.';
