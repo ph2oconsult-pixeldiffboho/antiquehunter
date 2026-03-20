@@ -44,6 +44,9 @@
     "value_range": "Marktwertspanne",
     "resale_potential": "Wiederverkaufspotenzial",
     "price_assessment": "Preisbewertung",
+    "dealer_perspective": "Händlerperspektive",
+    "negotiation_strategy": "Verhandlungsstrategie",
+    "when_to_walk_away": "Wann man gehen sollte",
     "disclaimer": "Die KI-Analyse ist probabilistisch. Vor dem Kauf immer persönlich überprüfen."
   },
   "collection": {
@@ -55,11 +58,16 @@
   "describe": {
     "title": "Beschreiben Sie Ihren Fund",
     "placeholder": "z.B. Ein Mahagoni-Sekretär mit Schwalbenschwanzverbindungen und originalen Messinggriffen...",
-    "asking_price": "Angebotspreis (optional)",
+    "asking_price": "Preis",
+    "price_offered": "Angeboten",
+    "price_paid": "Bezahlt",
     "seller_type": "Verkäufertyp",
     "seller_dealer": "Händler",
     "seller_private": "Privatverkäufer",
     "seller_auction": "Auktion",
+    "category": "Kategorie",
+    "location": "Standort",
+    "location_placeholder": "z.B. Pariser Flohmarkt, Londoner Geschäft",
     "analyze_button": "Gegenstand analysieren",
     "images": "Hochgeladene Bilder",
     "add_more": "Mehr hinzufügen",
@@ -69,11 +77,22 @@
     "shot_back": "Rückseite / Unterseite",
     "shot_detail": "Verbindungen / Konstruktion"
   },
+  "categories": {
+    "furniture": "Möbel",
+    "chandelier_lighting": "Kronleuchter & Beleuchtung",
+    "painting_art": "Gemälde & Kunst",
+    "sculpture_object": "Skulptur & Objekte",
+    "rug_textile": "Teppiche & Textilien",
+    "china_ceramic": "Porzellan & Keramik",
+    "decorative_object": "Dekorationsobjekte",
+    "unknown": "Unbekannt / Sonstiges"
+  },
   "upload_choice": {
     "title": "Bereit zur Analyse?",
     "desc": "Möchten Sie weitere Details für eine bessere Bewertung hinzufügen oder direkt zur Expertenanalyse übergehen?",
     "analyze_now": "Jetzt analysieren",
-    "add_details": "Weitere Details hinzufügen"
+    "add_details": "Weitere Details hinzufügen",
+    "default_prompt": "Analysieren Sie diese Antiquität anhand der bereitgestellten Bilder."
   },
   "settings": {
     "title": "Einstellungen",

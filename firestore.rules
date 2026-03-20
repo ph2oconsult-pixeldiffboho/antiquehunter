@@ -63,15 +63,25 @@ service cloud.firestore {
       return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role']) &&
              data.uid == request.auth.uid &&
              data.email is string && isValidEmail(data.email) &&
+             data.email.size() < 256 &&
+             (data.displayName == null || (data.displayName is string && data.displayName.size() < 128)) &&
              data.role in ['user', 'admin'];
     }
 
     function isValidFind(data) {
-      return data.userId == request.auth.uid &&
-             data.title is string &&
+      return hasOnlyAllowedFields(['userId', 'title', 'analysis', 'status', 'createdAt', 'location', 'notes', 'image', 'askingPrice', 'currency', 'sellerType', 'description']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 256 &&
              data.analysis is map &&
              data.status in ['watching', 'bought', 'passed', 'sold'] &&
-             data.createdAt is timestamp;
+             data.createdAt is timestamp &&
+             (data.location == null || (data.location is string && data.location.size() < 256)) &&
+             (data.notes == null || (data.notes is string && data.notes.size() < 2048)) &&
+             (data.image == null || (data.image is string && data.image.size() < 2048)) &&
+             (data.askingPrice == null || data.askingPrice is number) &&
+             (data.currency == null || (data.currency is string && data.currency.size() < 10)) &&
+             (data.sellerType == null || (data.sellerType is string && data.sellerType.size() < 64)) &&
+             (data.description == null || (data.description is string && data.description.size() < 2048));
     }
 
     // ===============================================================
@@ -87,7 +97,11 @@ service cloud.firestore {
     match /finds/{findId} {
       allow read: if isDocOwner() || isAdmin();
       allow create: if isAuthenticated() && isValidFind(request.resource.data);
-      allow update: if isAuthenticated() && isValidFind(request.resource.data) && isDocOwner();
+      allow update: if isAuthenticated() && 
+                      isDocOwner() && 
+                      isValidFind(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isDocOwner() || isAdmin();
     }
   }

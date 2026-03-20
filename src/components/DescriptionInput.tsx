@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Send, Info, Plus, X, Camera } from 'lucide-react';
+import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { AntiqueCategory } from '../services/gemini';
 
 interface DescriptionInputProps {
   onBack: () => void;
@@ -25,18 +26,35 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const { t } = useTranslation();
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
   const [currency, setCurrency] = useState('USD');
   const [sellerType, setSellerType] = useState('Market/Fair');
+  const [category, setCategory] = useState<AntiqueCategory>('unknown');
+  const [location, setLocation] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) return;
     onAnalyze(description, { 
       askingPrice: price ? parseFloat(price) : undefined, 
+      priceType,
       currency, 
-      sellerType 
+      sellerType,
+      category,
+      location
     });
   };
+
+  const categories: AntiqueCategory[] = [
+    'furniture', 
+    'chandelier_lighting', 
+    'painting_art', 
+    'sculpture_object', 
+    'rug_textile', 
+    'china_ceramic', 
+    'decorative_object', 
+    'unknown'
+  ];
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
@@ -100,6 +118,38 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-2">
+              <Tag className="w-3 h-3" />
+              {t('describe.category')}
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as AntiqueCategory)}
+              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm appearance-none cursor-pointer"
+            >
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{t(`categories.${cat}`)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-2">
+              <MapPin className="w-3 h-3" />
+              {t('describe.location')}
+            </label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder={t('describe.location_placeholder')}
+              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm"
+            />
+          </div>
+        </div>
+
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('common.describe')}</label>
           <textarea
@@ -111,9 +161,27 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('describe.asking_price')}</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('describe.asking_price')}</label>
+              <div className="flex bg-zinc-100 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setPriceType('offered')}
+                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${priceType === 'offered' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}
+                >
+                  {t('describe.price_offered')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPriceType('paid')}
+                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${priceType === 'paid' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}
+                >
+                  {t('describe.price_paid')}
+                </button>
+              </div>
+            </div>
             <div className="relative">
               <input
                 type="number"

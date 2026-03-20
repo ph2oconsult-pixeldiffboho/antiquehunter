@@ -44,6 +44,9 @@
     "value_range": "Market Value Range",
     "resale_potential": "Resale Potential",
     "price_assessment": "Price Assessment",
+    "dealer_perspective": "Dealer Perspective",
+    "negotiation_strategy": "Negotiation Strategy",
+    "when_to_walk_away": "When to Walk Away",
     "disclaimer": "AI analysis is probabilistic. Always verify in person before purchasing."
   },
   "collection": {
@@ -55,11 +58,16 @@
   "describe": {
     "title": "Describe Your Find",
     "placeholder": "e.g., A mahogany bureau with dovetail joints and original brass handles...",
-    "asking_price": "Asking Price (Optional)",
+    "asking_price": "Price",
+    "price_offered": "Offered",
+    "price_paid": "Paid",
     "seller_type": "Seller Type",
     "seller_dealer": "Dealer",
     "seller_private": "Private Seller",
     "seller_auction": "Auction",
+    "category": "Category",
+    "location": "Location",
+    "location_placeholder": "e.g. Paris Flea Market, London Shop",
     "analyze_button": "Analyze Item",
     "images": "Uploaded Images",
     "add_more": "Add More",
@@ -69,11 +77,22 @@
     "shot_back": "Back / Underside",
     "shot_detail": "Joints / Construction"
   },
+  "categories": {
+    "furniture": "Furniture",
+    "chandelier_lighting": "Chandeliers & Lighting",
+    "painting_art": "Paintings & Art",
+    "sculpture_object": "Sculpture & Objects",
+    "rug_textile": "Rugs & Textiles",
+    "china_ceramic": "China & Ceramics",
+    "decorative_object": "Decorative Objects",
+    "unknown": "Unknown / Other"
+  },
   "upload_choice": {
     "title": "Ready to Analyze?",
     "desc": "Would you like to add more details for a better appraisal, or go straight to the expert analysis?",
     "analyze_now": "Analyze Now",
-    "add_details": "Add More Details"
+    "add_details": "Add More Details",
+    "default_prompt": "Analyze this antique from the images provided."
   },
   "settings": {
     "title": "Settings",

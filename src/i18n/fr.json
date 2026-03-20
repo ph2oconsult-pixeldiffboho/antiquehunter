@@ -44,6 +44,9 @@
     "value_range": "Gamme de valeur marchande",
     "resale_potential": "Potentiel de revente",
     "price_assessment": "Évaluation du prix",
+    "dealer_perspective": "Perspective du concessionnaire",
+    "negotiation_strategy": "Stratégie de négociation",
+    "when_to_walk_away": "Quand s'en aller",
     "disclaimer": "L'analyse par IA est probabiliste. Vérifiez toujours en personne avant d'acheter."
   },
   "collection": {
@@ -55,11 +58,16 @@
   "describe": {
     "title": "Décrivez votre trouvaille",
     "placeholder": "ex: Un bureau en acajou avec des joints en queue d'aronde et des poignées en laiton d'origine...",
-    "asking_price": "Prix demandé (facultatif)",
+    "asking_price": "Prix",
+    "price_offered": "Offert",
+    "price_paid": "Payé",
     "seller_type": "Type de vendeur",
     "seller_dealer": "Antiquaire",
     "seller_private": "Vendeur privé",
     "seller_auction": "Enchères",
+    "category": "Catégorie",
+    "location": "Emplacement",
+    "location_placeholder": "ex: Marché aux puces de Paris, boutique de Londres",
     "analyze_button": "Analyser l'objet",
     "images": "Images téléchargées",
     "add_more": "Ajouter plus",
@@ -69,11 +77,22 @@
     "shot_back": "Dos / Dessous",
     "shot_detail": "Joints / Construction"
   },
+  "categories": {
+    "furniture": "Meubles",
+    "chandelier_lighting": "Lustres et éclairage",
+    "painting_art": "Peintures et art",
+    "sculpture_object": "Sculpture et objets",
+    "rug_textile": "Tapis et textiles",
+    "china_ceramic": "Chine et céramiques",
+    "decorative_object": "Objets décoratifs",
+    "unknown": "Inconnu / Autre"
+  },
   "upload_choice": {
     "title": "Prêt pour l'analyse ?",
     "desc": "Souhaitez-vous ajouter plus de détails pour une meilleure évaluation, ou passer directement à l'analyse d'expert ?",
     "analyze_now": "Analyser maintenant",
-    "add_details": "Ajouter plus de détails"
+    "add_details": "Ajouter plus de détails",
+    "default_prompt": "Analysez cet objet ancien à partir des images fournies."
   },
   "settings": {
     "title": "Paramètres",

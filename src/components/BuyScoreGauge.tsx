@@ -3,18 +3,19 @@ import { motion } from 'motion/react';
 
 interface BuyScoreGaugeProps {
   score: number;
+  confidence?: string;
 }
 
-export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score }) => {
+export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence }) => {
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
   const getColor = (s: number) => {
-    if (s >= 75) return '#10b981'; // emerald-500
-    if (s >= 50) return '#f59e0b'; // amber-500
-    if (s >= 25) return '#f97316'; // orange-500
-    return '#ef4444'; // rose-500
+    if (s >= 80) return '#10b981'; // emerald-500 (Strong Buy)
+    if (s >= 65) return '#f59e0b'; // amber-500 (Worth Investigating)
+    if (s >= 50) return '#f97316'; // orange-500 (Risky)
+    return '#ef4444'; // rose-500 (Pass)
   };
 
   return (
@@ -27,6 +28,7 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score }) => {
           stroke="currentColor"
           strokeWidth="8"
           fill="transparent"
+          strokeDasharray={circumference}
           className="text-white/10"
         />
         <motion.circle
@@ -45,7 +47,12 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score }) => {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-2xl font-bold">{score}</span>
-        <span className="text-[8px] uppercase tracking-widest font-bold text-white/40">Buy Score</span>
+        <div className="flex flex-col items-center -mt-1">
+          <span className="text-[7px] uppercase tracking-widest font-bold text-white/40">Buy Score</span>
+          {confidence && (
+            <span className="text-[6px] uppercase tracking-widest font-bold text-white/20">{confidence}</span>
+          )}
+        </div>
       </div>
     </div>
   );

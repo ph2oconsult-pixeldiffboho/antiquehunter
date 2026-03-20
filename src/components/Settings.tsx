@@ -5,9 +5,11 @@ import { auth } from '../firebase';
 
 interface SettingsProps {
   onBack: () => void;
+  plan: 'free' | 'pro' | 'dealer';
+  onUpgrade: (plan: 'free' | 'pro' | 'dealer') => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
+export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade }) => {
   const { t, i18n } = useTranslation();
 
   const changeLanguage = (lng: string) => {
@@ -19,6 +21,12 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     { code: 'fr', name: 'Français' },
     { code: 'es', name: 'Español' },
     { code: 'de', name: 'Deutsch' }
+  ];
+
+  const plans = [
+    { id: 'free', name: 'Free', desc: 'Basic analysis' },
+    { id: 'pro', name: 'Pro', desc: 'Advanced market insights' },
+    { id: 'dealer', name: 'Dealer', desc: 'Full commercial strategy' }
   ];
 
   return (
@@ -48,7 +56,10 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               </div>
               <div className="flex-1">
                 <p className="font-medium text-zinc-900">{auth.currentUser?.displayName || 'Antique Hunter'}</p>
-                <p className="text-xs text-zinc-500">{auth.currentUser?.email}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-zinc-500">{auth.currentUser?.email}</p>
+                  <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-bold uppercase tracking-widest rounded-full">{plan}</span>
+                </div>
               </div>
             </div>
             <button 
@@ -58,6 +69,37 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               <LogOut className="w-5 h-5" />
               <span className="font-medium">{t('settings.sign_out')}</span>
             </button>
+          </div>
+        </section>
+
+        {/* Plan Selection */}
+        <section className="space-y-4">
+          <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 px-2">Subscription Plan</h2>
+          <div className="bg-white border border-zinc-100 rounded-[32px] overflow-hidden">
+            {plans.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onUpgrade(p.id as any)}
+                className={`w-full p-6 flex items-center justify-between hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0 ${
+                  plan === p.id ? 'bg-zinc-50' : ''
+                }`}
+              >
+                <div className="flex flex-col items-start">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-medium ${plan === p.id ? 'text-zinc-900' : 'text-zinc-500'}`}>
+                      {p.name}
+                    </span>
+                    {plan === p.id && <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  </div>
+                  <span className="text-xs text-zinc-400">{p.desc}</span>
+                </div>
+                {plan === p.id ? (
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Active</span>
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-zinc-300" />
+                )}
+              </button>
+            ))}
           </div>
         </section>
 

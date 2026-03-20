@@ -20,6 +20,7 @@ type Screen = 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settin
 export default function App() {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
+  const [plan, setPlan] = useState<'free' | 'pro' | 'dealer'>('free');
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -46,13 +47,18 @@ export default function App() {
     }
   };
 
-  const handleAnalyze = async (input: string, details: any, isImage = false, additionalImages: string[] = []) => {
+  const handleAnalyze = async (input: string, details: any, inputIsImage = false, additionalImages: string[] = []) => {
     setIsAnalyzing(true);
     setLastDetails(details);
     
     let allImages = [...capturedImages];
-    if (isImage) {
+    if (inputIsImage) {
+      // If input is an image, it's the primary image, and we might have additional ones
       allImages = [input, ...additionalImages];
+      setCapturedImages(allImages);
+    } else if (additionalImages.length > 0) {
+      // If we have additional images but input is a prompt, use those
+      allImages = additionalImages;
       setCapturedImages(allImages);
     }
     
@@ -60,12 +66,15 @@ export default function App() {
     
     try {
       const result = await searchAntiques(
-        isImage ? "Analyze this antique from the images provided." : input,
+        inputIsImage ? "Analyze this antique from the images provided." : input,
         allImages.length > 0 ? allImages : undefined,
         details.askingPrice,
         details.currency,
         details.sellerType,
-        i18n.language
+        i18n.language,
+        details.priceType,
+        details.category,
+        details.location
       );
       
       if (result) {
@@ -114,17 +123,18 @@ export default function App() {
     const items = Array.isArray(analysisResult) ? analysisResult : [analysisResult];
     const mainTitle = items.length > 1 
       ? `${items.length} ${t('common.items', 'Items')} Detected` 
-      : items[0].identification;
+      : items[0].item_summary.title;
 
     const path = 'finds';
     try {
       await addDoc(collection(db, path), {
         userId: user.uid,
         title: mainTitle || 'Antique Find',
+        category: items[0].item_summary.category,
         images: capturedImages,
         analysis: analysisResult,
         status: status,
-        location: 'Current Location', // Placeholder
+        location: lastDetails?.location || 'Current Location',
         notes: '',
         createdAt: serverTimestamp()
       });
@@ -187,7 +197,7 @@ export default function App() {
             
             <div className="flex flex-col gap-4">
               <button
-                onClick={() => handleAnalyze("Analyze this antique from the images provided.", {}, isDetailedScan, capturedImages)}
+                onClick={() => handleAnalyze(t('upload_choice.default_prompt', "Analyze this antique from the images provided."), {}, false, capturedImages)}
                 className="w-full py-4 bg-zinc-900 text-white rounded-full font-medium hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20 flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-5 h-5" />
@@ -247,6 +257,7 @@ export default function App() {
                 images={capturedImages}
                 onSave={handleSaveFind}
                 onBack={() => setCurrentScreen('home')}
+                plan={plan}
               />
             )}
           </div>
@@ -264,7 +275,11 @@ export default function App() {
         );
       case 'settings':
         return (
-          <Settings onBack={() => setCurrentScreen('home')} />
+          <Settings 
+            onBack={() => setCurrentScreen('home')} 
+            plan={plan}
+            onUpgrade={setPlan}
+          />
         );
       default:
         return (

@@ -44,6 +44,9 @@
     "value_range": "Rango de valor de mercado",
     "resale_potential": "Potencial de reventa",
     "price_assessment": "Evaluación del precio",
+    "dealer_perspective": "Perspectiva del distribuidor",
+    "negotiation_strategy": "Estrategia de negociación",
+    "when_to_walk_away": "Cuándo alejarse",
     "disclaimer": "El análisis de IA es probabilístico. Siempre verifique en persona antes de comprar."
   },
   "collection": {
@@ -55,11 +58,16 @@
   "describe": {
     "title": "Describe tu hallazgo",
     "placeholder": "ej: Un buró de caoba con juntas de cola de milano y tiradores de latón originales...",
-    "asking_price": "Precio solicitado (opcional)",
+    "asking_price": "Precio",
+    "price_offered": "Ofrecido",
+    "price_paid": "Pagado",
     "seller_type": "Tipo de vendedor",
     "seller_dealer": "Anticuario",
     "seller_private": "Vendedor privado",
     "seller_auction": "Subasta",
+    "category": "Categoría",
+    "location": "Ubicación",
+    "location_placeholder": "ej: Rastro de Madrid, tienda de Londres",
     "analyze_button": "Analizar objeto",
     "images": "Imágenes subidas",
     "add_more": "Añadir más",
@@ -69,11 +77,22 @@
     "shot_back": "Parte trasera / Inferior",
     "shot_detail": "Juntas / Construcción"
   },
+  "categories": {
+    "furniture": "Muebles",
+    "chandelier_lighting": "Lámparas e iluminación",
+    "painting_art": "Pinturas y arte",
+    "sculpture_object": "Escultura y objetos",
+    "rug_textile": "Alfombras y textiles",
+    "china_ceramic": "Loza y cerámica",
+    "decorative_object": "Objetos decorativos",
+    "unknown": "Desconocido / Otro"
+  },
   "upload_choice": {
     "title": "¿Listo para analizar?",
     "desc": "¿Desea añadir más detalles para una mejor tasación o pasar directamente al análisis experto?",
     "analyze_now": "Analizar ahora",
-    "add_details": "Añadir más detalles"
+    "add_details": "Añadir más detalles",
+    "default_prompt": "Analiza esta antigüedad a partir de las imágenes proporcionadas."
   },
   "settings": {
     "title": "Ajustes",

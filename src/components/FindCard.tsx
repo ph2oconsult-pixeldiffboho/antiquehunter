@@ -6,13 +6,10 @@ interface FindCardProps {
   find: {
     id: string;
     title: string;
+    category?: string;
     image?: string;
     images?: string[];
-    analysis: {
-      buyScore: number;
-      buyLabel: string;
-      period: string;
-    };
+    analysis: any; // The full analysis object or array
     status: string;
     location?: string;
     createdAt: any;
@@ -24,6 +21,11 @@ interface FindCardProps {
 export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) => {
   const date = find.createdAt?.toDate ? find.createdAt.toDate().toLocaleDateString() : new Date(find.createdAt).toLocaleDateString();
   const displayImage = find.images?.[0] || find.image;
+  
+  const items = Array.isArray(find.analysis) ? find.analysis : [find.analysis];
+  const mainItem = items[0];
+  const score = mainItem.buy_decision.score;
+  const label = mainItem.buy_decision.label;
 
   return (
     <motion.div
@@ -46,17 +48,22 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
           {find.status}
         </div>
         <div className={`absolute bottom-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm text-white ${
-          find.analysis.buyScore >= 75 ? 'bg-emerald-500' : 
-          find.analysis.buyScore >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+          score >= 80 ? 'bg-emerald-500' : 
+          score >= 65 ? 'bg-amber-500' : 
+          score >= 50 ? 'bg-orange-500' : 'bg-rose-500'
         }`}>
-          Score: {find.analysis.buyScore}
+          Score: {score}
         </div>
       </div>
 
       <div className="p-6 space-y-4">
         <div className="space-y-1">
           <h3 className="serif text-xl font-light tracking-tight group-hover:text-zinc-600 transition-colors line-clamp-1">{find.title}</h3>
-          <p className="text-xs text-zinc-400 uppercase tracking-widest font-bold">{find.analysis.buyLabel}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">{find.category || mainItem.item_summary.category}</p>
+            <span className="w-1 h-1 rounded-full bg-zinc-200" />
+            <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">{label}</p>
+          </div>
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-zinc-50">
