@@ -15,7 +15,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       title: "Don’t overpay for antiques",
       subtext: "Get dealer-level insight before you buy",
       icon: <Sparkles className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=800"
     },
     {
       id: 'step2',
