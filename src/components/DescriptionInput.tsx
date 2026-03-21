@@ -107,22 +107,22 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
     <div className="max-w-2xl mx-auto px-6 py-8">
       <button 
         onClick={onBack}
-        className="flex items-center gap-2 text-zinc-500 hover:text-zinc-900 transition-colors mb-8"
+        className="flex items-center gap-2 text-muted hover:text-ink transition-colors mb-8"
       >
         <ArrowLeft className="w-4 h-4" />
         <span className="text-sm font-medium">{t('common.back')}</span>
       </button>
 
       <div className="mb-8">
-        <h1 className="serif text-3xl mb-2 tracking-tight">{t('describe.title')}</h1>
-        <p className="text-zinc-500 text-sm">{t('home.describe_subtitle')}</p>
+        <h1 className="serif text-3xl mb-2 tracking-tight text-ink">{t('describe.title')}</h1>
+        <p className="text-muted text-sm">{t('home.describe_subtitle')}</p>
       </div>
 
       <div className="mb-8 space-y-4">
-        <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('describe.images')}</label>
+        <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('describe.images')}</label>
         <div className="flex flex-wrap gap-3">
           {images.map((img, index) => (
-            <div key={index} className="relative w-20 h-20 rounded-xl overflow-hidden group">
+            <div key={index} className="relative w-20 h-20 rounded-xl overflow-hidden group border border-border-custom">
               <img src={img} alt="" className="w-full h-full object-cover" />
               <button 
                 onClick={() => onRemoveImage(index)}
@@ -134,7 +134,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
           ))}
           <button 
             onClick={onAddImage}
-            className="w-20 h-20 rounded-xl border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center gap-1 text-zinc-400 hover:border-amber-500 hover:text-amber-500 transition-all"
+            className="w-20 h-20 rounded-xl border-2 border-dashed border-border-custom flex flex-col items-center justify-center gap-1 text-muted hover:border-gold hover:text-gold transition-all"
           >
             <Plus className="w-5 h-5" />
             <span className="text-[8px] font-bold uppercase tracking-tighter">{t('describe.add_more')}</span>
@@ -142,10 +142,10 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
         </div>
 
         {isDetailedScan && (
-          <div className="bg-amber-50/50 rounded-2xl p-4 border border-amber-100/50">
+          <div className="bg-gold/5 rounded-2xl p-4 border border-gold/10">
             <div className="flex items-center gap-2 mb-3">
-              <Camera className="w-4 h-4 text-amber-600" />
-              <span className="text-xs font-bold text-amber-900 uppercase tracking-wider">{t('describe.suggested_shots')}</span>
+              <Camera className="w-4 h-4 text-gold" />
+              <span className="text-xs font-bold text-ink uppercase tracking-wider">{t('describe.suggested_shots')}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -154,8 +154,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                 t('describe.shot_back'),
                 t('describe.shot_detail')
               ].map((shot, i) => (
-                <div key={i} className="flex items-center gap-2 text-[11px] text-amber-800/70">
-                  <div className="w-1 h-1 rounded-full bg-amber-400" />
+                <div key={i} className="flex items-center gap-2 text-[11px] text-muted">
+                  <div className="w-1 h-1 rounded-full bg-gold/40" />
                   {shot}
                 </div>
               ))}
@@ -167,14 +167,14 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-2">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted flex items-center gap-2">
               <Tag className="w-3 h-3" />
               {t('describe.category')}
             </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as AntiqueCategory)}
-              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm appearance-none cursor-pointer"
+              className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm appearance-none cursor-pointer text-ink"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{t(`categories.${cat}`)}</option>
@@ -183,7 +183,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-2">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted flex items-center gap-2">
               <MapPin className="w-3 h-3" />
               {t('describe.location')}
             </label>
@@ -192,22 +192,22 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder={t('describe.location_placeholder')}
-              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm"
+              className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm text-ink placeholder:text-muted/40"
             />
           </div>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('common.describe')}</label>
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('common.describe')}</label>
             {isSpeechSupported && (
               <button
                 type="button"
                 onClick={toggleListening}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
                   isListening 
-                    ? 'bg-rose-100 text-rose-600 animate-pulse' 
-                    : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
+                    ? 'bg-decision-red/10 text-decision-red animate-pulse' 
+                    : 'bg-paper text-muted hover:bg-border-custom'
                 }`}
               >
                 {isListening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
@@ -222,8 +222,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={isListening ? 'Listening... Describe what you see' : t('describe.placeholder')}
-              className={`w-full h-40 p-4 bg-zinc-50 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all resize-none text-sm leading-relaxed ${
-                isListening ? 'border-amber-400 ring-2 ring-amber-500/10' : 'border-zinc-100'
+              className={`w-full h-40 p-4 bg-paper border rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all resize-none text-sm leading-relaxed text-ink placeholder:text-muted/40 ${
+                isListening ? 'border-gold ring-2 ring-gold/10' : 'border-border-custom'
               }`}
               required
             />
@@ -236,11 +236,11 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                         key={i}
                         animate={{ height: [8, 16, 8] }}
                         transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
-                        className="w-1 bg-amber-500 rounded-full"
+                        className="w-1 bg-gold rounded-full"
                       />
                     ))}
                   </div>
-                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Listening...</span>
+                  <span className="text-[10px] font-bold text-gold uppercase tracking-widest">Listening...</span>
                 </div>
               </div>
             )}
@@ -250,19 +250,19 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('describe.asking_price')}</label>
-              <div className="flex bg-zinc-100 rounded-lg p-0.5">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('describe.asking_price')}</label>
+              <div className="flex bg-paper rounded-lg p-0.5 border border-border-custom">
                 <button
                   type="button"
                   onClick={() => setPriceType('offered')}
-                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${priceType === 'offered' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}
+                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${priceType === 'offered' ? 'bg-white text-ink shadow-sm' : 'text-muted'}`}
                 >
                   {t('describe.price_offered')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPriceType('paid')}
-                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${priceType === 'paid' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}
+                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${priceType === 'paid' ? 'bg-white text-ink shadow-sm' : 'text-muted'}`}
                 >
                   {t('describe.price_paid')}
                 </button>
@@ -274,13 +274,13 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="0.00"
-                className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm"
+                className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm text-ink placeholder:text-muted/40"
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <select 
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-zinc-400 focus:outline-none cursor-pointer"
+                  className="bg-transparent text-xs font-bold text-muted focus:outline-none cursor-pointer"
                 >
                   <option>USD</option>
                   <option>GBP</option>
@@ -292,11 +292,11 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('describe.seller_type')}</label>
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('describe.seller_type')}</label>
             <select
               value={sellerType}
               onChange={(e) => setSellerType(e.target.value)}
-              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm appearance-none cursor-pointer"
+              className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm appearance-none cursor-pointer text-ink"
             >
               <option value="Market/Fair">{t('describe.seller_private')}</option>
               <option value="Antique Shop">{t('describe.seller_dealer')}</option>
@@ -308,7 +308,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
         <button
           type="submit"
           disabled={isAnalyzing || !description.trim()}
-          className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-zinc-900/10"
+          className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-ink/10"
         >
           {isAnalyzing ? (
             <>
