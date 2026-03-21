@@ -12,11 +12,9 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence 
   const offset = circumference - (score / 100) * circumference;
 
   const getColor = (s: number) => {
-    if (s >= 80) return '#10b981'; // emerald-500 (Strong Buy)
-    if (s >= 65) return '#10b981'; // emerald-500 (Buy)
-    if (s >= 45) return '#f43f5e'; // rose-500 (Risky)
-    if (s >= 25) return '#f43f5e'; // rose-500 (Avoid)
-    return '#e11d48'; // rose-600 (Hard Pass)
+    if (s >= 65) return '#2F6F4F'; // decision-green
+    if (s >= 45) return '#B7791F'; // decision-amber
+    return '#8B2E2E'; // decision-red
   };
 
   return (
