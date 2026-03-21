@@ -177,8 +177,8 @@ export default function App() {
 
   if (!isAuthReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <Loader2 className="w-8 h-8 text-gold animate-spin" />
       </div>
     );
   }
@@ -218,24 +218,24 @@ export default function App() {
         return (
           <div className="max-w-2xl mx-auto px-6 py-20 space-y-8 text-center">
             <div className="space-y-4">
-              <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
-                <Sparkles className="w-10 h-10 text-amber-500" />
+              <div className="w-20 h-20 bg-gold/10 rounded-full flex items-center justify-center mx-auto">
+                <Sparkles className="w-10 h-10 text-gold" />
               </div>
               <h2 className="serif text-3xl font-light">{t('upload_choice.title', 'Ready to Analyze?')}</h2>
-              <p className="text-zinc-500">{t('upload_choice.desc', 'Would you like to add more details for a better appraisal, or go straight to the expert analysis?')}</p>
+              <p className="text-muted">{t('upload_choice.desc', 'Would you like to add more details for a better appraisal, or go straight to the expert analysis?')}</p>
             </div>
             
             <div className="flex flex-col gap-4">
               <button
                 onClick={() => handleAnalyze(t('upload_choice.default_prompt', "Analyze this antique from the images provided."), {}, false, capturedImages)}
-                className="w-full py-4 bg-zinc-900 text-white rounded-full font-medium hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-ink text-paper rounded-full font-medium hover:opacity-90 transition-all shadow-xl shadow-ink/20 flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-5 h-5" />
                 {t('upload_choice.analyze_now', 'Analyze Now')}
               </button>
               <button
                 onClick={() => setCurrentScreen('describe')}
-                className="w-full py-4 bg-zinc-100 text-zinc-900 rounded-full font-medium hover:bg-zinc-200 transition-all"
+                className="w-full py-4 bg-paper text-ink rounded-full font-medium hover:bg-border-custom transition-all border border-border-custom"
               >
                 {t('upload_choice.add_details', 'Add More Details')}
               </button>
@@ -246,7 +246,7 @@ export default function App() {
                 setCapturedImages([]);
                 setCurrentScreen('home');
               }}
-              className="text-xs text-zinc-400 uppercase tracking-widest font-bold hover:text-zinc-600 transition-colors"
+              className="text-xs text-muted uppercase tracking-widest font-bold hover:text-ink transition-colors"
             >
               {t('common.back')}
             </button>
@@ -273,12 +273,12 @@ export default function App() {
             {isAnalyzing ? (
               <div className="flex flex-col items-center justify-center py-20 gap-6">
                 <div className="relative">
-                  <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
-                  <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-amber-500 animate-pulse" />
+                  <Loader2 className="w-12 h-12 text-gold animate-spin" />
+                  <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-gold animate-pulse" />
                 </div>
                 <div className="text-center space-y-2">
-                  <p className="serif text-2xl font-light">Analyzing Artifact</p>
-                  <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-400">Consulting historical databases and market trends...</p>
+                  <p className="serif text-2xl font-light text-ink">Analyzing Artifact</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted">Consulting historical databases and market trends...</p>
                 </div>
               </div>
             ) : (
@@ -360,8 +360,8 @@ export default function App() {
                 className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl space-y-6"
               >
                 <div className="space-y-2 text-center">
-                  <h3 className="serif text-2xl font-light">Unsaved Analysis</h3>
-                  <p className="text-sm text-zinc-500">You have an active analysis that hasn't been saved to your collection. Starting a new scan will discard it.</p>
+                  <h3 className="serif text-2xl font-light text-ink">Unsaved Analysis</h3>
+                  <p className="text-sm text-muted">You have an active analysis that hasn't been saved to your collection. Starting a new scan will discard it.</p>
                 </div>
                 <div className="flex flex-col gap-3">
                   <button 
@@ -369,13 +369,13 @@ export default function App() {
                       setShowResetPrompt(false);
                       setCurrentScreen('analysis');
                     }}
-                    className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm shadow-lg shadow-zinc-900/10"
+                    className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm shadow-lg shadow-ink/10"
                   >
                     Go Back to Save
                   </button>
                   <button 
                     onClick={confirmReset}
-                    className="w-full py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold text-sm hover:bg-zinc-200 transition-colors"
+                    className="w-full py-4 bg-paper text-muted rounded-2xl font-bold text-sm hover:bg-border-custom transition-colors border border-border-custom"
                   >
                     Discard and Continue
                   </button>
