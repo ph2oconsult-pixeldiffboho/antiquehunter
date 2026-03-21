@@ -18,9 +18,9 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
     <div className="max-w-2xl mx-auto px-6 py-12 space-y-12 pb-32">
       {/* Hero Section */}
       <section className="space-y-6 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gold/10 text-gold rounded-full border border-gold/20">
-          <Sparkles className="w-4 h-4" />
-          <span className="text-[10px] uppercase tracking-widest font-bold">{t('home.hero_badge')}</span>
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-gold/10 text-gold rounded-full border border-gold/20">
+          <Sparkles className="w-3 h-3" />
+          <span className="text-[9px] uppercase tracking-widest font-bold">Try an item — even something nearby</span>
         </div>
         <h1 className="serif text-5xl font-light tracking-tight leading-tight text-ink">{t('home.hero_title')}</h1>
         <p className="text-muted max-w-md mx-auto leading-relaxed">
@@ -28,76 +28,78 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
         </p>
       </section>
 
-      {/* Main Actions */}
-      <section className="grid grid-cols-1 gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Main Input Actions */}
+      <section className="space-y-6">
+        <div className="grid grid-cols-1 gap-4">
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
             onClick={onScan}
-            className="group relative h-64 rounded-[40px] overflow-hidden bg-card text-white shadow-2xl shadow-ink/20"
+            className="group relative h-48 rounded-[32px] overflow-hidden bg-ink text-paper shadow-2xl shadow-ink/20"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-ink/80 to-ink" />
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-8">
-              <div className="p-6 bg-white/10 rounded-full group-hover:bg-white/20 transition-colors">
-                <Camera className="w-10 h-10" />
-              </div>
-              <div className="space-y-2 text-center">
+            <div className="absolute inset-0 flex items-center justify-between p-8">
+              <div className="space-y-2 text-left">
                 <h2 className="serif text-3xl font-light">{t('common.scan')}</h2>
-                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{t('home.scan_subtitle')}</p>
+                <p className="text-[10px] text-paper/40 uppercase tracking-widest font-bold">{t('home.scan_subtitle')}</p>
+              </div>
+              <div className="p-5 bg-white/10 rounded-full group-hover:bg-white/20 transition-colors">
+                <Camera className="w-8 h-8" />
               </div>
             </div>
           </motion.button>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onUpload}
-            className="group relative h-64 rounded-[40px] overflow-hidden bg-white border border-border-custom shadow-sm hover:shadow-xl transition-all"
-          >
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-8">
-              <div className="p-6 bg-paper rounded-full group-hover:bg-border-custom transition-colors">
-                <Upload className="w-10 h-10 text-muted" />
+          <div className="grid grid-cols-2 gap-4">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onUpload}
+              className="group p-8 bg-white border border-border-custom rounded-[32px] text-left space-y-4 shadow-sm hover:shadow-xl transition-all"
+            >
+              <div className="p-4 bg-paper rounded-2xl w-fit group-hover:bg-border-custom transition-colors">
+                <Upload className="w-6 h-6 text-muted" />
               </div>
-              <div className="space-y-2 text-center">
-                <h2 className="serif text-3xl font-light text-ink">{t('common.upload')}</h2>
-                <p className="text-[10px] text-muted uppercase tracking-widest font-bold">{t('home.upload_subtitle')}</p>
+              <div className="space-y-1">
+                <h3 className="serif text-xl font-light text-ink">{t('common.upload')}</h3>
+                <p className="text-[9px] text-muted uppercase tracking-widest font-bold">{t('home.upload_subtitle')}</p>
               </div>
-            </div>
-          </motion.button>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onDescribe}
+              className="group p-8 bg-white border border-border-custom rounded-[32px] text-left space-y-4 shadow-sm hover:shadow-xl transition-all"
+            >
+              <div className="p-4 bg-paper rounded-2xl w-fit group-hover:bg-border-custom transition-colors">
+                <Search className="w-6 h-6 text-muted" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="serif text-xl font-light text-ink">{t('common.describe')}</h3>
+                <p className="text-[9px] text-muted uppercase tracking-widest font-bold">{t('home.describe_subtitle')}</p>
+              </div>
+            </motion.button>
+          </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-2 gap-6">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onDescribe}
-            className="p-8 bg-white border border-border-custom rounded-[40px] text-left space-y-6 shadow-sm hover:shadow-xl transition-all"
-          >
-            <div className="p-4 bg-paper rounded-2xl w-fit">
-              <Search className="w-6 h-6 text-muted" />
+      {/* Secondary Actions */}
+      <section className="pt-4">
+        <button 
+          onClick={onViewCollection}
+          className="w-full p-6 bg-paper rounded-[24px] flex items-center justify-between border border-border-custom hover:bg-border-custom transition-colors group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white rounded-xl">
+              <History className="w-5 h-5 text-muted" />
             </div>
-            <div className="space-y-1">
-              <h3 className="serif text-xl font-light text-ink">{t('common.describe')}</h3>
-              <p className="text-[10px] text-muted uppercase tracking-widest font-bold">{t('home.describe_subtitle')}</p>
-            </div>
-          </motion.button>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onViewCollection}
-            className="p-8 bg-white border border-border-custom rounded-[40px] text-left space-y-6 shadow-sm hover:shadow-xl transition-all"
-          >
-            <div className="p-4 bg-paper rounded-2xl w-fit">
-              <History className="w-6 h-6 text-muted" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="serif text-xl font-light text-ink">{t('common.history')}</h3>
+            <div className="text-left">
+              <h4 className="font-medium text-ink">{t('common.history')}</h4>
               <p className="text-[10px] text-muted uppercase tracking-widest font-bold">{t('home.history_subtitle')}</p>
             </div>
-          </motion.button>
-        </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-muted group-hover:translate-x-1 transition-transform" />
+        </button>
       </section>
 
       {/* Quick Tips / Recent Finds */}
