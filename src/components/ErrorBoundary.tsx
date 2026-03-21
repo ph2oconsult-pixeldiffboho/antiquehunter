@@ -41,12 +41,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="min-h-screen flex items-center justify-center bg-paper p-8">
-          <div className="max-w-md w-full bg-white p-12 rounded-[40px] shadow-xl border border-ink/5 text-center">
-            <h2 className="serif text-3xl mb-4">An Error Occurred</h2>
-            <p className="text-ink/60 mb-8">{errorMessage}</p>
+          <div className="max-w-md w-full bg-white p-12 rounded-[40px] shadow-xl border border-border-custom text-center">
+            <h2 className="serif text-3xl mb-4 text-ink">An Error Occurred</h2>
+            <p className="text-muted mb-8">{errorMessage}</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-8 py-3 bg-ink text-paper rounded-full font-medium hover:bg-ink/90 transition-colors"
+              className="px-8 py-3 bg-ink text-paper rounded-full font-medium hover:opacity-90 transition-colors"
             >
               Reload Application
             </button>
