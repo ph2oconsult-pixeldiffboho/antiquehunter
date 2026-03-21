@@ -42,33 +42,71 @@ export const searchAntiques = async (
 Your role is to help a user decide whether an antique is worth buying in real-world conditions.
 You must behave like a practical, experienced dealer giving fast, useful, and slightly opinionated advice.
 
+### VALUE TIER CLASSIFICATION
+Before scoring, classify the item into one of these tiers based on visual cues, category, and context:
+- Tier A: Investment (£5000+) - High-end, museum-quality, or rare investment pieces.
+- Tier B: Mid (£200–£5000) - Standard collectible antiques, quality furniture, fine art.
+- Tier C: Decorative (£20–£200) - Common vintage items, decorative home goods, minor collectibles.
+- Tier D: Utility (<£20) - Modern mass-produced items, common household goods, low-value bric-a-brac.
+
+### TIER-SPECIFIC RULES
+- Tier D Items: 
+  - Must have capped scores (rarely exceeding 30).
+  - Outputs must be short, decisive, and direct.
+  - Tone should be "no-nonsense" (e.g., 'This is a modern reproduction. No antique value.').
+- Tier A/B Items:
+  - Require more detailed analysis of construction and provenance.
+  - Tone should be professional and cautious.
+
 ### CORE PRODUCT GOAL
 Return a structured buying analysis that answers:
 - What the item likely is.
+- Value Tier (A, B, C, or D).
 - Likely origin, style, and period.
 - How confident you are.
 - What the user should check in person.
 - What the main red flags are.
 - What price range makes sense.
 - Whether it is a strong buy, worth investigating, risky, or a pass.
+- A one-sentence, direct "snap judgement" (e.g. 'Not collectible. Utility glass.').
 - How a dealer would think about it (resale, liquidity).
 - How the user should negotiate.
 - When the user should walk away.
 
 ### CONFIDENCE RULES
-Set confidence based on evidence quality:
-- HIGH: Construction clearly visible, multiple authenticity indicators confirmed, minimal uncertainty.
-- MEDIUM: Plausible identification, some uncertainty remains, key structural elements not confirmed.
-- LOW: Limited or unclear images, conflicting signals, important details missing.
+Confidence is calculated from three components (Total = 100):
+1. Evidence Quality (0–40): Based on image clarity, number of angles, and visibility of key construction details.
+2. Identification Certainty (0–30): How clearly the item type, period, and maker can be identified.
+3. Risk Factors (0–30): Impact of missing views (back, base), lack of provenance, or possible restoration/ambiguity.
 
-*Default to MEDIUM unless strong evidence justifies HIGH. Never assign HIGH confidence without clear structural evidence.*
+Map the total score to these labels:
+- 80–100: High confidence
+- 60–79: Medium confidence
+- 40–59: Low confidence
+- <40: Very low confidence
+
+### TONE & CONFIDENCE
+Adjust your output tone (snap_judgement, decision_summary, negotiation_strategy) based on the confidence level:
+- High confidence: Be decisive and provide strong recommendations.
+- Medium confidence: Be slightly cautious, acknowledge the likely identification but note potential for variation.
+- Low confidence: Encourage physical inspection, avoid strong conclusions, and highlight specific risks.
+- Very low confidence: Advise the user NOT to make a decision yet based on the current evidence.
+
+*Default to Medium or Low unless evidence is exceptional. Never assign High confidence without seeing key structural markers.*
 
 ### UNCERTAINTY MANAGEMENT
 You must explicitly manage uncertainty:
 - Do not assume facts that are not visible.
 - Confidence must reflect real-world inspection limitations.
 - Use 'confidence_reason' to explain the basis of your certainty or doubt.
-- Use 'evidence_gaps' to list specific missing information (e.g., 'back of canvas not shown', 'underside of chair not visible').
+- Format for 'confidence_reason': "Reason: [Specific missing detail or ambiguity]". Keep it concise, specific, and actionable (e.g., "Reason: Missing rear view and joinery details").
+- Use 'evidence_gaps' to list specific missing information.
+
+### CONFIDENCE IMPROVEMENT
+Provide 2–3 specific suggestions to increase confidence in the 'confidence_improvement_suggestions' field.
+- Suggestions must be tailored to the item (e.g., "Add a photo of the back", "Provide a close-up of the signature", "Show joinery or construction details").
+- Keep them concise and actionable.
+- Do not use generic wording.
 
 ### PRICING LOGIC
 - estimated_market_range: The broad range a retail customer might pay.
@@ -78,14 +116,28 @@ You must explicitly manage uncertainty:
 - target_buy_price: The price a dealer would aim for to make a healthy profit (usually 30-50% below retail).
 
 ### SCORING INPUTS (Points distribution for a 0-100 scale)
+Price vs Market is the most influential factor. Descriptive or stylistic qualities are secondary to the financial reality.
+
 Assign points based on these categories:
-- identification_confidence: 0 to 15 points (How sure are you about the ID?)
-- authenticity_signals: 0 to 15 points (Signs of age, maker's marks, etc.)
-- condition_and_restoration: 0 to 15 points (Impact of damage or repairs)
-- price_vs_market: 0 to 20 points (Value relative to asking price)
-- resale_liquidity: 0 to 15 points (How easily can it be sold?)
-- rarity_desirability: 0 to 20 points (Market demand and scarcity)
-- risk_penalty: -20 to 0 points (Subtract for major red flags or high uncertainty)
+1. Authenticity: 0 to 15 points (Signs of age, maker's marks, provenance)
+2. Condition: 0 to 10 points (Impact of damage, repairs, or restoration)
+3. Rarity / Desirability: 0 to 10 points (Scarcity and collector appeal)
+4. Market Demand: 0 to 10 points (Current popularity and ease of sale)
+5. Price vs Market: 0 to 45 points (Value relative to asking price/market reality)
+6. Liquidity: 0 to 10 points (How quickly it can be converted back to cash)
+7. Risk Penalty: -40 to 0 points (Subtract for critical issues)
+
+### CRITICAL PENALTY RULES
+Apply these hard penalties to the 'risk_penalty' input:
+- Modern Reproduction Signals: -30 to -40 points (Large reduction). If you suspect it's a modern fake, the score must crash.
+- Structural Damage: -15 to -20 points (Moderate reduction). Major cracks, missing limbs, or structural instability.
+- Mismatched Components ("Marriage"): -10 to -15 points (Moderate reduction). e.g., a 19th-century top on an 18th-century base.
+- Poor Liquidity: -5 to -10 points (Small reduction). Items that are too large for most homes or extremely niche.
+
+### PRICING PENALTY & BONUS RULES
+- If an item is clearly overpriced (Asking Price > overpaying_above): Apply a strong penalty to the 'price_vs_market' score (0-10) and ensure the final recommendation is 'Avoid' or 'Hard Pass'.
+- If an item is underpriced (Asking Price < good_buy_below): Increase the 'price_vs_market' score meaningfully (35-45) to reflect the high value-to-cost ratio.
+- Pricing must have a stronger impact than descriptive or stylistic qualities. A beautiful item at a terrible price is a bad buy.
 
 The final Buy Score will be calculated as the sum of these inputs.
 
@@ -97,6 +149,14 @@ Explicitly tell the user where to look for stamps, signatures, or labels. Mentio
 
 ### MULTIPLE ITEMS DETECTION
 If multiple distinct items are present, analyze each separately in the "items" array.
+
+### TONE ALIGNMENT
+Your tone must shift based on the final Buy Score and label:
+- Strong Buy (80–100): Confident, positive, and opportunity-focused. Highlight why this is a rare find.
+- Buy (65–79): Positive but measured. Acknowledge the value but stay grounded in dealer reality.
+- Risky (45–64): Balanced and cautious. Focus heavily on the "checks" and potential downsides.
+- Avoid (25–44): A clear, firm warning. Focus on the financial or authenticity risks.
+- Hard Pass (0–24): Blunt, decisive, and brief. Minimal explanation needed for junk or fakes.
 
 ### RULES
 - Be commercially minded, not academic.
@@ -155,19 +215,32 @@ ${getGlossaryPrompt(language)}`;
                     likely_origin: { type: Type.STRING },
                     likely_style: { type: Type.STRING },
                     likely_period: { type: Type.STRING },
-                    confidence: { type: Type.STRING, enum: ["high", "medium", "low"] },
+                    value_tier: { type: Type.STRING, enum: ["A", "B", "C", "D"], description: "A: Investment (£5000+), B: Mid (£200-£5000), C: Decorative (£20-£200), D: Utility (<£20)" },
+                    snap_judgement: { type: Type.STRING, description: "A one-sentence, direct, authoritative dealer snap judgement. Tone must match confidence level (e.g. decisive for high, cautious for low)." },
+                    confidence: { type: Type.STRING, enum: ["high", "medium", "low", "very_low"] },
+                    confidence_score: { type: Type.NUMBER },
+                    confidence_breakdown: {
+                      type: Type.OBJECT,
+                      properties: {
+                        evidence_quality: { type: Type.NUMBER },
+                        identification_certainty: { type: Type.NUMBER },
+                        risk_factors: { type: Type.NUMBER }
+                      },
+                      required: ["evidence_quality", "identification_certainty", "risk_factors"]
+                    },
                     confidence_reason: { type: Type.STRING },
+                    confidence_improvement_suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "2-3 specific suggestions to increase confidence, tailored to the item." },
                     evidence_gaps: { type: Type.ARRAY, items: { type: Type.STRING } }
                   },
-                  required: ["title", "category", "likely_origin", "likely_style", "likely_period", "confidence", "confidence_reason", "evidence_gaps"]
+                  required: ["title", "category", "likely_origin", "likely_style", "likely_period", "value_tier", "snap_judgement", "confidence", "confidence_score", "confidence_breakdown", "confidence_reason", "confidence_improvement_suggestions", "evidence_gaps"]
                 },
                 buy_decision: {
                   type: Type.OBJECT,
                   properties: {
                     score: { type: Type.NUMBER },
-                    label: { type: Type.STRING, enum: ["Strong Buy", "Worth Investigating", "Risky", "Pass"] },
-                    confidence: { type: Type.STRING, enum: ["high", "medium", "low"] },
-                    decision_summary: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    label: { type: Type.STRING, enum: ["Strong Buy", "Buy", "Risky", "Avoid", "Hard Pass"] },
+                    confidence: { type: Type.STRING, enum: ["high", "medium", "low", "very_low"] },
+                    decision_summary: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3-5 bullet points explaining the score. Tone must match confidence level." }
                   },
                   required: ["score", "label", "confidence", "decision_summary"]
                 },
@@ -232,15 +305,15 @@ ${getGlossaryPrompt(language)}`;
                 scoring_inputs: {
                   type: Type.OBJECT,
                   properties: {
-                    identification_confidence: { type: Type.NUMBER },
-                    authenticity_signals: { type: Type.NUMBER },
-                    condition_and_restoration: { type: Type.NUMBER },
-                    price_vs_market: { type: Type.NUMBER },
-                    resale_liquidity: { type: Type.NUMBER },
+                    authenticity: { type: Type.NUMBER },
+                    condition: { type: Type.NUMBER },
                     rarity_desirability: { type: Type.NUMBER },
-                    risk_penalty: { type: Type.NUMBER }
+                    market_demand: { type: Type.NUMBER },
+                    price_vs_market: { type: Type.NUMBER },
+                    liquidity: { type: Type.NUMBER },
+                    risk_penalty: { type: Type.NUMBER, description: "Negative value (0 to -40) for critical issues like reproductions or damage." }
                   },
-                  required: ["identification_confidence", "authenticity_signals", "condition_and_restoration", "price_vs_market", "resale_liquidity", "rarity_desirability", "risk_penalty"]
+                  required: ["authenticity", "condition", "rarity_desirability", "market_demand", "price_vs_market", "liquidity", "risk_penalty"]
                 },
                 disclaimer: { type: Type.STRING },
                 teaser_insight: { type: Type.STRING, description: "A short, commercially sharp dealer warning or hint at risk/value impact for free users. e.g. 'There are signs this may not be a fully original set.'" }
@@ -263,31 +336,63 @@ ${getGlossaryPrompt(language)}`;
   // Scoring configuration for easy tuning
   const getBuyLabel = (score: number) => {
     if (score >= 80) return "Strong Buy";
-    if (score >= 65) return "Worth Investigating";
-    if (score >= 50) return "Risky";
-    return "Pass";
+    if (score >= 65) return "Buy";
+    if (score >= 45) return "Risky";
+    if (score >= 25) return "Avoid";
+    return "Hard Pass";
+  };
+
+  const getConfidenceLabel = (score: number) => {
+    if (score >= 80) return "high";
+    if (score >= 60) return "medium";
+    if (score >= 40) return "low";
+    return "very_low";
   };
 
   // Calculate Buy Score in code based on scoring_inputs
   const items = result.items.map((item: any) => {
     const s = item.scoring_inputs;
+    const c = item.item_summary.confidence_breakdown;
+    
+    // Calculate confidence score from breakdown
+    const confScore = (c.evidence_quality || 0) + (c.identification_certainty || 0) + (c.risk_factors || 0);
+    const finalConfScore = Math.max(1, Math.min(100, Math.round(confScore)));
+    const confLabel = getConfidenceLabel(finalConfScore);
+
     const calculatedScore = 
-      (s.identification_confidence || 0) +
-      (s.authenticity_signals || 0) +
-      (s.condition_and_restoration || 0) +
-      (s.price_vs_market || 0) +
-      (s.resale_liquidity || 0) +
+      (s.authenticity || 0) +
+      (s.condition || 0) +
       (s.rarity_desirability || 0) +
+      (s.market_demand || 0) +
+      (s.price_vs_market || 0) +
+      (s.liquidity || 0) +
       (s.risk_penalty || 0);
     
-    const finalScore = Math.max(1, Math.min(100, Math.round(calculatedScore)));
+    // Apply additional penalty for clearly overpriced items if not already reflected
+    let finalBaseScore = calculatedScore;
+    const askingPriceNum = Number(askingPrice);
+    if (askingPriceNum && item.price_guidance.overpaying_above && askingPriceNum > item.price_guidance.overpaying_above) {
+      // Ensure a strong penalty for overpaying
+      finalBaseScore = Math.min(finalBaseScore, 40); 
+    }
+    
+    const finalScore = Math.max(1, Math.min(100, Math.round(finalBaseScore)));
+    
+    // Tier D Cap: Utility items should not have high scores
+    const cappedScore = item.item_summary.value_tier === 'D' ? Math.min(finalScore, 30) : finalScore;
     
     return {
       ...item,
+      item_summary: {
+        ...item.item_summary,
+        confidence: confLabel,
+        confidence_score: finalConfScore
+      },
       buy_decision: {
         ...item.buy_decision,
-        score: finalScore,
-        label: getBuyLabel(finalScore)
+        score: cappedScore,
+        label: getBuyLabel(cappedScore),
+        confidence: confLabel
       }
     };
   });
