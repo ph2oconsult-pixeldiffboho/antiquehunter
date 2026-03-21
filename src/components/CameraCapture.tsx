@@ -81,11 +81,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
           <p className="text-[10px] uppercase tracking-widest font-bold text-white/60 mb-1">{t('describe.suggested_shots')}</p>
           <div className="flex gap-1 justify-center">
             {capturedImages.length < 4 ? (
-              <span className="text-xs font-medium text-amber-400">
+              <span className="text-xs font-medium text-decision-amber">
                 {[t('describe.shot_overall'), t('describe.shot_mark'), t('describe.shot_back'), t('describe.shot_detail')][capturedImages.length]}
               </span>
             ) : (
-              <span className="text-xs font-medium text-emerald-400">Ready to Analyze</span>
+              <span className="text-xs font-medium text-decision-green">Ready to Analyze</span>
             )}
           </div>
         </div>
@@ -107,7 +107,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
       </div>
 
       {/* Captured List */}
-      <div className="bg-zinc-900/90 backdrop-blur-md px-6 py-4 flex gap-3 overflow-x-auto no-scrollbar border-t border-white/5">
+      <div className="bg-card/90 backdrop-blur-md px-6 py-4 flex gap-3 overflow-x-auto no-scrollbar border-t border-white/5">
         {capturedImages.map((img, i) => (
           <div key={i} className="relative flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-white/10">
             <img src={img} alt="" className="w-full h-full object-cover" />
@@ -120,13 +120,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
           </div>
         ))}
         {capturedImages.length === 0 && (
-          <div className="flex-1 flex items-center justify-center text-zinc-500 text-[10px] uppercase tracking-widest font-bold h-16">
+          <div className="flex-1 flex items-center justify-center text-muted text-[10px] uppercase tracking-widest font-bold h-16">
             No shots captured yet
           </div>
         )}
       </div>
 
-      <div className="bg-zinc-900 p-8 flex items-center justify-around">
+      <div className="bg-card p-8 flex items-center justify-around">
         {currentPreview ? (
           <>
             <button
@@ -140,7 +140,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
             </button>
             <button
               onClick={handleKeep}
-              className="p-6 rounded-full bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/20"
+              className="p-6 rounded-full bg-gold text-paper hover:opacity-90 transition-colors shadow-lg shadow-gold/20"
             >
               <Plus className="w-8 h-8" />
             </button>
@@ -150,14 +150,14 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
             <div className="w-14" /> {/* Spacer */}
             <button
               onClick={capture}
-              className="p-6 rounded-full bg-white text-zinc-900 hover:bg-zinc-200 transition-colors shadow-xl"
+              className="p-6 rounded-full bg-white text-ink hover:bg-paper transition-colors shadow-xl"
             >
               <Camera className="w-8 h-8" />
             </button>
             <button
               onClick={() => capturedImages.length > 0 && onCapture(capturedImages)}
               disabled={capturedImages.length === 0}
-              className="p-4 rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-30 disabled:grayscale"
+              className="p-4 rounded-full bg-decision-green text-paper hover:opacity-90 transition-colors disabled:opacity-30 disabled:grayscale"
             >
               <Check className="w-6 h-6" />
             </button>
