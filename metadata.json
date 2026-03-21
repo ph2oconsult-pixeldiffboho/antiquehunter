@@ -2,6 +2,7 @@
   "name": "Antique Hunter",
   "description": "A smart field companion for antique hunters, providing real-time identification, inspection guidance, and buy decision scores.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ]
 }
