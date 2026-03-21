@@ -84,12 +84,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     }
     if (score >= 45) { // Risky
       return {
-        text: 'text-decision-amber',
-        accent: 'bg-decision-amber/10',
-        border: 'border-decision-amber/20',
-        dot: 'bg-decision-amber',
+        text: 'text-decision-gold',
+        accent: 'bg-decision-gold/10',
+        border: 'border-decision-gold/20',
+        dot: 'bg-decision-gold',
         cardBg: 'bg-card',
-        blur: 'bg-decision-amber/10'
+        blur: 'bg-decision-gold/10'
       };
     }
     // Avoid & Hard Pass
@@ -106,7 +106,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const decisionStyles = getDecisionStyles(currentItem.buy_decision.score);
 
   const PaywallCard = () => (
-    <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-zinc-900/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
+    <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
       <div className={`absolute top-0 right-0 w-80 h-80 ${decisionStyles.blur} blur-[120px] rounded-full -mr-40 -mt-40 transition-colors duration-500`} />
       
       <div className="relative z-10 space-y-8 text-center">
@@ -119,10 +119,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <h2 className="serif text-4xl font-light leading-tight">
             {t('paywall.title')}
           </h2>
-          <p className="text-zinc-400 text-base font-light italic leading-relaxed max-w-[280px] mx-auto">
+          <p className="text-muted text-base font-light italic leading-relaxed max-w-[280px] mx-auto">
             {t('paywall.benefit_line')}
           </p>
-          <p className="text-zinc-300 text-sm font-medium">
+          <p className="text-paper text-sm font-medium">
             {t('paywall.subtitle')}
           </p>
         </div>
@@ -131,7 +131,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <p className={`${decisionStyles.text} text-2xl font-bold leading-tight tracking-tight`}>
             {t('paywall.tension_line_title')}
           </p>
-          <p className="text-zinc-400 text-xs font-medium uppercase tracking-wider">
+          <p className="text-muted text-xs font-medium uppercase tracking-wider">
             {t('paywall.tension_line_subtitle')}
           </p>
         </div>
@@ -203,7 +203,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <div className="px-4 py-1.5 bg-paper rounded-full flex items-center gap-2 border border-border-custom">
                 <div className={`w-2 h-2 rounded-full ${
                   currentItem.item_summary.confidence === 'high' ? 'bg-decision-green' : 
-                  currentItem.item_summary.confidence === 'medium' ? 'bg-decision-amber' : 
+                  currentItem.item_summary.confidence === 'medium' ? 'bg-decision-gold' : 
                   'bg-decision-red'
                 }`} />
                 <span className="text-[10px] uppercase tracking-widest font-bold text-muted">
@@ -214,7 +214,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <div 
                   className={`h-full transition-all duration-1000 ease-out rounded-full ${
                     currentItem.item_summary.confidence === 'high' ? 'bg-decision-green' : 
-                    currentItem.item_summary.confidence === 'medium' ? 'bg-decision-amber' : 
+                    currentItem.item_summary.confidence === 'medium' ? 'bg-decision-gold' : 
                     'bg-decision-red'
                   }`}
                   style={{ width: `${currentItem.item_summary.confidence_score}%` }}
@@ -235,7 +235,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.1 }}
-                className="relative flex-shrink-0 w-full aspect-[4/3] rounded-[32px] overflow-hidden bg-zinc-100 snap-center border border-zinc-100"
+                className="relative flex-shrink-0 w-full aspect-[4/3] rounded-[32px] overflow-hidden bg-paper snap-center border border-border-custom"
               >
                 <img 
                   src={img} 
@@ -280,11 +280,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
             <div className="flex items-center justify-between relative z-10">
               <div className="space-y-2">
-                <p className="text-[11px] text-zinc-400 uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
+                <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
                 <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
                 <div className="flex items-center gap-2 pt-1">
                   <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/60">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-paper/60">
                     {currentItem.buy_decision.confidence.replace('_', ' ')} Certainty
                   </span>
                 </div>
@@ -357,7 +357,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <div className="flex items-center gap-1.5">
                   <div className={`w-1.5 h-1.5 rounded-full ${
                     currentItem.item_summary.confidence === 'high' ? 'bg-decision-green' : 
-                    currentItem.item_summary.confidence === 'medium' ? 'bg-decision-amber' : 
+                    currentItem.item_summary.confidence === 'medium' ? 'bg-decision-gold' : 
                     'bg-decision-red'
                   }`} />
                   <p className="text-sm font-medium text-ink capitalize">
@@ -372,7 +372,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <div 
                   className={`h-full transition-all duration-1000 ease-out rounded-full ${
                     currentItem.item_summary.confidence === 'high' ? 'bg-decision-green' : 
-                    currentItem.item_summary.confidence === 'medium' ? 'bg-decision-amber' : 
+                    currentItem.item_summary.confidence === 'medium' ? 'bg-decision-gold' : 
                     'bg-decision-red'
                   }`}
                   style={{ width: `${currentItem.item_summary.confidence_score}%` }}
@@ -625,13 +625,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             {currentItem.red_flags.map((flag: any, i: number) => (
               <div key={i} className={`p-4 rounded-2xl space-y-2 border ${
                 flag.severity === 'high' ? 'bg-decision-red/5 border-decision-red/20' :
-                flag.severity === 'medium' ? 'bg-decision-amber/5 border-decision-amber/20' :
+                flag.severity === 'medium' ? 'bg-decision-gold/5 border-decision-gold/20' :
                 'bg-paper border-border-custom'
               }`}>
                 <div className="flex items-center justify-between">
                   <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest ${
                     flag.severity === 'high' ? 'bg-decision-red/10 text-decision-red' :
-                    flag.severity === 'medium' ? 'bg-decision-amber/10 text-decision-amber' :
+                    flag.severity === 'medium' ? 'bg-decision-gold/10 text-decision-gold' :
                     'bg-border-custom text-muted'
                   }`}>
                     {flag.severity}
