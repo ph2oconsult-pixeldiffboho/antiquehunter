@@ -11,11 +11,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
   const { t } = useTranslation();
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900 selection:bg-amber-100 selection:text-amber-900">
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-zinc-100">
+    <div className="min-h-screen bg-paper text-ink selection:bg-gold/20 selection:text-ink">
+      <nav className="fixed top-0 left-0 right-0 z-40 bg-paper/80 backdrop-blur-md border-b border-border-custom">
         <div className="max-w-2xl mx-auto flex items-center justify-between h-16 px-6">
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-zinc-50 rounded-full transition-colors">
+            <button className="p-2 hover:bg-white/50 rounded-full transition-colors">
               <Menu className="w-5 h-5" />
             </button>
           </div>
@@ -23,7 +23,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
           <div className="absolute left-1/2 -translate-x-1/2">
             <button 
               onClick={() => onViewChange?.('home')}
-              className="serif text-xl tracking-tight font-light"
+              className="serif text-xl tracking-tight font-light text-ink"
             >
               {t('common.app_name')}
             </button>
@@ -32,11 +32,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => onViewChange?.('settings')}
-              className="p-2 hover:bg-zinc-50 rounded-full transition-colors"
+              className="p-2 hover:bg-white/50 rounded-full transition-colors"
             >
               <Settings className="w-5 h-5" />
             </button>
-            <button className="p-2 hover:bg-zinc-50 rounded-full transition-colors">
+            <button className="p-2 hover:bg-white/50 rounded-full transition-colors">
               <User className="w-5 h-5" />
             </button>
           </div>
