@@ -12,6 +12,7 @@ interface DescriptionInputProps {
   isDetailedScan?: boolean;
   onAddImage: () => void;
   onRemoveImage: (index: number) => void;
+  autoStartListening?: boolean;
 }
 
 export const DescriptionInput: React.FC<DescriptionInputProps> = ({ 
@@ -21,7 +22,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   images,
   isDetailedScan,
   onAddImage,
-  onRemoveImage
+  onRemoveImage,
+  autoStartListening = false
 }) => {
   const { t } = useTranslation();
   const [showHint, setShowHint] = useState(() => {
@@ -35,6 +37,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const [category, setCategory] = useState<AntiqueCategory>('unknown');
   const [location, setLocation] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
+  const isSpeechSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   const toggleListening = () => {
     if (isListening) {
@@ -80,7 +84,12 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
     }
   };
 
-  const isSpeechSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  React.useEffect(() => {
+    if (autoStartListening && isSpeechSupported && !hasAutoStarted) {
+      setHasAutoStarted(true);
+      toggleListening();
+    }
+  }, [autoStartListening, isSpeechSupported, hasAutoStarted]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,22 +247,27 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('common.describe')}</label>
-            {isSpeechSupported && (
-              <button
-                type="button"
-                onClick={toggleListening}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
-                  isListening 
-                    ? 'bg-decision-red/10 text-decision-red animate-pulse' 
-                    : 'bg-paper text-muted hover:bg-border-custom'
-                }`}
-              >
-                {isListening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-                <span className="text-[9px] font-bold uppercase tracking-widest">
-                  {isListening ? 'Listening...' : 'Speak details instead'}
-                </span>
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {!isSpeechSupported && (
+                <span className="text-[9px] text-muted/60 italic">Voice input not supported in this browser</span>
+              )}
+              {isSpeechSupported && (
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all border shadow-sm ${
+                    isListening 
+                      ? 'bg-decision-red/10 text-decision-red border-decision-red/20 animate-pulse' 
+                      : 'bg-paper text-muted border-border-custom hover:border-gold hover:text-gold'
+                  }`}
+                >
+                  {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                  <span className="text-[10px] font-bold uppercase tracking-widest">
+                    {isListening ? 'Stop Listening' : 'Voice Input'}
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
           <div className="relative">
             <textarea
