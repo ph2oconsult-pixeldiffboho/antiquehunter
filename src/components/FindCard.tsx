@@ -27,6 +27,22 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
   const score = mainItem.buy_decision.score;
   const label = mainItem.buy_decision.label;
 
+  const getScoreColor = (s: number) => {
+    if (s >= 80) return 'bg-emerald-500';
+    if (s >= 65) return 'bg-emerald-500';
+    if (s >= 45) return 'bg-rose-500';
+    if (s >= 25) return 'bg-rose-500';
+    return 'bg-rose-600';
+  };
+
+  const getScoreTextColor = (s: number) => {
+    if (s >= 80) return 'text-emerald-600';
+    if (s >= 65) return 'text-emerald-600';
+    if (s >= 45) return 'text-rose-600';
+    if (s >= 25) return 'text-rose-600';
+    return 'text-rose-700';
+  };
+
   return (
     <motion.div
       layout
@@ -47,11 +63,7 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
         <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
           {find.status}
         </div>
-        <div className={`absolute bottom-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm text-white ${
-          score >= 80 ? 'bg-emerald-500' : 
-          score >= 65 ? 'bg-amber-500' : 
-          score >= 50 ? 'bg-orange-500' : 'bg-rose-500'
-        }`}>
+        <div className={`absolute bottom-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm text-white ${getScoreColor(score)}`}>
           Score: {score}
         </div>
       </div>
@@ -62,7 +74,7 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
           <div className="flex items-center gap-2">
             <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">{find.category || mainItem.item_summary.category}</p>
             <span className="w-1 h-1 rounded-full bg-zinc-200" />
-            <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">{label}</p>
+            <p className={`text-[10px] uppercase tracking-widest font-bold ${getScoreTextColor(score)}`}>{label}</p>
           </div>
         </div>
 
