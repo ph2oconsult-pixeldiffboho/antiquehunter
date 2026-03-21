@@ -81,7 +81,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
           <p className="text-[10px] uppercase tracking-widest font-bold text-white/60 mb-1">{t('describe.suggested_shots')}</p>
           <div className="flex gap-1 justify-center">
             {capturedImages.length < 4 ? (
-              <span className="text-xs font-medium text-decision-amber">
+              <span className="text-xs font-medium text-decision-gold">
                 {[t('describe.shot_overall'), t('describe.shot_mark'), t('describe.shot_back'), t('describe.shot_detail')][capturedImages.length]}
               </span>
             ) : (
