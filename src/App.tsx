@@ -336,6 +336,7 @@ export default function App() {
         <Onboarding onComplete={() => {
           setShowOnboarding(false);
           localStorage.setItem('onboarding_complete', 'true');
+          setCurrentScreen('describe');
         }} />
       )}
       <Layout onViewChange={setCurrentScreen}>
