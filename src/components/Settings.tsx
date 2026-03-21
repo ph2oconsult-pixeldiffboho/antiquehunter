@@ -34,37 +34,37 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade }) =
       <header className="flex items-center gap-4">
         <button 
           onClick={onBack}
-          className="p-3 bg-white border border-zinc-100 rounded-2xl text-zinc-400 hover:text-zinc-900 transition-colors"
+          className="p-3 bg-white border border-border-custom rounded-2xl text-muted hover:text-ink transition-colors"
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h1 className="serif text-3xl font-light">{t('settings.title')}</h1>
+        <h1 className="serif text-3xl font-light text-ink">{t('settings.title')}</h1>
       </header>
 
       <div className="space-y-8">
         {/* Profile */}
         <section className="space-y-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 px-2">{t('settings.profile')}</h2>
-          <div className="bg-white border border-zinc-100 rounded-[32px] overflow-hidden">
-            <div className="p-6 flex items-center gap-4 border-b border-zinc-50">
-              <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center overflow-hidden">
+          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">{t('settings.profile')}</h2>
+          <div className="bg-white border border-border-custom rounded-[32px] overflow-hidden">
+            <div className="p-6 flex items-center gap-4 border-b border-paper">
+              <div className="w-12 h-12 rounded-full bg-paper flex items-center justify-center overflow-hidden">
                 {auth.currentUser?.photoURL ? (
                   <img src={auth.currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <User className="w-6 h-6 text-zinc-400" />
+                  <User className="w-6 h-6 text-muted" />
                 )}
               </div>
               <div className="flex-1">
-                <p className="font-medium text-zinc-900">{auth.currentUser?.displayName || 'Antique Hunter'}</p>
+                <p className="font-medium text-ink">{auth.currentUser?.displayName || 'Antique Hunter'}</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs text-zinc-500">{auth.currentUser?.email}</p>
-                  <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-bold uppercase tracking-widest rounded-full">{plan}</span>
+                  <p className="text-xs text-muted">{auth.currentUser?.email}</p>
+                  <span className="px-1.5 py-0.5 bg-gold/10 text-gold text-[8px] font-bold uppercase tracking-widest rounded-full">{plan}</span>
                 </div>
               </div>
             </div>
             <button 
               onClick={() => auth.signOut()}
-              className="w-full p-6 flex items-center gap-4 text-rose-600 hover:bg-rose-50 transition-colors text-left"
+              className="w-full p-6 flex items-center gap-4 text-decision-red hover:bg-decision-red/5 transition-colors text-left"
             >
               <LogOut className="w-5 h-5" />
               <span className="font-medium">{t('settings.sign_out')}</span>
@@ -74,29 +74,29 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade }) =
 
         {/* Plan Selection */}
         <section className="space-y-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 px-2">Subscription Plan</h2>
-          <div className="bg-white border border-zinc-100 rounded-[32px] overflow-hidden">
+          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">Subscription Plan</h2>
+          <div className="bg-white border border-border-custom rounded-[32px] overflow-hidden">
             {plans.map((p) => (
               <button
                 key={p.id}
                 onClick={() => onUpgrade(p.id as any)}
-                className={`w-full p-6 flex items-center justify-between hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0 ${
-                  plan === p.id ? 'bg-zinc-50' : ''
+                className={`w-full p-6 flex items-center justify-between hover:bg-paper transition-colors border-b border-paper last:border-0 ${
+                  plan === p.id ? 'bg-paper' : ''
                 }`}
               >
                 <div className="flex flex-col items-start">
                   <div className="flex items-center gap-2">
-                    <span className={`font-medium ${plan === p.id ? 'text-zinc-900' : 'text-zinc-500'}`}>
+                    <span className={`font-medium ${plan === p.id ? 'text-ink' : 'text-muted'}`}>
                       {p.name}
                     </span>
-                    {plan === p.id && <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                    {plan === p.id && <div className="w-1.5 h-1.5 rounded-full bg-gold" />}
                   </div>
-                  <span className="text-xs text-zinc-400">{p.desc}</span>
+                  <span className="text-xs text-muted">{p.desc}</span>
                 </div>
                 {plan === p.id ? (
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Active</span>
+                  <span className="text-[10px] font-bold text-muted uppercase tracking-widest">Active</span>
                 ) : (
-                  <ChevronRight className="w-4 h-4 text-zinc-300" />
+                  <ChevronRight className="w-4 h-4 text-muted/40" />
                 )}
               </button>
             ))}
@@ -105,23 +105,23 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade }) =
 
         {/* Language Selection */}
         <section className="space-y-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 px-2">{t('settings.language')}</h2>
-          <div className="bg-white border border-zinc-100 rounded-[32px] overflow-hidden">
+          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">{t('settings.language')}</h2>
+          <div className="bg-white border border-border-custom rounded-[32px] overflow-hidden">
             {languages.map((lang) => (
               <button
                 key={lang.code}
                 onClick={() => changeLanguage(lang.code)}
-                className={`w-full p-6 flex items-center justify-between hover:bg-zinc-50 transition-colors border-b border-zinc-50 last:border-0 ${
-                  i18n.language === lang.code ? 'bg-amber-50/50' : ''
+                className={`w-full p-6 flex items-center justify-between hover:bg-paper transition-colors border-b border-paper last:border-0 ${
+                  i18n.language === lang.code ? 'bg-paper' : ''
                 }`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-2 h-2 rounded-full ${i18n.language === lang.code ? 'bg-amber-400' : 'bg-transparent'}`} />
-                  <span className={`font-medium ${i18n.language === lang.code ? 'text-zinc-900' : 'text-zinc-500'}`}>
+                  <div className={`w-2 h-2 rounded-full ${i18n.language === lang.code ? 'bg-gold' : 'bg-transparent'}`} />
+                  <span className={`font-medium ${i18n.language === lang.code ? 'text-ink' : 'text-muted'}`}>
                     {lang.name}
                   </span>
                 </div>
-                {i18n.language === lang.code && <Globe className="w-4 h-4 text-amber-500" />}
+                {i18n.language === lang.code && <Globe className="w-4 h-4 text-gold" />}
               </button>
             ))}
           </div>
@@ -129,15 +129,15 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade }) =
 
         {/* About */}
         <section className="space-y-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 px-2">{t('settings.about')}</h2>
-          <div className="bg-white border border-zinc-100 rounded-[32px] p-6 space-y-4">
+          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">{t('settings.about')}</h2>
+          <div className="bg-white border border-border-custom rounded-[32px] p-6 space-y-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-zinc-500">Version</span>
-              <span className="font-medium text-zinc-900">1.0.0</span>
+              <span className="text-muted">Version</span>
+              <span className="font-medium text-ink">1.0.0</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-zinc-500">Legal</span>
-              <ChevronRight className="w-4 h-4 text-zinc-300" />
+              <span className="text-muted">Legal</span>
+              <ChevronRight className="w-4 h-4 text-muted/40" />
             </div>
           </div>
         </section>
