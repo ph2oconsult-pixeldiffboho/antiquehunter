@@ -15,21 +15,21 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       title: "Don’t overpay for antiques",
       subtext: "Get dealer-level insight before you buy",
       icon: <Sparkles className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1528909514045-2fa4ac7a08ba?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=800"
     },
     {
       id: 'step2',
       title: "Snap. Analyse. Decide.",
       subtext: "Upload a photo or describe the item. Get pricing, risks, and negotiation strategy.",
       icon: <Camera className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1516315720917-231ef9acce48?auto=format&fit=crop&q=80&w=800"
     },
     {
       id: 'step3',
       title: "Avoid costly mistakes",
       subtext: "Know when to buy, negotiate, or walk away",
       icon: <ShieldCheck className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1573164713988-8665fc963095?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1565038930214-09566ed2149b?auto=format&fit=crop&q=80&w=800"
     }
   ];
 
