@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag, Mic, MicOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag, Mic, MicOff, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AntiqueCategory } from '../services/gemini';
 
@@ -24,6 +24,9 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   onRemoveImage
 }) => {
   const { t } = useTranslation();
+  const [showHint, setShowHint] = useState(() => {
+    return localStorage.getItem('input_hint_shown') !== 'true';
+  });
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
@@ -82,6 +85,12 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) return;
+    
+    if (showHint) {
+      setShowHint(false);
+      localStorage.setItem('input_hint_shown', 'true');
+    }
+
     onAnalyze(description, { 
       askingPrice: price ? parseFloat(price) : undefined, 
       priceType,
@@ -114,31 +123,60 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       </button>
 
       <div className="mb-8">
-        <h1 className="serif text-3xl mb-2 tracking-tight text-ink">{t('describe.title')}</h1>
-        <p className="text-muted text-sm">{t('home.describe_subtitle')}</p>
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-gold/10 text-gold rounded-full border border-gold/20 mb-4">
+          <Sparkles className="w-3 h-3" />
+          <span className="text-[9px] uppercase tracking-widest font-bold">Try an item — even something nearby</span>
+        </div>
+        <h1 className="serif text-4xl mb-2 tracking-tight text-ink">{t('describe.title')}</h1>
+        <p className="text-muted text-sm leading-relaxed">{t('home.describe_subtitle')}</p>
+        
+        <AnimatePresence>
+          {showHint && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 p-3 bg-paper border border-border-custom rounded-xl flex items-center gap-3"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse shrink-0" />
+              <p className="text-xs text-muted italic">
+                “Start with something simple — even a glass or small item”
+              </p>
+              <button 
+                onClick={() => {
+                  setShowHint(false);
+                  localStorage.setItem('input_hint_shown', 'true');
+                }}
+                className="ml-auto text-muted hover:text-ink"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="mb-8 space-y-4">
         <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('describe.images')}</label>
         <div className="flex flex-wrap gap-3">
+          <button 
+            onClick={onAddImage}
+            className="w-24 h-24 rounded-2xl border-2 border-dashed border-border-custom flex flex-col items-center justify-center gap-2 text-muted hover:border-gold hover:text-gold transition-all bg-paper/50"
+          >
+            <Camera className="w-6 h-6" />
+            <span className="text-[9px] font-bold uppercase tracking-widest">{t('common.upload')}</span>
+          </button>
           {images.map((img, index) => (
-            <div key={index} className="relative w-20 h-20 rounded-xl overflow-hidden group border border-border-custom">
+            <div key={index} className="relative w-24 h-24 rounded-2xl overflow-hidden group border border-border-custom shadow-sm">
               <img src={img} alt="" className="w-full h-full object-cover" />
               <button 
                 onClick={() => onRemoveImage(index)}
-                className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3" />
               </button>
             </div>
           ))}
-          <button 
-            onClick={onAddImage}
-            className="w-20 h-20 rounded-xl border-2 border-dashed border-border-custom flex flex-col items-center justify-center gap-1 text-muted hover:border-gold hover:text-gold transition-all"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="text-[8px] font-bold uppercase tracking-tighter">{t('describe.add_more')}</span>
-          </button>
         </div>
 
         {isDetailedScan && (
