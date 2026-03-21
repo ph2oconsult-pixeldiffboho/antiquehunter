@@ -8,6 +8,7 @@ import { CameraCapture } from './components/CameraCapture';
 import { DescriptionInput } from './components/DescriptionInput';
 import { AnalysisView } from './components/AnalysisView';
 import { Settings } from './components/Settings';
+import { Onboarding } from './components/Onboarding';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { searchAntiques } from './services/gemini';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
@@ -21,6 +22,9 @@ export default function App() {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [plan, setPlan] = useState<'free' | 'pro' | 'dealer'>('free');
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return localStorage.getItem('onboarding_complete') !== 'true';
+  });
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -328,6 +332,12 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      {showOnboarding && (
+        <Onboarding onComplete={() => {
+          setShowOnboarding(false);
+          localStorage.setItem('onboarding_complete', 'true');
+        }} />
+      )}
       <Layout onViewChange={setCurrentScreen}>
         <input 
           type="file" 
