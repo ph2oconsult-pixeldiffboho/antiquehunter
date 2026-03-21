@@ -13,9 +13,10 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence 
 
   const getColor = (s: number) => {
     if (s >= 80) return '#10b981'; // emerald-500 (Strong Buy)
-    if (s >= 65) return '#f59e0b'; // amber-500 (Worth Investigating)
-    if (s >= 50) return '#f97316'; // orange-500 (Risky)
-    return '#ef4444'; // rose-500 (Pass)
+    if (s >= 65) return '#f59e0b'; // amber-500 (Buy)
+    if (s >= 45) return '#f97316'; // orange-500 (Risky)
+    if (s >= 25) return '#fb7185'; // rose-400 (Avoid)
+    return '#e11d48'; // rose-600 (Hard Pass)
   };
 
   return (
@@ -50,7 +51,7 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence 
         <div className="flex flex-col items-center -mt-1">
           <span className="text-[7px] uppercase tracking-widest font-bold text-white/40">Buy Score</span>
           {confidence && (
-            <span className="text-[6px] uppercase tracking-widest font-bold text-white/20">{confidence}</span>
+            <span className="text-[6px] uppercase tracking-widest font-bold text-white/20">{confidence.replace('_', ' ')}</span>
           )}
         </div>
       </div>
