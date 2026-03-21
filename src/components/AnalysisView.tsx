@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2 } from 'lucide-react';
 import { BuyScoreGauge } from './BuyScoreGauge';
 import { useTranslation } from 'react-i18next';
 
@@ -27,11 +27,56 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const isDealer = plan === 'dealer';
   const isFree = plan === 'free';
 
+  // Value Tier logic: Tier D (Utility) items bypass paywall
+  const isTierD = currentItem.item_summary?.value_tier === 'D';
+  const showPaywall = isFree && !isTierD;
+
+  // Content visibility logic
+  const showProContent = isPro || isTierD;
+  const showDealerContent = isDealer || isTierD;
+  const isHardPass = currentItem.buy_decision.score < 25;
+
+  const [copied, setCopied] = React.useState(false);
+
+  const handleShare = async () => {
+    const text = isHardPass 
+      ? `Dealer Warning: This item is a Hard Pass (Score: ${currentItem.buy_decision.score}). ${currentItem.item_summary.snap_judgement}`
+      : `Antique Hunter Alert: This ${currentItem.item_summary.title} is a Tier D utility item. ${currentItem.item_summary.snap_judgement}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Antique Hunter Analysis',
+          text: text,
+          url: window.location.href
+        });
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(`${text}\n${window.location.href}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const ShareButton = ({ className = "" }: { className?: string }) => (
+    <button 
+      onClick={handleShare}
+      className={`flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full border border-white/20 transition-colors text-[10px] font-bold uppercase tracking-widest text-white/80 ${className}`}
+    >
+      <Share2 className="w-3 h-3" />
+      {copied ? "Copied!" : (isHardPass ? t('paywall.share_warning') : t('paywall.send_to_friend'))}
+    </button>
+  );
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-emerald-400';
     if (score >= 65) return 'text-amber-400';
-    if (score >= 50) return 'text-orange-400';
-    return 'text-rose-400';
+    if (score >= 45) return 'text-orange-400';
+    if (score >= 25) return 'text-rose-400';
+    return 'text-rose-600'; // Stronger red for Hard Pass
   };
 
   const PaywallCard = () => (
@@ -128,11 +173,27 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               </button>
             </div>
           ) : (
-            <div className="px-4 py-1.5 bg-zinc-100 rounded-full flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">
-                {currentItem.item_summary.confidence} {t('analysis.confidence')}
-              </span>
+            <div className="flex flex-col items-end gap-1">
+              <div className="px-4 py-1.5 bg-zinc-100 rounded-full flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : 
+                  currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 
+                  currentItem.item_summary.confidence === 'low' ? 'bg-rose-400' : 'bg-rose-600'
+                }`} />
+                <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">
+                  {currentItem.item_summary.confidence.replace('_', ' ')} {t('analysis.confidence')}
+                </span>
+              </div>
+              <div className="w-24 h-0.5 bg-zinc-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-1000 ease-out rounded-full ${
+                    currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : 
+                    currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 
+                    currentItem.item_summary.confidence === 'low' ? 'bg-rose-400' : 'bg-rose-600'
+                  }`}
+                  style={{ width: `${currentItem.item_summary.confidence_score}%` }}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -185,18 +246,60 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Era</p>
             <p className="text-sm font-medium text-zinc-900">{currentItem.item_summary.likely_period}</p>
           </div>
-          <div>
+          <div className="col-span-2">
             <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-0.5">Certainty</p>
-            <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
-              <p className="text-sm font-medium text-zinc-900 capitalize">{currentItem.item_summary.confidence}</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : 
+                    currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 
+                    currentItem.item_summary.confidence === 'low' ? 'bg-rose-400' : 'bg-rose-600'
+                  }`} />
+                  <p className="text-sm font-medium text-zinc-900 capitalize">
+                    {currentItem.item_summary.confidence.replace('_', ' ')}
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold text-zinc-400">{currentItem.item_summary.confidence_score}%</span>
+              </div>
+              
+              {/* Minimal Confidence Meter */}
+              <div className="h-1 w-full bg-zinc-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-1000 ease-out rounded-full ${
+                    currentItem.item_summary.confidence === 'high' ? 'bg-emerald-500' : 
+                    currentItem.item_summary.confidence === 'medium' ? 'bg-amber-500' : 
+                    currentItem.item_summary.confidence === 'low' ? 'bg-rose-400' : 'bg-rose-600'
+                  }`}
+                  style={{ width: `${currentItem.item_summary.confidence_score}%` }}
+                />
+              </div>
+
+              {currentItem.item_summary.confidence_reason && (
+                <p className="text-[10px] text-zinc-500 leading-tight italic">
+                  {currentItem.item_summary.confidence_reason}
+                </p>
+              )}
+              {currentItem.item_summary.confidence_improvement_suggestions?.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-zinc-50 space-y-1.5">
+                  <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">How to increase confidence</p>
+                  <ul className="space-y-1">
+                    {currentItem.item_summary.confidence_improvement_suggestions.map((suggestion: string, i: number) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <div className="w-1 h-1 rounded-full bg-zinc-300 mt-1.5 shrink-0" />
+                        <p className="text-[10px] text-zinc-600 font-medium leading-tight">{suggestion}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </section>
 
       {/* 3. Teaser Insight for Free Users */}
-      {isFree && (
+      {showPaywall && (
         <div className="space-y-6">
           <div className="space-y-3">
             <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 px-1">{t('analysis.preliminary_findings')}</h3>
@@ -240,20 +343,52 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       )}
 
+      {/* 4. Dealer Snap Judgement */}
+      <section className="px-1 space-y-2">
+        <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">{t('analysis.snap_judgement')}</h3>
+        <p className="serif text-xl font-medium text-zinc-900 italic leading-snug">
+          "{currentItem.item_summary.snap_judgement}"
+        </p>
+      </section>
+
       {/* 4. Buy Score Card - Visually Dominant */}
-      {isFree ? (
+      {showPaywall ? (
         <PaywallCard />
       ) : (
         <section className="p-8 bg-zinc-900 text-white rounded-[40px] shadow-2xl shadow-zinc-900/30 space-y-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 blur-[80px] rounded-full -mr-24 -mt-24" />
           
+          {isTierD && isFree && (
+            <div className="relative z-10 px-6 py-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 mb-4">
+              <p className="text-xs font-medium text-amber-400 leading-relaxed italic">
+                {t('paywall.low_value_notice')}
+              </p>
+              <p className="text-[10px] font-bold text-white/60 mt-1 uppercase tracking-wider">
+                {t('paywall.value_anchor', { 
+                  currency: currentItem.price_guidance.currency, 
+                  low: currentItem.price_guidance.estimated_market_range_low, 
+                  high: currentItem.price_guidance.estimated_market_range_high 
+                })}
+              </p>
+              <div className="mt-3">
+                <ShareButton />
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between relative z-10">
             <div className="space-y-1">
               <p className="text-[10px] text-zinc-400 uppercase tracking-[0.2em] font-bold">{t('analysis.buy_score')}</p>
               <h2 className={`serif text-4xl font-light ${getScoreColor(currentItem.buy_decision.score)}`}>{currentItem.buy_decision.label}</h2>
               <div className="flex items-center gap-2 pt-1">
-                <div className={`w-1.5 h-1.5 rounded-full ${currentItem.buy_decision.confidence === 'high' ? 'bg-emerald-500' : currentItem.buy_decision.confidence === 'medium' ? 'bg-amber-500' : 'bg-rose-500'}`} />
-                <span className="text-[9px] uppercase tracking-widest font-bold text-zinc-500">{currentItem.buy_decision.confidence} Certainty</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${
+                currentItem.buy_decision.confidence === 'high' ? 'bg-emerald-500' : 
+                currentItem.buy_decision.confidence === 'medium' ? 'bg-amber-500' : 
+                currentItem.buy_decision.confidence === 'low' ? 'bg-rose-400' : 'bg-rose-600'
+              }`} />
+              <span className="text-[9px] uppercase tracking-widest font-bold text-zinc-500">
+                {currentItem.buy_decision.confidence.replace('_', ' ')} Certainty
+              </span>
               </div>
             </div>
             <BuyScoreGauge 
@@ -277,12 +412,17 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 </div>
               ))}
             </div>
+            {isHardPass && (
+              <div className="pt-2">
+                <ShareButton />
+              </div>
+            )}
           </div>
         </section>
       )}
 
       {/* 4. Price Guidance Card */}
-      {isFree ? (
+      {showPaywall ? (
         <UpgradePlaceholder 
           title={t('analysis.price_guidance')} 
           description="See the real price vs what sellers ask"
@@ -330,7 +470,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 5. Dealer Take Card */}
-      {isDealer ? (
+      {showDealerContent ? (
         <section className="p-6 bg-zinc-50 rounded-[32px] space-y-4">
           <div className="flex items-center gap-2 text-amber-600/70">
             <Gavel className="w-4 h-4" />
@@ -367,7 +507,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 6. Negotiation Strategy Card */}
-      {isPro ? (
+      {showProContent ? (
         <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
           <div className="flex items-center gap-2 text-emerald-600/70">
             <Handshake className="w-4 h-4" />
@@ -402,7 +542,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 7. Walk Away Card */}
-      {isFree ? (
+      {showPaywall ? (
         <UpgradePlaceholder 
           title={t('analysis.when_to_walk_away')} 
           description="Conditions that make this a bad buy"
@@ -429,7 +569,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 8. Top 3 Checks Card */}
-      {!isFree && (
+      {!showPaywall && (
         <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
           <div className="flex items-center gap-2 text-zinc-400">
             <CheckCircle className="w-4 h-4" />
@@ -449,7 +589,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 9. Red Flags Card */}
-      {!isFree && currentItem.red_flags.length > 0 && (
+      {!showPaywall && currentItem.red_flags.length > 0 && (
         <section className="p-6 bg-white border border-zinc-100 rounded-[32px] shadow-sm space-y-4">
           <div className="flex items-center gap-2 text-rose-500">
             <ShieldAlert className="w-4 h-4" />
@@ -476,7 +616,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 10. Market Insight Card */}
-      {isPro ? (
+      {showProContent ? (
         <section className="p-6 bg-zinc-50 rounded-[32px] space-y-4">
           <div className="flex items-center gap-2 text-zinc-400">
             <Info className="w-4 h-4" />
