@@ -13,7 +13,7 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence 
 
   const getColor = (s: number) => {
     if (s >= 65) return '#2F6F4F'; // decision-green
-    if (s >= 45) return '#B7791F'; // decision-amber
+    if (s >= 45) return '#C5A059'; // decision-gold
     return '#8B2E2E'; // decision-red
   };
 
