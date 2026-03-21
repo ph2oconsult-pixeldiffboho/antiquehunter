@@ -1,100 +1,58 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { MapPin, Calendar, ArrowRight, Trash2 } from 'lucide-react';
 
-interface FindCardProps {
-  find: {
-    id: string;
-    title: string;
-    category?: string;
-    image?: string;
-    images?: string[];
-    analysis: any; // The full analysis object or array
-    status: string;
-    location?: string;
-    createdAt: any;
-  };
-  onClick: () => void;
-  onDelete: (e: React.MouseEvent) => void;
+interface BuyScoreGaugeProps {
+  score: number;
+  confidence?: string;
 }
 
-export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) => {
-  const date = find.createdAt?.toDate ? find.createdAt.toDate().toLocaleDateString() : new Date(find.createdAt).toLocaleDateString();
-  const displayImage = find.images?.[0] || find.image;
-  
-  const items = Array.isArray(find.analysis) ? find.analysis : [find.analysis];
-  const mainItem = items[0];
-  const score = mainItem.buy_decision.score;
-  const label = mainItem.buy_decision.label;
+export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence }) => {
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
 
-  const getScoreColor = (s: number) => {
-    if (s >= 65) return 'bg-decision-green';
-    if (s >= 45) return 'bg-decision-amber';
-    return 'bg-decision-red';
-  };
-
-  const getScoreTextColor = (s: number) => {
-    if (s >= 65) return 'text-decision-green';
-    if (s >= 45) return 'text-decision-amber';
-    return 'text-decision-red';
+  const getColor = (s: number) => {
+    if (s >= 65) return '#2F6F4F'; // decision-green
+    if (s >= 45) return '#B7791F'; // decision-amber
+    return '#8B2E2E'; // decision-red
   };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      onClick={onClick}
-      className="group bg-white rounded-[32px] overflow-hidden border border-border-custom shadow-sm hover:shadow-xl transition-all duration-500 cursor-pointer relative"
-    >
-      <div className="aspect-[4/3] relative overflow-hidden">
-        {displayImage ? (
-          <img src={displayImage} alt={find.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-        ) : (
-          <div className="w-full h-full bg-zinc-100 flex items-center justify-center">
-            <span className="text-zinc-300 font-serif text-4xl">?</span>
-          </div>
-        )}
-        <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
-          {find.status}
-        </div>
-        <div className={`absolute bottom-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm text-white ${getScoreColor(score)}`}>
-          Score: {score}
-        </div>
-      </div>
-
-      <div className="p-6 space-y-4">
-        <div className="space-y-1">
-          <h3 className="serif text-xl font-light tracking-tight group-hover:text-zinc-600 transition-colors line-clamp-1">{find.title}</h3>
-          <div className="flex items-center gap-2">
-            <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">{find.category || mainItem.item_summary.category}</p>
-            <span className="w-1 h-1 rounded-full bg-zinc-200" />
-            <p className={`text-[10px] uppercase tracking-widest font-bold ${getScoreTextColor(score)}`}>{label}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between pt-4 border-t border-zinc-50">
-          <div className="flex items-center gap-3 text-zinc-400">
-            <div className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              <span className="text-[10px] font-bold">{date}</span>
-            </div>
-            {find.location && (
-              <div className="flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                <span className="text-[10px] font-bold line-clamp-1">{find.location}</span>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={onDelete}
-            className="p-2 text-zinc-300 hover:text-rose-500 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+    <div className="relative w-24 h-24 flex items-center justify-center">
+      <svg className="w-full h-full transform -rotate-90">
+        <circle
+          cx="48"
+          cy="48"
+          r={radius}
+          stroke="currentColor"
+          strokeWidth="8"
+          fill="transparent"
+          strokeDasharray={circumference}
+          className="text-white/10"
+        />
+        <motion.circle
+          cx="48"
+          cy="48"
+          r={radius}
+          stroke={getColor(score)}
+          strokeWidth="8"
+          fill="transparent"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold">{score}</span>
+        <div className="flex flex-col items-center -mt-1">
+          <span className="text-[7px] uppercase tracking-widest font-bold text-white/40">Buy Score</span>
+          {confidence && (
+            <span className="text-[6px] uppercase tracking-widest font-bold text-white/20">{confidence.replace('_', ' ')}</span>
+          )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
