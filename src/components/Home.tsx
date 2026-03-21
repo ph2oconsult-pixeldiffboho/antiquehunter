@@ -1,18 +1,20 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Camera, Search, History, Settings, Sparkles, ArrowRight, Upload } from 'lucide-react';
+import { Camera, Search, History, Settings, Sparkles, ArrowRight, Upload, Mic } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface HomeProps {
   onScan: () => void;
   onUpload: () => void;
-  onDescribe: () => void;
+  onDescribe: (autoListen?: boolean) => void;
   onViewCollection: () => void;
   onViewSettings: () => void;
 }
 
 export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onViewCollection, onViewSettings }) => {
   const { t } = useTranslation();
+
+  const isSpeechSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12 space-y-12 pb-32">
@@ -68,7 +70,7 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={onDescribe}
+              onClick={() => onDescribe(false)}
               className="group p-8 bg-white border border-border-custom rounded-[32px] text-left space-y-4 shadow-sm hover:shadow-xl transition-all"
             >
               <div className="p-4 bg-paper rounded-2xl w-fit group-hover:bg-border-custom transition-colors">
@@ -80,6 +82,28 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
               </div>
             </motion.button>
           </div>
+
+          {isSpeechSupported && (
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              onClick={() => onDescribe(true)}
+              className="group relative h-24 rounded-[24px] overflow-hidden bg-white border border-border-custom shadow-sm hover:shadow-md transition-all"
+            >
+              <div className="absolute inset-0 flex items-center justify-between px-8">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-gold/10 rounded-xl group-hover:bg-gold/20 transition-colors">
+                    <Mic className="w-5 h-5 text-gold" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="serif text-lg font-light text-ink">Voice Appraisal</h3>
+                    <p className="text-[9px] text-muted uppercase tracking-widest font-bold">Speak to describe your item</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-muted group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.button>
+          )}
         </div>
       </section>
 
