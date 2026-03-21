@@ -28,19 +28,15 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
   const label = mainItem.buy_decision.label;
 
   const getScoreColor = (s: number) => {
-    if (s >= 80) return 'bg-emerald-500';
-    if (s >= 65) return 'bg-emerald-500';
-    if (s >= 45) return 'bg-rose-500';
-    if (s >= 25) return 'bg-rose-500';
-    return 'bg-rose-600';
+    if (s >= 65) return 'bg-decision-green';
+    if (s >= 45) return 'bg-decision-amber';
+    return 'bg-decision-red';
   };
 
   const getScoreTextColor = (s: number) => {
-    if (s >= 80) return 'text-emerald-600';
-    if (s >= 65) return 'text-emerald-600';
-    if (s >= 45) return 'text-rose-600';
-    if (s >= 25) return 'text-rose-600';
-    return 'text-rose-700';
+    if (s >= 65) return 'text-decision-green';
+    if (s >= 45) return 'text-decision-amber';
+    return 'text-decision-red';
   };
 
   return (
@@ -50,7 +46,7 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       onClick={onClick}
-      className="group bg-white rounded-[32px] overflow-hidden border border-zinc-100 shadow-sm hover:shadow-xl transition-all duration-500 cursor-pointer relative"
+      className="group bg-white rounded-[32px] overflow-hidden border border-border-custom shadow-sm hover:shadow-xl transition-all duration-500 cursor-pointer relative"
     >
       <div className="aspect-[4/3] relative overflow-hidden">
         {displayImage ? (
