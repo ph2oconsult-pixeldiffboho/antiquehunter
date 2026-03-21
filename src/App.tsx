@@ -33,6 +33,7 @@ export default function App() {
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [lastDetails, setLastDetails] = useState<any>(null);
   const [isFromCollection, setIsFromCollection] = useState(false);
+  const [autoStartListening, setAutoStartListening] = useState(false);
   const [showResetPrompt, setShowResetPrompt] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -200,8 +201,9 @@ export default function App() {
               setIsDetailedScan(false);
               fileInputRef.current?.click();
             })}
-            onDescribe={() => handleResetAndAction(() => {
+            onDescribe={(autoListen) => handleResetAndAction(() => {
               setIsDetailedScan(false);
+              setAutoStartListening(!!autoListen);
               setCurrentScreen('describe');
             })} 
             onViewCollection={() => setCurrentScreen('collection')}
@@ -269,6 +271,7 @@ export default function App() {
             isDetailedScan={isDetailedScan}
             onAddImage={() => fileInputRef.current?.click()}
             onRemoveImage={(index) => setCapturedImages(prev => prev.filter((_, i) => i !== index))}
+            autoStartListening={autoStartListening}
           />
         );
       case 'analysis':
