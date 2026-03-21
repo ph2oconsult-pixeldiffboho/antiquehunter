@@ -35,7 +35,7 @@ export const SearchHero: React.FC<SearchHeroProps> = ({ onSearch, isSearching })
       <motion.h1 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="serif text-5xl md:text-7xl font-light mb-8 tracking-tight"
+        className="serif text-5xl md:text-7xl font-light mb-8 tracking-tight text-ink"
       >
         The Curator
       </motion.h1>
@@ -43,29 +43,29 @@ export const SearchHero: React.FC<SearchHeroProps> = ({ onSearch, isSearching })
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="text-ink/60 uppercase tracking-widest text-xs mb-12"
+        className="text-muted uppercase tracking-widest text-xs mb-12"
       >
         Global Antique Aggregator & Visual Search
       </motion.p>
 
       <form onSubmit={handleSubmit} className="relative group">
-        <div className="relative flex items-center bg-white border border-ink/10 rounded-full p-2 shadow-sm focus-within:shadow-md transition-shadow">
+        <div className="relative flex items-center bg-white border border-border-custom rounded-full p-2 shadow-sm focus-within:shadow-md transition-shadow">
           <div className="pl-6 pr-4">
-            <Search className="w-5 h-5 text-ink/40" />
+            <Search className="w-5 h-5 text-muted/40" />
           </div>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Describe the piece you seek..."
-            className="flex-1 bg-transparent border-none outline-none py-4 text-lg placeholder:text-ink/20"
+            className="flex-1 bg-transparent border-none outline-none py-4 text-lg placeholder:text-muted/20 text-ink"
           />
           
           <div className="flex items-center gap-2 pr-2">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-3 rounded-full hover:bg-paper transition-colors text-ink/60"
+              className="p-3 rounded-full hover:bg-paper transition-colors text-muted"
               title="Upload Image"
             >
               <Camera className="w-5 h-5" />
@@ -73,7 +73,7 @@ export const SearchHero: React.FC<SearchHeroProps> = ({ onSearch, isSearching })
             <button
               type="submit"
               disabled={isSearching}
-              className="bg-ink text-paper px-8 py-3 rounded-full font-medium hover:bg-ink/90 transition-colors disabled:opacity-50"
+              className="bg-ink text-paper px-8 py-3 rounded-full font-medium hover:opacity-90 transition-colors disabled:opacity-50"
             >
               {isSearching ? 'Searching...' : 'Search'}
             </button>
@@ -94,7 +94,7 @@ export const SearchHero: React.FC<SearchHeroProps> = ({ onSearch, isSearching })
               initial={{ opacity: 0, scale: 0.9, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 10 }}
-              className="absolute -bottom-32 left-1/2 -translate-x-1/2 bg-white p-2 rounded-xl shadow-xl border border-ink/5"
+              className="absolute -bottom-32 left-1/2 -translate-x-1/2 bg-white p-2 rounded-xl shadow-xl border border-border-custom"
             >
               <div className="relative w-24 h-24 rounded-lg overflow-hidden">
                 <img src={image} alt="Upload preview" className="w-full h-full object-cover" />
