@@ -15,14 +15,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       title: "Don’t overpay for antiques",
       subtext: "Get dealer-level insight before you buy",
       icon: <Sparkles className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1540932239986-30128078f3c5?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1528909514045-2fa4ac7a08ba?auto=format&fit=crop&q=80&w=800"
     },
     {
       id: 'step2',
       title: "Snap. Analyse. Decide.",
       subtext: "Upload a photo or describe the item. Get pricing, risks, and negotiation strategy.",
       icon: <Camera className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1533900298318-6b8da08a523e?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=800"
     },
     {
       id: 'step3',
