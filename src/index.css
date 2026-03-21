@@ -3,9 +3,15 @@
 @theme {
   --font-serif: "Cormorant Garamond", serif;
   --font-sans: "Inter", sans-serif;
-  --color-paper: #f5f2ed;
-  --color-ink: #1a1a1a;
-  --color-gold: #c5a059;
+  --color-paper: #F7F4EF;
+  --color-ink: #1A1A1A;
+  --color-muted: #6B6B6B;
+  --color-card: #111111;
+  --color-border-custom: #E5E0D8;
+  --color-gold: #C5A059;
+  --color-decision-green: #2F6F4F;
+  --color-decision-amber: #B7791F;
+  --color-decision-red: #8B2E2E;
 }
 
 body {
