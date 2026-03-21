@@ -28,6 +28,9 @@ export default function App() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [lastDetails, setLastDetails] = useState<any>(null);
+  const [isFromCollection, setIsFromCollection] = useState(false);
+  const [showResetPrompt, setShowResetPrompt] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export default function App() {
   const handleAnalyze = async (input: string, details: any, inputIsImage = false, additionalImages: string[] = []) => {
     setIsAnalyzing(true);
     setLastDetails(details);
+    setIsFromCollection(false);
     
     let allImages = [...capturedImages];
     if (inputIsImage) {
@@ -139,9 +143,35 @@ export default function App() {
         createdAt: serverTimestamp()
       });
       alert('Find saved to your collection!');
+      setAnalysisResult(null);
+      setCapturedImages([]);
+      setIsFromCollection(false);
       setCurrentScreen('collection');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  };
+
+  const handleResetAndAction = (action: () => void) => {
+    if (analysisResult && !isFromCollection) {
+      setPendingAction(() => action);
+      setShowResetPrompt(true);
+    } else {
+      setAnalysisResult(null);
+      setCapturedImages([]);
+      setIsFromCollection(false);
+      action();
+    }
+  };
+
+  const confirmReset = () => {
+    setAnalysisResult(null);
+    setCapturedImages([]);
+    setIsFromCollection(false);
+    setShowResetPrompt(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
     }
   };
 
@@ -158,18 +188,18 @@ export default function App() {
       case 'home':
         return (
           <Home 
-            onScan={() => {
+            onScan={() => handleResetAndAction(() => {
               setIsDetailedScan(true);
               setCurrentScreen('scan');
-            }} 
-            onUpload={() => {
+            })} 
+            onUpload={() => handleResetAndAction(() => {
               setIsDetailedScan(false);
               fileInputRef.current?.click();
-            }}
-            onDescribe={() => {
+            })}
+            onDescribe={() => handleResetAndAction(() => {
               setIsDetailedScan(false);
               setCurrentScreen('describe');
-            }} 
+            })} 
             onViewCollection={() => setCurrentScreen('collection')}
             onViewSettings={() => setCurrentScreen('settings')}
           />
@@ -269,6 +299,7 @@ export default function App() {
             onViewFind={(find) => {
               setAnalysisResult(find.analysis);
               setCapturedImages(find.images || (find.image ? [find.image] : []));
+              setIsFromCollection(true);
               setCurrentScreen('analysis');
             }} 
             onBack={() => setCurrentScreen('home')}
@@ -316,6 +347,42 @@ export default function App() {
           >
             {renderScreen()}
           </motion.div>
+        </AnimatePresence>
+
+        {/* Reset Confirmation Prompt */}
+        <AnimatePresence>
+          {showResetPrompt && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl space-y-6"
+              >
+                <div className="space-y-2 text-center">
+                  <h3 className="serif text-2xl font-light">Unsaved Analysis</h3>
+                  <p className="text-sm text-zinc-500">You have an active analysis that hasn't been saved to your collection. Starting a new scan will discard it.</p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={() => {
+                      setShowResetPrompt(false);
+                      setCurrentScreen('analysis');
+                    }}
+                    className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm shadow-lg shadow-zinc-900/10"
+                  >
+                    Go Back to Save
+                  </button>
+                  <button 
+                    onClick={confirmReset}
+                    className="w-full py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold text-sm hover:bg-zinc-200 transition-colors"
+                  >
+                    Discard and Continue
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
         </AnimatePresence>
       </Layout>
     </ErrorBoundary>
