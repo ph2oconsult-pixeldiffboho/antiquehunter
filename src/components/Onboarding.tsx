@@ -82,6 +82,23 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-ink/40 to-transparent" />
+                
+                {/* Value Comparison Overlay for Step 1 */}
+                {currentStep === 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="absolute top-8 left-1/2 -translate-x-1/2 w-[80%] bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-4 flex flex-col gap-1 items-center"
+                  >
+                    <p className="text-[9px] uppercase tracking-widest font-bold text-white/60">Asking Price</p>
+                    <p className="text-xl font-medium text-white/40 line-through decoration-decision-red decoration-2">£950</p>
+                    <div className="w-px h-4 bg-white/20 my-1" />
+                    <p className="text-[9px] uppercase tracking-widest font-bold text-decision-gold">Real Market Value</p>
+                    <p className="text-2xl font-bold text-white tracking-tight">£450 – £600</p>
+                  </motion.div>
+                )}
+
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-20 h-20 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/20">
                   {steps[currentStep].icon}
                 </div>
