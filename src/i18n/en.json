@@ -37,6 +37,7 @@
     "style": "Aesthetic",
     "confidence": "Certainty",
     "explanation": "The Verdict",
+    "snap_judgement": "Dealer Snap Judgement",
     "preliminary_findings": "Initial Scan Results",
     "checklist": "Field Inspection",
     "red_flags": "Deal Breakers",
@@ -60,7 +61,11 @@
     "cta_footer": "Instant access • No subscription",
     "urgency": "Warning: High Stakes",
     "tension_line_title": "⚠️ This item may be overpriced",
-    "tension_line_subtitle": "See the dealer view before you commit"
+    "tension_line_subtitle": "See the dealer view before you commit",
+    "low_value_notice": "This is a Tier D utility item. No need to unlock — save your dealer view for higher-value finds.",
+    "value_anchor": "This is typically a {{currency}}{{low}}–{{currency}}{{high}} item in real terms.",
+    "share_warning": "Share this warning",
+    "send_to_friend": "Send to a friend"
   },
   "collection": {
     "title": "Your Hunting Log",
