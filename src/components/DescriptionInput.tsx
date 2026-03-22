@@ -31,6 +31,9 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const [showHint, setShowHint] = useState(() => {
     return localStorage.getItem('input_hint_shown') !== 'true';
   });
+  const [showGuide, setShowGuide] = useState(() => {
+    return localStorage.getItem('guide_shown') !== 'true';
+  });
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
@@ -144,6 +147,30 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       </button>
 
       <div className="mb-8">
+        {showGuide && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+              <h2 className="serif text-2xl mb-4">How to get the best result</h2>
+              <ol className="list-decimal list-inside space-y-2 text-sm text-muted mb-6">
+                <li>Upload clear images of your item.</li>
+                <li>Select the category and location.</li>
+                <li>Describe the item in detail.</li>
+              </ol>
+              <p className="text-sm text-ink font-medium mb-6">
+                Remember: The more information you provide, the more confident the result.
+              </p>
+              <button
+                onClick={() => {
+                  setShowGuide(false);
+                  localStorage.setItem('guide_shown', 'true');
+                }}
+                className="w-full py-3 bg-ink text-paper rounded-xl font-bold text-sm hover:opacity-90"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-gold/10 text-gold rounded-full border border-gold/20 mb-4">
           <Sparkles className="w-3 h-3" />
           <span className="text-[9px] uppercase tracking-widest font-bold">Try an item — even something nearby</span>
