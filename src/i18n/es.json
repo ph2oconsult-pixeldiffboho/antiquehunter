@@ -48,6 +48,9 @@
     "dealer_perspective": "Perspectiva del distribuidor",
     "negotiation_strategy": "Estrategia de negociación",
     "when_to_walk_away": "Cuándo alejarse",
+    "confidence_high_desc": "Certeza alta — marcadores claros detectados",
+    "confidence_medium_desc": "Certeza media — basada solo en características visibles",
+    "confidence_low_desc": "Certeza baja — datos visuales limitados",
     "disclaimer": "El análisis de IA es probabilístico. Siempre verifique en persona antes de comprar."
   },
   "collection": {
