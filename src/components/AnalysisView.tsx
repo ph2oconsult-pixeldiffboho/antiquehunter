@@ -608,7 +608,30 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </section>
       )}
 
-      {/* 3. Analysis Confidence & Data Quality */}
+      {/* 3. Item Description (Item Summary Card) */}
+      <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-4">
+        <h1 className="serif text-3xl font-light tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
+        <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Type</p>
+            <p className="text-sm font-medium text-ink">{currentItem.item_summary.category}</p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Provenance</p>
+            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_origin}</p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Aesthetic</p>
+            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_style}</p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Era</p>
+            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_period}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Data Quality Assessment */}
       <section className={`p-8 bg-white border-2 rounded-[44px] shadow-md space-y-6 transition-all duration-500 ${
         currentItem.item_summary.confidence === 'high' ? 'border-decision-green/20 shadow-decision-green/5' : 
         currentItem.item_summary.confidence === 'medium' ? 'border-decision-gold/20 shadow-decision-gold/5' : 
@@ -696,34 +719,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </section>
 
-      {/* 4. Item Summary Card */}
-      <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-4">
-        <h1 className="serif text-3xl font-light tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
-        <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-          <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Type</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.category}</p>
-          </div>
-          <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Provenance</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_origin}</p>
-          </div>
-          <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Aesthetic</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_style}</p>
-          </div>
-          <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Era</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_period}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Teaser Insight for Free Users */}
+      {/* 5. Warning High Stakes Section (Teaser Insight for Free Users) */}
       {showPaywall && (
         <div className="space-y-6">
           <div className="space-y-3">
-            <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted px-1">{t('analysis.preliminary_findings')}</h3>
+            <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted px-1">{t('paywall.urgency')}</h3>
             
             {currentItem.teaser_insight && (
               <motion.div 
@@ -811,6 +811,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </p>
         </section>
       )}
+
+      {/* 6. Dealer Analysis Headline */}
+      <div className="pt-8 pb-4">
+        <h2 className="text-2xl font-bold text-ink tracking-tight">
+          {showDealerContent ? "Dealer Analysis" : "Unlock Dealer Analysis"}
+        </h2>
+      </div>
 
       {/* 6. Dealer Take Card */}
       {showDealerContent ? (
