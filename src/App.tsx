@@ -100,7 +100,7 @@ export default function App() {
         inputIsImage ? "Analyze this antique from the images provided." : input,
         allImages.length > 0 ? allImages : undefined,
         details.askingPrice,
-        currency, // Use global currency
+        details.currency || currency, // Use provided currency or fallback to global
         details.sellerType,
         i18n.language,
         details.priceType,
