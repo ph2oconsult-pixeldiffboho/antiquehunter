@@ -757,53 +757,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </section>
 
-      {/* 5. Warning High Stakes Section (Teaser Insight for Free Users) */}
-      {showPaywall && (
-        <div className="space-y-8">
-          <div className="space-y-3">
-            <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted px-1">{t('paywall.urgency')}</h3>
-            
-            {currentItem.teaser_insight && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="px-6 py-4 bg-decision-red/5 border border-decision-red/20 rounded-2xl flex items-start gap-3"
-              >
-                <AlertTriangle className="w-4 h-4 text-decision-red shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">Dealer's Warning</p>
-                  <p className="text-sm font-medium text-ink leading-relaxed">
-                    {currentItem.teaser_insight}
-                  </p>
-                </div>
-              </motion.div>
-            )}
 
-            {/* Trust Builders: One Check & One Red Flag */}
-            <div className="grid grid-cols-1 gap-3">
-              {currentItem.top_checks?.[0] && (
-                <div className="p-4 bg-white border border-border-custom rounded-2xl flex items-center gap-3">
-                  <CheckCircle className="w-4 h-4 text-decision-green shrink-0" />
-                  <p className="text-xs font-medium text-ink">
-                    <span className="text-muted mr-1">Inspection:</span> {currentItem.top_checks[0]}
-                  </p>
-                </div>
-              )}
-              {currentItem.red_flags?.[0] && (
-                <div className="p-4 bg-white border border-border-custom rounded-2xl flex items-center gap-3">
-                  <ShieldAlert className="w-4 h-4 text-decision-red shrink-0" />
-                  <p className="text-xs font-medium text-ink">
-                    <span className="text-muted mr-1">Flag:</span> {currentItem.red_flags[0].issue}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Paywall Section moved up */}
-          <PaywallCard />
-        </div>
-      )}
 
       {/* 5. Price Guidance Card */}
       {!showPaywall && (
@@ -1111,7 +1065,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         <section className="space-y-8 pt-12 border-t border-border-custom">
           {lockedFeatures.length > 0 && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold tracking-tight text-ink px-1">{t('paywall.cta')}</h2>
               <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory -mx-6 px-6">
                 {lockedFeatures.map((feature, i) => (
                   <div key={i} className="flex-shrink-0 w-72 snap-center">
