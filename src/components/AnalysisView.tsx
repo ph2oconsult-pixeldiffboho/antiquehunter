@@ -105,6 +105,24 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   const decisionStyles = getDecisionStyles(currentItem.buy_decision.score);
 
+  const getContextualPaywallMessage = () => {
+    const category = currentItem.item_summary?.category?.toLowerCase() || '';
+    const score = currentItem.buy_decision?.score || 50;
+
+    if (score < 45) {
+      return "This category is often overpriced by inexperienced buyers";
+    }
+    if (category.includes('furniture') || category.includes('ceramic') || category.includes('china')) {
+      return "Value is highly condition-dependent";
+    }
+    if (category.includes('art') || category.includes('painting') || category.includes('jewelry')) {
+      return "Small details will significantly impact price";
+    }
+    return t('paywall.description');
+  };
+
+  const contextualMessage = getContextualPaywallMessage();
+
   const PaywallCard = () => (
     <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
       <div className={`absolute top-0 right-0 w-80 h-80 ${decisionStyles.blur} blur-[120px] rounded-full -mr-40 -mt-40 transition-colors duration-500`} />
@@ -119,8 +137,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <h2 className="serif text-4xl font-light leading-tight">
             {t('paywall.title')}
           </h2>
-          <p className="text-muted text-base font-light italic leading-relaxed max-w-[280px] mx-auto">
-            {t('paywall.benefit_line')}
+          <p className="text-gold text-base font-bold italic leading-relaxed max-w-[280px] mx-auto">
+            “{contextualMessage}”
           </p>
           <p className="text-paper text-sm font-medium">
             {t('paywall.subtitle')}
@@ -210,6 +228,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   {currentItem.item_summary.confidence.replace('_', ' ')} {t('analysis.confidence')}
                 </span>
               </div>
+              <p className="text-[8px] text-muted/60 font-medium italic pr-1">
+                {currentItem.item_summary.confidence === 'high' ? t('analysis.confidence_high_desc') : 
+                 currentItem.item_summary.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
+                 t('analysis.confidence_low_desc')}
+              </p>
               <div className="w-24 h-0.5 bg-border-custom rounded-full overflow-hidden">
                 <div 
                   className={`h-full transition-all duration-1000 ease-out rounded-full ${
@@ -284,9 +307,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
                 <div className="flex items-center gap-2 pt-1">
                   <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-paper/60">
-                    {currentItem.buy_decision.confidence.replace('_', ' ')} Certainty
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-paper/60">
+                      {currentItem.buy_decision.confidence.replace('_', ' ')} Certainty
+                    </span>
+                    <p className="text-[8px] text-paper/40 font-light italic">
+                      {currentItem.buy_decision.confidence === 'high' ? t('analysis.confidence_high_desc') : 
+                       currentItem.buy_decision.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
+                       t('analysis.confidence_low_desc')}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="scale-125 origin-right">
@@ -360,9 +390,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                     currentItem.item_summary.confidence === 'medium' ? 'bg-decision-gold' : 
                     'bg-decision-red'
                   }`} />
-                  <p className="text-sm font-medium text-ink capitalize">
-                    {currentItem.item_summary.confidence.replace('_', ' ')}
-                  </p>
+                  <div className="flex flex-col">
+                    <p className="text-sm font-medium text-ink capitalize">
+                      {currentItem.item_summary.confidence.replace('_', ' ')}
+                    </p>
+                    <p className="text-[9px] text-muted/60 font-medium italic">
+                      {currentItem.item_summary.confidence === 'high' ? t('analysis.confidence_high_desc') : 
+                       currentItem.item_summary.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
+                       t('analysis.confidence_low_desc')}
+                    </p>
+                  </div>
                 </div>
                 <span className="text-[10px] font-bold text-muted">{currentItem.item_summary.confidence_score}%</span>
               </div>
@@ -470,7 +507,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">Safe Entry</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">Smart Buy</p>
               <p className="text-xl font-medium text-decision-green">
                 {currentItem.price_guidance.currency}{currentItem.price_guidance.good_buy_below}
               </p>
@@ -482,7 +519,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">Danger Zone</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">Overpaying</p>
               <p className="text-lg font-medium text-decision-red">
                 {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}
               </p>
@@ -534,28 +571,40 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 6. Negotiation Strategy Card */}
       {showProContent ? (
-        <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-decision-green/70">
-            <Handshake className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.negotiation_strategy')}</h3>
+        <section className="p-8 bg-white border border-border-custom rounded-[44px] shadow-sm space-y-8">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-decision-green/70">
+              <Handshake className="w-4 h-4" />
+              <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.negotiation_strategy')}</h3>
+            </div>
+            <h2 className="serif text-3xl font-light tracking-tight text-ink">How to actually buy this well</h2>
+            <p className="text-muted text-sm font-light italic">What experienced dealers would do</p>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-decision-green/5 rounded-2xl">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70 mb-1">First Bid</p>
-              <p className="text-lg font-bold text-decision-green">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.opening_offer}</p>
+            <div className="p-6 bg-decision-green/5 rounded-3xl border border-decision-green/10">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70 mb-2">First Bid</p>
+              <p className="text-2xl font-bold text-decision-green tracking-tight">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.opening_offer}</p>
             </div>
-            <div className="p-4 bg-paper rounded-2xl">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">Closing Target</p>
-              <p className="text-lg font-bold text-ink">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.target_price_low}-{currentItem.negotiation_strategy.target_price_high}</p>
+            <div className="p-6 bg-paper rounded-3xl border border-border-custom">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-2">Closing Target</p>
+              <p className="text-2xl font-bold text-ink tracking-tight">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.target_price_low}-{currentItem.negotiation_strategy.target_price_high}</p>
             </div>
           </div>
-          <div className="space-y-3">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Leverage Points</p>
-            {currentItem.negotiation_strategy.points_to_raise.map((point: string, i: number) => (
-              <p key={i} className="text-sm text-muted leading-relaxed flex gap-2">
-                <span className="text-decision-green">→</span> {point}
-              </p>
-            ))}
+          <div className="space-y-4 pt-4 border-t border-border-custom">
+            <p className="text-[10px] uppercase tracking-widest font-bold text-muted">Leverage Points</p>
+            <div className="space-y-3">
+              {currentItem.negotiation_strategy.points_to_raise.map((point: string, i: number) => (
+                <div key={i} className="flex gap-4 items-start">
+                  <div className="w-5 h-5 rounded-full bg-decision-green/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-decision-green text-[10px] font-bold">→</span>
+                  </div>
+                  <p className="text-sm text-ink leading-relaxed font-light">
+                    {point}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       ) : (
