@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2 } from 'lucide-react';
 import { BuyScoreGauge } from './BuyScoreGauge';
@@ -304,6 +304,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const [helpful, setHelpful] = useState<boolean | null>(null);
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+      if (submitted) {
+        const timer = setTimeout(() => {
+          onBack();
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    }, [submitted]);
 
     const handleSubmit = async () => {
       if (outcome === null || helpful === null) return;
