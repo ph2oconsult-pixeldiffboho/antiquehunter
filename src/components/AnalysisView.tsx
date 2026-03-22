@@ -1,22 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2 } from 'lucide-react';
 import { BuyScoreGauge } from './BuyScoreGauge';
 import { useTranslation } from 'react-i18next';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AnalysisViewProps {
   result: any; // Can be a single object or an array of objects
   images?: string[];
   onSave?: (status: string) => void;
   onBack: () => void;
-  onUpgrade?: (plan: 'pro') => void;
+  onUpgrade?: (packId: string) => void;
   isSaved?: boolean;
-  plan?: 'free' | 'pro' | 'dealer';
+  plan?: 'free' | 'pro' | 'dealer' | string;
+  currency: string;
 }
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free' }) => {
-  const { t } = useTranslation();
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free', currency }) => {
+  const { t, i18n } = useTranslation();
   const [currentIndex, setCurrentIndex] = React.useState(0);
+
+  const formatPrice = (amount: number) => {
+    try {
+      return new Intl.NumberFormat(i18n.language, {
+        style: 'currency',
+        currency: currency,
+        maximumFractionDigits: 0
+      }).format(amount);
+    } catch (e) {
+      const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$' };
+      return `${symbols[currency] || '$'}${amount}`;
+    }
+  };
 
   const items = Array.isArray(result) ? result : [result];
   const currentItem = items[currentIndex];
@@ -123,46 +139,142 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   const contextualMessage = getContextualPaywallMessage();
 
+  const [selectedPack, setSelectedPack] = useState('3pack');
+
+  const getPackPrices = (currencyCode: string) => {
+    const prices: Record<string, any> = {
+      GBP: { 
+        single: '£4.99', 
+        pack3: '£9.99', 
+        pack10: '£29.99', 
+        singlePer: '£4.99/ea', 
+        pack3Per: '£3.33/ea', 
+        pack10Per: '£2.99/ea',
+        pack3Label: 'Best value',
+        pack10Label: 'Best for regular buyers'
+      },
+      USD: { 
+        single: '$6.99', 
+        pack3: '$13.99', 
+        pack10: '$39.99', 
+        singlePer: '$6.99/ea', 
+        pack3Per: '$4.66/ea', 
+        pack10Per: '$3.99/ea' 
+      },
+      EUR: { 
+        single: '€5.99', 
+        pack3: '€11.99', 
+        pack10: '€34.99', 
+        singlePer: '€5.99/ea', 
+        pack3Per: '€3.99/ea', 
+        pack10Per: '€3.49/ea' 
+      },
+      AUD: { 
+        single: 'A$9.99', 
+        pack3: 'A$19.99', 
+        pack10: 'A$59.99', 
+        singlePer: 'A$9.99/ea', 
+        pack3Per: 'A$6.66/ea', 
+        pack10Per: 'A$5.99/ea' 
+      },
+    };
+    return prices[currencyCode] || prices.USD;
+  };
+
+  const currentPackPrices = getPackPrices(currency);
+
+  const packs = [
+    { 
+      id: 'single', 
+      title: t('paywall.pack_single_title'), 
+      price: currentPackPrices.single, 
+      per: currentPackPrices.singlePer 
+    },
+    { 
+      id: '3pack', 
+      title: t('paywall.pack_3_title'), 
+      price: currentPackPrices.pack3, 
+      per: currentPackPrices.pack3Per, 
+      featured: true,
+      label: currentPackPrices.pack3Label || t('paywall.best_value')
+    },
+    { 
+      id: '10pack', 
+      title: t('paywall.pack_10_title'), 
+      price: currentPackPrices.pack10, 
+      per: currentPackPrices.pack10Per,
+      label: currentPackPrices.pack10Label
+    },
+  ];
+
+  const handleCheckout = (packId: string) => {
+    // Call the upgrade function with the selected pack
+    onUpgrade?.(packId as any);
+  };
+
   const PaywallCard = () => (
-    <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
+    <section className={`p-8 sm:p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
       <div className={`absolute top-0 right-0 w-80 h-80 ${decisionStyles.blur} blur-[120px] rounded-full -mr-40 -mt-40 transition-colors duration-500`} />
       
-      <div className="relative z-10 space-y-8 text-center">
-        <div className={`inline-flex items-center gap-2 px-4 py-1.5 ${decisionStyles.accent} rounded-full border ${decisionStyles.border}`}>
-          <ShieldAlert className={`w-3.5 h-3.5 ${decisionStyles.text}`} />
-          <span className={`text-[11px] font-bold uppercase tracking-widest ${decisionStyles.text}`}>{t('paywall.urgency')}</span>
-        </div>
-        
-        <div className="space-y-4">
-          <h2 className="serif text-4xl font-light leading-tight">
-            {t('paywall.title')}
-          </h2>
-          <p className="text-gold text-base font-bold italic leading-relaxed max-w-[280px] mx-auto">
-            “{contextualMessage}”
-          </p>
-          <p className="text-paper text-sm font-medium">
-            {t('paywall.subtitle')}
-          </p>
-        </div>
-
-        <div className="space-y-2 py-4 border-y border-white/10">
-          <p className={`${decisionStyles.text} text-2xl font-bold leading-tight tracking-tight`}>
-            {t('paywall.tension_line_title')}
-          </p>
-          <p className="text-muted text-xs font-medium uppercase tracking-wider">
-            {t('paywall.tension_line_subtitle')}
-          </p>
+      <div className="relative z-10 space-y-8">
+        <div className="text-center space-y-6">
+          <div className={`inline-flex items-center gap-2 px-4 py-1.5 ${decisionStyles.accent} rounded-full border ${decisionStyles.border}`}>
+            <ShieldAlert className={`w-3.5 h-3.5 ${decisionStyles.text}`} />
+            <span className={`text-[11px] font-bold uppercase tracking-widest ${decisionStyles.text}`}>{t('paywall.urgency')}</span>
+          </div>
+          
+          <div className="space-y-4">
+            <h2 className="serif text-3xl sm:text-4xl font-light leading-tight">
+              {t('paywall.title')}
+            </h2>
+            <p className="text-gold text-base font-bold italic leading-relaxed max-w-[280px] mx-auto">
+              “{contextualMessage}”
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-4">
+        {/* Pricing Options */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {packs.map((pack) => (
+            <motion.div
+              key={pack.id}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setSelectedPack(pack.id)}
+              className={`relative p-6 rounded-3xl border-2 transition-all cursor-pointer flex flex-col items-center text-center gap-2 ${
+                selectedPack === pack.id 
+                  ? 'border-gold bg-gold/10' 
+                  : pack.featured
+                    ? 'border-gold/30 bg-gold/5 hover:border-gold/50'
+                    : 'border-white/10 bg-white/5 hover:border-white/20'
+              }`}
+            >
+              {pack.label && (
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 ${pack.featured ? 'bg-gold text-ink' : 'bg-white/10 text-white/60 border border-white/10'} text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg whitespace-nowrap`}>
+                  {pack.label}
+                </div>
+              )}
+              <h3 className="text-xs font-bold uppercase tracking-wider opacity-60">{pack.title}</h3>
+              <div className="text-2xl font-bold">{pack.price}</div>
+              <div className="text-[10px] opacity-40 font-medium">{pack.per}</div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="space-y-4 pt-4">
           <button 
-            onClick={() => onUpgrade?.('pro')}
-            className="w-full py-5 bg-gold text-ink rounded-full font-bold hover:opacity-90 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-gold/40 border border-gold/20 flex items-center justify-center gap-3 group"
+            onClick={() => handleCheckout(selectedPack)}
+            className="w-full py-5 bg-gold text-ink rounded-full font-bold hover:opacity-90 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-gold/40 border border-gold/20 flex flex-col items-center justify-center gap-0.5 group"
           >
-            <span className="text-lg">{t('paywall.cta')}</span>
-            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+            <div className="flex items-center gap-3">
+              <span className="text-lg">{t('paywall.cta')}</span>
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+            </div>
+            <span className="text-[10px] uppercase tracking-widest font-bold opacity-60">
+              {t('paywall.cta_strategy')}
+            </span>
           </button>
-          <p className="text-[11px] text-muted font-medium tracking-wide">
+          <p className="text-[11px] text-muted font-medium tracking-wide text-center">
             {t('paywall.cta_footer')}
           </p>
         </div>
@@ -182,6 +294,216 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       </div>
     </div>
   );
+
+  const FeedbackSection = ({ currentItem }: { currentItem: any }) => {
+    const { t } = useTranslation();
+    const [outcome, setOutcome] = useState<'bought' | 'not_bought' | 'still_deciding' | null>(null);
+    const [pricePaid, setPricePaid] = useState('');
+    const [reason, setReason] = useState<string | null>(null);
+    const [helpful, setHelpful] = useState<boolean | null>(null);
+    const [submitted, setSubmitted] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async () => {
+      if (outcome === null || helpful === null) return;
+      if (outcome === 'not_bought' && !reason) return;
+      
+      setLoading(true);
+      try {
+        const feedbackData = {
+          userId: auth.currentUser?.uid || 'anonymous',
+          itemCategory: currentItem.item_summary.category,
+          predictedPriceRange: {
+            low: currentItem.price_guidance.estimated_market_range_low,
+            high: currentItem.price_guidance.estimated_market_range_high
+          },
+          confidenceLevel: currentItem.item_summary.confidence,
+          confidenceScore: currentItem.item_summary.confidence_score,
+          userAction: outcome,
+          pricePaid: outcome === 'bought' ? parseFloat(pricePaid) || null : null,
+          notBoughtReason: outcome === 'not_bought' ? reason : null,
+          isHelpful: helpful,
+          timestamp: serverTimestamp(),
+          itemId: currentItem.item_summary.title
+        };
+
+        await addDoc(collection(db, 'analysis_feedback'), feedbackData);
+        setSubmitted(true);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, 'analysis_feedback');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (submitted) {
+      return (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-8 bg-decision-green/5 border border-decision-green/20 rounded-[44px] text-center space-y-2"
+        >
+          <CheckCircle className="w-8 h-8 text-decision-green mx-auto" />
+          <p className="text-sm font-bold text-decision-green">{t('feedback.thanks')}</p>
+        </motion.div>
+      );
+    }
+
+    return (
+      <section className="p-8 bg-white border border-border-custom rounded-[44px] shadow-sm space-y-8">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-muted">
+            <Info className="w-4 h-4" />
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('feedback.title')}</h3>
+          </div>
+          <p className="text-sm text-muted font-medium">{t('feedback.subtitle')}</p>
+        </div>
+
+        <div className="space-y-6">
+          {/* Question 1: What happened? */}
+          <div className="space-y-3">
+            <p className="text-sm font-bold text-ink">{t('feedback.outcome_question')}</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'bought', label: t('feedback.bought') },
+                { id: 'not_bought', label: t('feedback.not_bought') },
+                { id: 'still_deciding', label: t('feedback.still_deciding') }
+              ].map((opt) => (
+                <button 
+                  key={opt.id}
+                  onClick={() => {
+                    setOutcome(opt.id as any);
+                    setReason(null);
+                    setHelpful(null);
+                  }}
+                  className={`px-4 py-2.5 rounded-2xl border text-xs font-bold transition-all ${outcome === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted hover:border-gold/30'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Conditional: Bought it */}
+          {outcome === 'bought' && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="space-y-6 pt-2"
+            >
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-ink">{t('feedback.price_paid_label')}</p>
+                <input 
+                  type="number"
+                  value={pricePaid}
+                  onChange={(e) => setPricePaid(e.target.value)}
+                  placeholder={t('feedback.price_paid_placeholder')}
+                  className="w-full px-5 py-3 bg-paper border border-border-custom rounded-2xl text-sm font-medium focus:outline-none focus:border-gold transition-colors"
+                />
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-ink">{t('feedback.helpful_question')}</p>
+                <div className="flex gap-2">
+                  {[
+                    { id: true, label: t('feedback.yes') },
+                    { id: false, label: t('feedback.no') }
+                  ].map((opt) => (
+                    <button 
+                      key={String(opt.id)}
+                      onClick={() => setHelpful(opt.id)}
+                      className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Conditional: Didn't buy */}
+          {outcome === 'not_bought' && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="space-y-6 pt-2"
+            >
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-ink">{t('feedback.why_not_bought_question')}</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'too_expensive', label: t('feedback.reason_expensive') },
+                    { id: 'no_trust', label: t('feedback.reason_trust') },
+                    { id: 'condition_issue', label: t('feedback.reason_condition') },
+                    { id: 'seller_issue', label: t('feedback.reason_seller') },
+                    { id: 'other', label: t('feedback.reason_other') }
+                  ].map((opt) => (
+                    <button 
+                      key={opt.id}
+                      onClick={() => setReason(opt.id)}
+                      className={`px-4 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${reason === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-ink">{t('feedback.helpful_question')}</p>
+                <div className="flex gap-2">
+                  {[
+                    { id: true, label: t('feedback.yes') },
+                    { id: false, label: t('feedback.no') }
+                  ].map((opt) => (
+                    <button 
+                      key={String(opt.id)}
+                      onClick={() => setHelpful(opt.id)}
+                      className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Conditional: Still deciding */}
+          {outcome === 'still_deciding' && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="space-y-3 pt-2"
+            >
+              <p className="text-sm font-bold text-ink">{t('feedback.helpful_so_far_question')}</p>
+              <div className="flex gap-2">
+                {[
+                  { id: true, label: t('feedback.yes') },
+                  { id: false, label: t('feedback.no') }
+                ].map((opt) => (
+                  <button 
+                    key={String(opt.id)}
+                    onClick={() => setHelpful(opt.id)}
+                    className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          <button 
+            onClick={handleSubmit}
+            disabled={outcome === null || helpful === null || (outcome === 'not_bought' && !reason) || loading}
+            className="w-full py-4 bg-ink text-white rounded-2xl font-bold text-sm disabled:opacity-30 transition-all hover:opacity-95 shadow-xl shadow-ink/10"
+          >
+            {loading ? t('common.loading') : t('feedback.submit')}
+          </button>
+        </div>
+      </section>
+    );
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8 space-y-6 pb-32">
@@ -290,9 +612,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 </p>
                 <p className="text-[11px] font-bold text-white/60 mt-1 uppercase tracking-wider">
                   {t('paywall.value_anchor', { 
-                    currency: currentItem.price_guidance.currency, 
-                    low: currentItem.price_guidance.estimated_market_range_low, 
-                    high: currentItem.price_guidance.estimated_market_range_high 
+                    low: formatPrice(currentItem.price_guidance.estimated_market_range_low), 
+                    high: formatPrice(currentItem.price_guidance.estimated_market_range_high) 
                   })}
                 </p>
                 <div className="mt-4">
@@ -338,7 +659,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <div className="space-y-6 relative z-10">
               <div className={`p-5 bg-white/5 rounded-3xl border ${decisionStyles.border}`}>
                 <p className={`text-[11px] uppercase tracking-widest font-bold ${decisionStyles.text} mb-1`}>Hard Limit</p>
-                <p className="text-xl font-medium">Hard ceiling: {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}</p>
+                <p className="text-xl font-medium">Hard ceiling: {formatPrice(currentItem.price_guidance.overpaying_above)}</p>
               </div>
               <div className="space-y-4">
                 {currentItem.buy_decision.decision_summary.slice(0, 3).map((point: string, i: number) => (
@@ -503,25 +824,25 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Market Reality</p>
               <p className="text-xl font-medium text-ink">
-                {currentItem.price_guidance.currency}{currentItem.price_guidance.estimated_market_range_low} - {currentItem.price_guidance.estimated_market_range_high}
+                {formatPrice(currentItem.price_guidance.estimated_market_range_low)} - {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">Smart Buy</p>
               <p className="text-xl font-medium text-decision-green">
-                {currentItem.price_guidance.currency}{currentItem.price_guidance.good_buy_below}
+                {formatPrice(currentItem.price_guidance.good_buy_below)}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Retail Range</p>
               <p className="text-lg font-medium text-muted">
-                {currentItem.price_guidance.currency}{currentItem.price_guidance.fair_price_low} - {currentItem.price_guidance.fair_price_high}
+                {formatPrice(currentItem.price_guidance.fair_price_low)} - {formatPrice(currentItem.price_guidance.fair_price_high)}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">Overpaying</p>
               <p className="text-lg font-medium text-decision-red">
-                {currentItem.price_guidance.currency}{currentItem.price_guidance.overpaying_above}
+                {formatPrice(currentItem.price_guidance.overpaying_above)}
               </p>
             </div>
           </div>
@@ -543,7 +864,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <div>
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">Dealer's Buy</p>
               <p className="text-lg font-medium text-ink">
-                {currentItem.price_guidance.currency}{currentItem.dealer_take.target_buy_price_low} - {currentItem.dealer_take.target_buy_price_high}
+                {formatPrice(currentItem.dealer_take.target_buy_price_low)} - {formatPrice(currentItem.dealer_take.target_buy_price_high)}
               </p>
             </div>
             <div>
@@ -581,14 +902,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <p className="text-muted text-sm font-light italic">What experienced dealers would do</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-6 bg-decision-green/5 rounded-3xl border border-decision-green/10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-6 bg-decision-green/5 rounded-3xl border border-decision-green/10 text-center">
               <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70 mb-2">First Bid</p>
-              <p className="text-2xl font-bold text-decision-green tracking-tight">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.opening_offer}</p>
+              <p className="text-xl sm:text-2xl font-bold text-decision-green tracking-tight">{formatPrice(currentItem.negotiation_strategy.opening_offer)}</p>
             </div>
-            <div className="p-6 bg-paper rounded-3xl border border-border-custom">
+            <div className="p-6 bg-paper rounded-3xl border border-border-custom text-center">
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-2">Closing Target</p>
-              <p className="text-2xl font-bold text-ink tracking-tight">{currentItem.price_guidance.currency}{currentItem.negotiation_strategy.target_price_low}-{currentItem.negotiation_strategy.target_price_high}</p>
+              <p className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
+                {formatPrice(currentItem.negotiation_strategy.target_price_low)} – {formatPrice(currentItem.negotiation_strategy.target_price_high)}
+              </p>
             </div>
           </div>
           <div className="space-y-4 pt-4 border-t border-border-custom">
@@ -631,7 +954,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h3 className="text-[10px] uppercase tracking-widest font-bold opacity-80">{t('analysis.when_to_walk_away')}</h3>
           </div>
           <div className="space-y-3">
-            <p className="text-sm font-bold text-decision-red">Walk-away price: {currentItem.price_guidance.currency}{currentItem.negotiation_strategy.walk_away_price}</p>
+            <p className="text-sm font-bold text-decision-red">Walk-away price: {formatPrice(currentItem.negotiation_strategy.walk_away_price)}</p>
             <div className="space-y-2">
               {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
                 <p key={i} className="text-sm text-decision-red/80 leading-relaxed flex gap-2">
@@ -731,7 +1054,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         />
       )}
 
-      {/* 11. Disclaimer */}
+      {/* 11. Feedback System */}
+      {!showPaywall && (
+        <FeedbackSection currentItem={currentItem} />
+      )}
+
+      {/* 12. Disclaimer */}
       <p className="text-[10px] text-muted leading-relaxed text-center px-8 pt-4">
         {currentItem.disclaimer}
       </p>
