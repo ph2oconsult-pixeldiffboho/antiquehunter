@@ -48,6 +48,9 @@
     "dealer_perspective": "Perspective du concessionnaire",
     "negotiation_strategy": "Stratégie de négociation",
     "when_to_walk_away": "Quand s'en aller",
+    "confidence_high_desc": "Certitude élevée — marqueurs clairs détectés",
+    "confidence_medium_desc": "Certitude moyenne — basée sur les caractéristiques visibles uniquement",
+    "confidence_low_desc": "Certitude faible — données visuelles limitées",
     "disclaimer": "L'analyse par IA est probabiliste. Vérifiez toujours en personne avant d'acheter."
   },
   "collection": {
