@@ -111,8 +111,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     transition={{ delay: 0.4, duration: 0.6 }}
-                    className="absolute inset-x-6 top-12 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[32px] p-6 shadow-2xl"
+                    className="absolute inset-x-6 top-8 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[32px] p-6 shadow-2xl"
                   >
+                    {/* Decision Anchor - Most Prominent */}
+                    <div className="text-center mb-5 pb-5 border-b border-white/10">
+                      <p className="text-[9px] uppercase tracking-[0.2em] font-bold text-gold mb-2">Expert Verdict</p>
+                      <h2 className="serif text-2xl text-white leading-tight italic">“Only buy below £8,000”</h2>
+                    </div>
+
                     <div className="flex items-center justify-between mb-6">
                       <div>
                         <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/50 mb-1">Buy Score</p>
