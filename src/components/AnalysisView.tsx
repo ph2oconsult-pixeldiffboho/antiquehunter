@@ -608,90 +608,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </section>
       )}
 
-      {/* 2. Buy Score Card - Visually Dominant & First Priority */}
-      <div className="space-y-6">
-        {showPaywall ? (
-          <PaywallCard />
-        ) : (
-          <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
-            <div className={`absolute top-0 right-0 w-64 h-64 ${decisionStyles.blur} blur-[100px] rounded-full -mr-32 -mt-32 transition-colors duration-500`} />
-            
-            {isTierD && isFree && (
-              <div className="relative z-10 px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 mb-6">
-                <p className="text-sm font-medium text-gold leading-relaxed italic">
-                  {t('paywall.low_value_notice')}
-                </p>
-                <p className="text-[11px] font-bold text-white/60 mt-1 uppercase tracking-wider">
-                  {t('paywall.value_anchor', { 
-                    low: formatPrice(currentItem.price_guidance.estimated_market_range_low), 
-                    high: formatPrice(currentItem.price_guidance.estimated_market_range_high) 
-                  })}
-                </p>
-                <div className="mt-4">
-                  <ShareButton />
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between relative z-10">
-              <div className="space-y-2">
-                <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
-                <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
-                <div className="flex items-center gap-2 pt-1">
-                  <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
-                  <div className="flex flex-col">
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-paper/60">
-                      {currentItem.buy_decision.confidence.replace('_', ' ')} Certainty
-                    </span>
-                    <p className="text-[8px] text-paper/40 font-light italic">
-                      {currentItem.buy_decision.confidence === 'high' ? t('analysis.confidence_high_desc') : 
-                       currentItem.buy_decision.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
-                       t('analysis.confidence_low_desc')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="scale-125 origin-right">
-                <BuyScoreGauge 
-                  score={currentItem.buy_decision.score} 
-                  confidence={currentItem.buy_decision.confidence}
-                />
-              </div>
-            </div>
-
-            {/* Integrated Snap Judgement */}
-            <div className="relative z-10 py-6 border-y border-white/10">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">{t('analysis.snap_judgement')}</p>
-              <p className="serif text-2xl font-medium text-white italic leading-snug">
-                "{currentItem.item_summary.snap_judgement}"
-              </p>
-            </div>
-
-            <div className="space-y-6 relative z-10">
-              <div className={`p-5 bg-white/5 rounded-3xl border ${decisionStyles.border}`}>
-                <p className={`text-[11px] uppercase tracking-widest font-bold ${decisionStyles.text} mb-1`}>Hard Limit</p>
-                <p className="text-xl font-medium">Hard ceiling: {formatPrice(currentItem.price_guidance.overpaying_above)}</p>
-              </div>
-              <div className="space-y-4">
-                {currentItem.buy_decision.decision_summary.slice(0, 3).map((point: string, i: number) => (
-                  <div key={i} className="flex gap-4 items-start">
-                    <div className={`w-1.5 h-1.5 rounded-full ${decisionStyles.dot} opacity-50 mt-2 shrink-0`} />
-                    <p className="text-base text-white/80 leading-relaxed italic font-light">
-                      {point}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              {isHardPass && (
-                <div className="pt-4">
-                  <ShareButton className="w-full justify-center py-4 text-xs" />
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-      </div>
-
       {/* 3. Item Summary Card */}
       <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-4">
         <h1 className="serif text-3xl font-light tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
@@ -713,7 +629,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_period}</p>
           </div>
           <div className="col-span-2">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Certainty</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Confidence</p>
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -771,7 +687,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </section>
 
-      {/* 3. Teaser Insight for Free Users */}
+      {/* 4. Teaser Insight for Free Users */}
       {showPaywall && (
         <div className="space-y-6">
           <div className="space-y-3">
@@ -816,6 +732,86 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       )}
 
+      {/* 5. Buy Score Card - Visually Dominant & First Priority */}
+      <div className="space-y-6">
+        {showPaywall ? (
+          <PaywallCard />
+        ) : (
+          <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
+            <div className={`absolute top-0 right-0 w-64 h-64 ${decisionStyles.blur} blur-[100px] rounded-full -mr-32 -mt-32 transition-colors duration-500`} />
+            
+            {isTierD && isFree && (
+              <div className="relative z-10 px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 mb-6">
+                <p className="text-sm font-medium text-gold leading-relaxed italic">
+                  {t('paywall.low_value_notice')}
+                </p>
+                <p className="text-[11px] font-bold text-white/60 mt-1 uppercase tracking-wider">
+                  {t('paywall.value_anchor', { 
+                    low: formatPrice(currentItem.price_guidance.estimated_market_range_low), 
+                    high: formatPrice(currentItem.price_guidance.estimated_market_range_high) 
+                  })}
+                </p>
+                <div className="mt-4">
+                  <ShareButton />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between relative z-10">
+              <div className="space-y-2">
+                <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
+                <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
+                <div className="flex items-center gap-2 pt-1">
+                  <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-paper/60">
+                      {currentItem.buy_decision.confidence.replace('_', ' ')} Confidence
+                    </span>
+                    <p className="text-[8px] text-paper/40 font-light italic">
+                      {currentItem.buy_decision.confidence === 'high' ? t('analysis.confidence_high_desc') : 
+                       currentItem.buy_decision.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
+                       t('analysis.confidence_low_desc')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="scale-125 origin-right">
+                <BuyScoreGauge 
+                  score={currentItem.buy_decision.score} 
+                  confidence={currentItem.buy_decision.confidence}
+                />
+              </div>
+            </div>
+
+            {/* Integrated Snap Judgement */}
+            <div className="relative z-10 py-6 border-y border-white/10">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">{t('analysis.snap_judgement')}</p>
+              <p className="serif text-2xl font-medium text-white italic leading-snug">
+                "{currentItem.item_summary.snap_judgement}"
+              </p>
+            </div>
+
+            <div className="space-y-6 relative z-10">
+              <div className="space-y-4">
+                {currentItem.buy_decision.decision_summary.slice(0, 3).map((point: string, i: number) => (
+                  <div key={i} className="flex gap-4 items-start">
+                    <div className={`w-1.5 h-1.5 rounded-full ${decisionStyles.dot} opacity-50 mt-2 shrink-0`} />
+                    <p className="text-base text-white/80 leading-relaxed italic font-light">
+                      {point}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {isHardPass && (
+                <div className="pt-4">
+                  <ShareButton className="w-full justify-center py-4 text-xs" />
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
+
       {/* 4. Price Guidance Card */}
       {showPaywall ? (
         <UpgradePlaceholder 
@@ -833,7 +829,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Market Reality</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Value Insight</p>
               <p className="text-xl font-medium text-ink">
                 {formatPrice(currentItem.price_guidance.estimated_market_range_low)} - {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
               </p>
@@ -909,7 +905,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <Handshake className="w-4 h-4" />
               <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.negotiation_strategy')}</h3>
             </div>
-            <h2 className="serif text-3xl font-light tracking-tight text-ink">How to actually buy this well</h2>
+            <h2 className="serif text-3xl font-light tracking-tight text-ink">Buying Strategy</h2>
             <p className="text-muted text-sm font-light italic">What experienced dealers would do</p>
           </div>
 
