@@ -27,7 +27,13 @@
     "tip_joints_title": "Construction Clues",
     "tip_joints_desc": "Look for dovetails. Machine-cut vs hand-cut tells the era. Irregularity is your friend.",
     "tip_glass_title": "Base Wear",
-    "tip_glass_desc": "Authentic wear should be on the base, not the sides. Look for 'pontil' marks."
+    "tip_glass_desc": "Authentic wear should be on the base, not the sides. Look for 'pontil' marks.",
+    "tip_veneer_title": "Veneer Thickness",
+    "tip_veneer_desc": "Check the edges. Thick veneer (1-2mm) usually means pre-1850. Paper-thin is modern.",
+    "tip_hardware_title": "Hardware Audit",
+    "tip_hardware_desc": "Look behind the handles. Extra holes suggest the hardware was replaced, affecting value.",
+    "tip_smell_title": "The Smell Test",
+    "tip_smell_desc": "Old wood has a distinct, musty but not rotten smell. New stains smell like chemicals."
   },
   "analysis": {
     "title": "Dealer's Assessment",
