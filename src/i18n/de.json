@@ -23,11 +23,17 @@
     "upload_subtitle": "Aus der Galerie",
     "describe_subtitle": "Textanalyse",
     "history_subtitle": "Ihr Jagdprotokoll",
-    "quick_tips": "Kurztipps",
-    "tip_joints_title": "Verbindungen prüfen",
-    "tip_joints_desc": "Suchen Sie nach Schwalbenschwanzverbindungen. Maschinenschnitt vs. Handschnitt verrät die Ära.",
-    "tip_glass_title": "Glasabnutzung",
-    "tip_glass_desc": "Authentische Abnutzungsmuster sollten sich am Boden befinden, nicht an den Seiten."
+    "quick_tips": "Händler-Tipps",
+    "tip_joints_title": "Konstruktionsmerkmale",
+    "tip_joints_desc": "Achten Sie auf Schwalbenschwanzverbindungen. Maschinenschnitt vs. Handschnitt verrät die Ära. Unregelmäßigkeit ist Ihr Freund.",
+    "tip_glass_title": "Bodenabnutzung",
+    "tip_glass_desc": "Authentische Abnutzung sollte am Boden sein, nicht an den Seiten. Suchen Sie nach 'Pontil'-Marken.",
+    "tip_veneer_title": "Furnierdicke",
+    "tip_veneer_desc": "Prüfen Sie die Kanten. Dickes Furnier (1-2mm) bedeutet meist vor 1850. Hauchdünnes Furnier ist modern.",
+    "tip_hardware_title": "Beschlags-Check",
+    "tip_hardware_desc": "Schauen Sie hinter die Griffe. Zusätzliche Löcher deuten darauf hin, dass die Beschläge ersetzt wurden.",
+    "tip_smell_title": "Der Geruchstest",
+    "tip_smell_desc": "Altes Holz hat einen ausgeprägten, muffigen, aber nicht verrotteten Geruch. Neue Beizen riechen nach Chemikalien."
   },
   "analysis": {
     "title": "Analyseergebnisse",
