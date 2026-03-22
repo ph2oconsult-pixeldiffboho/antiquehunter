@@ -48,6 +48,9 @@
     "dealer_perspective": "Händlerperspektive",
     "negotiation_strategy": "Verhandlungsstrategie",
     "when_to_walk_away": "Wann man gehen sollte",
+    "confidence_high_desc": "Hohe Sicherheit — klare Marker erkannt",
+    "confidence_medium_desc": "Mittlere Sicherheit — nur basierend auf sichtbaren Merkmalen",
+    "confidence_low_desc": "Geringe Sicherheit — begrenzte visuelle Daten",
     "disclaimer": "Die KI-Analyse ist probabilistisch. Vor dem Kauf immer persönlich überprüfen."
   },
   "collection": {
