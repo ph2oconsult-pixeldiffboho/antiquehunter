@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Menu, User, Settings, Home, BookOpen } from 'lucide-react';
 import Logo from './Logo';
 
+// Force rebuild to invalidate cache
 interface LayoutProps {
   children: React.ReactNode;
   onViewChange?: (view: any) => void;
