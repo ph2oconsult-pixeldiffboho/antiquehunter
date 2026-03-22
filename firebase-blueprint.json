@@ -47,6 +47,31 @@
         "role": { "type": "string", "enum": ["user", "admin"] }
       },
       "required": ["uid", "email", "role"]
+    },
+    "AnalysisFeedback": {
+      "title": "Analysis Feedback",
+      "description": "User feedback on analysis accuracy and purchase outcome.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "itemCategory": { "type": "string" },
+        "predictedPriceRange": {
+          "type": "object",
+          "properties": {
+            "low": { "type": "number" },
+            "high": { "type": "number" }
+          }
+        },
+        "confidenceLevel": { "type": "string" },
+        "confidenceScore": { "type": "number" },
+        "userAction": { "type": "string", "enum": ["bought", "not_bought", "still_deciding"] },
+        "pricePaid": { "type": "number" },
+        "notBoughtReason": { "type": "string", "enum": ["too_expensive", "no_trust", "condition_issue", "seller_issue", "other"] },
+        "isHelpful": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "itemId": { "type": "string" }
+      },
+      "required": ["userId", "itemCategory", "userAction", "isHelpful", "timestamp"]
     }
   },
   "firestore": {
@@ -57,6 +82,10 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "Collection of user profiles."
+    },
+    "/analysis_feedback/{feedbackId}": {
+      "schema": "AnalysisFeedback",
+      "description": "Collection of user feedback for analysis improvement."
     }
   }
 }
