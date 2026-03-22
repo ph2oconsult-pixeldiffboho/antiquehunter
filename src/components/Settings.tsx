@@ -7,9 +7,11 @@ interface SettingsProps {
   onBack: () => void;
   plan: 'free' | 'pro' | 'dealer';
   onUpgrade: (plan: 'free' | 'pro' | 'dealer') => void;
+  currency: string;
+  onCurrencyChange: (currency: string) => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade }) => {
+export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade, currency, onCurrencyChange }) => {
   const { t, i18n } = useTranslation();
 
   const changeLanguage = (lng: string) => {
@@ -21,6 +23,13 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade }) =
     { code: 'fr', name: 'Français' },
     { code: 'es', name: 'Español' },
     { code: 'de', name: 'Deutsch' }
+  ];
+
+  const currencies = [
+    { code: 'GBP', symbol: '£', name: 'British Pound' },
+    { code: 'USD', symbol: '$', name: 'US Dollar' },
+    { code: 'EUR', symbol: '€', name: 'Euro' },
+    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' }
   ];
 
   const plans = [
@@ -124,6 +133,34 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade }) =
                 {i18n.language === lang.code && <Globe className="w-4 h-4 text-gold" />}
               </button>
             ))}
+          </div>
+        </section>
+
+        {/* Currency Selection */}
+        <section className="space-y-4">
+          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">Currency</h2>
+          <div className="bg-white border border-border-custom rounded-[32px] overflow-hidden">
+            <div className="grid grid-cols-2">
+              {currencies.map((curr) => (
+                <button
+                  key={curr.code}
+                  onClick={() => onCurrencyChange(curr.code)}
+                  className={`p-6 flex flex-col items-start gap-1 hover:bg-paper transition-colors border-r border-b border-paper last:border-r-0 ${
+                    currency === curr.code ? 'bg-paper' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-bold ${currency === curr.code ? 'text-gold' : 'text-muted'}`}>
+                      {curr.symbol}
+                    </span>
+                    <span className={`font-medium ${currency === curr.code ? 'text-ink' : 'text-muted'}`}>
+                      {curr.code}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-muted/60 font-medium">{curr.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
