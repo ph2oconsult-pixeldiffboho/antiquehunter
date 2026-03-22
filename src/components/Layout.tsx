@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Menu, User, Settings, Home, BookOpen } from 'lucide-react';
-import Logo from './LogoComponent';
+import Logo from './Logo';
 
 interface LayoutProps {
   children: React.ReactNode;
