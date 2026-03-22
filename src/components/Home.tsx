@@ -1,6 +1,6 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { Camera, Search, History, Settings, Sparkles, ArrowRight, Upload, Mic } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Camera, Search, History, Settings, Sparkles, ArrowRight, Upload, Mic, X, BookOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface HomeProps {
@@ -13,8 +13,18 @@ interface HomeProps {
 
 export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onViewCollection, onViewSettings }) => {
   const { t } = useTranslation();
+  const [showAllTips, setShowAllTips] = useState(false);
+  const [selectedTip, setSelectedTip] = useState<number | null>(null);
 
   const isSpeechSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+  const tips = [
+    { id: 1, title: t('home.tip_joints_title'), desc: t('home.tip_joints_desc') },
+    { id: 2, title: t('home.tip_glass_title'), desc: t('home.tip_glass_desc') },
+    { id: 3, title: t('home.tip_veneer_title', 'Veneer Thickness'), desc: t('home.tip_veneer_desc', 'Check the edges. Thick veneer (1-2mm) usually means pre-1850. Paper-thin is modern.') },
+    { id: 4, title: t('home.tip_hardware_title', 'Hardware Audit'), desc: t('home.tip_hardware_desc', 'Look behind the handles. Extra holes suggest the hardware was replaced, affecting value.') },
+    { id: 5, title: t('home.tip_smell_title', 'The Smell Test'), desc: t('home.tip_smell_desc', 'Old wood has a distinct, musty but not rotten smell. New stains smell like chemicals.') }
+  ];
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12 space-y-12 pb-32">
@@ -130,25 +140,107 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
       <section className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="serif text-2xl font-light text-ink">{t('home.quick_tips')}</h2>
-          <button className="text-[10px] uppercase tracking-widest font-bold text-muted hover:text-ink transition-colors flex items-center gap-2">
+          <button 
+            onClick={() => setShowAllTips(true)}
+            className="text-[10px] uppercase tracking-widest font-bold text-muted hover:text-ink transition-colors flex items-center gap-2"
+          >
             {t('common.view_all')} <ArrowRight className="w-3 h-3" />
           </button>
         </div>
         <div className="space-y-4">
-          {[
-            { title: t('home.tip_joints_title'), desc: t('home.tip_joints_desc') },
-            { title: t('home.tip_glass_title'), desc: t('home.tip_glass_desc') }
-          ].map((tip, i) => (
-            <div key={i} className="p-6 bg-paper rounded-3xl flex items-start gap-4 border border-border-custom">
+          {tips.slice(0, 2).map((tip) => (
+            <motion.div 
+              key={tip.id}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              onClick={() => setSelectedTip(tip.id)}
+              className="p-6 bg-paper rounded-3xl flex items-start gap-4 border border-border-custom cursor-pointer hover:bg-white transition-colors"
+            >
               <div className="w-2 h-2 rounded-full bg-gold mt-2" />
               <div className="space-y-1">
                 <h4 className="font-medium text-sm text-ink">{tip.title}</h4>
-                <p className="text-xs text-muted leading-relaxed">{tip.desc}</p>
+                <p className="text-xs text-muted leading-relaxed line-clamp-2">{tip.desc}</p>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
+
+      {/* Tips Modal */}
+      <AnimatePresence>
+        {showAllTips && (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 100 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 100 }}
+              className="bg-white w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] max-h-[80vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-8 border-b border-border-custom flex items-center justify-between sticky top-0 bg-white z-10">
+                <div className="space-y-1">
+                  <h3 className="serif text-2xl font-light text-ink">{t('home.quick_tips')}</h3>
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-gold">Expert Field Knowledge</p>
+                </div>
+                <button 
+                  onClick={() => setShowAllTips(false)}
+                  className="w-10 h-10 bg-paper rounded-full flex items-center justify-center hover:bg-border-custom transition-colors"
+                >
+                  <X className="w-5 h-5 text-ink" />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-8 space-y-4">
+                {tips.map((tip) => (
+                  <div 
+                    key={tip.id}
+                    className="p-6 bg-paper rounded-3xl space-y-2 border border-border-custom"
+                  >
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-gold" />
+                      <h4 className="font-bold text-sm text-ink">{tip.title}</h4>
+                    </div>
+                    <p className="text-xs text-muted leading-relaxed">{tip.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Single Tip Detail Modal */}
+      <AnimatePresence>
+        {selectedTip !== null && !showAllTips && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white w-full max-w-sm rounded-[40px] p-8 space-y-6 shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-gold/10 rounded-2xl flex items-center justify-center mx-auto">
+                <Sparkles className="w-8 h-8 text-gold" />
+              </div>
+              
+              <div className="space-y-4 text-center">
+                <h3 className="serif text-2xl font-light text-ink">
+                  {tips.find(t => t.id === selectedTip)?.title}
+                </h3>
+                <p className="text-muted leading-relaxed">
+                  {tips.find(t => t.id === selectedTip)?.desc}
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setSelectedTip(null)}
+                className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm shadow-xl shadow-ink/20"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Bottom Nav Placeholder */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-border-custom flex items-center justify-around">
