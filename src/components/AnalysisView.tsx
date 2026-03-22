@@ -22,15 +22,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const [currentIndex, setCurrentIndex] = React.useState(0);
 
   const formatPrice = (amount: number) => {
+    const displayCurrency = currentItem?.price_guidance?.currency || currency;
     try {
       return new Intl.NumberFormat(i18n.language, {
         style: 'currency',
-        currency: currency,
+        currency: displayCurrency,
         maximumFractionDigits: 0
       }).format(amount);
     } catch (e) {
-      const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$' };
-      return `${symbols[currency] || '$'}${amount}`;
+      const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', JPY: '¥' };
+      return `${symbols[displayCurrency] || '$'}${amount}`;
     }
   };
 
@@ -324,7 +325,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           notBoughtReason: outcome === 'not_bought' ? reason : null,
           isHelpful: helpful,
           timestamp: serverTimestamp(),
-          itemId: currentItem.item_summary.title
+          itemId: currentItem.item_summary.title,
+          currency: currentItem.price_guidance.currency || currency
         };
 
         await addDoc(collection(db, 'analysis_feedback'), feedbackData);
