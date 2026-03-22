@@ -23,11 +23,17 @@
     "upload_subtitle": "Depuis la galerie",
     "describe_subtitle": "Analyse de texte",
     "history_subtitle": "Votre journal de chasse",
-    "quick_tips": "Conseils rapides",
-    "tip_joints_title": "Vérification des joints",
-    "tip_joints_desc": "Cherchez les queues d'aronde. La coupe à la machine par rapport à la coupe à la main indique l'époque.",
-    "tip_glass_title": "Usure du verre",
-    "tip_glass_desc": "Les motifs d'usure authentiques doivent être sur la base, pas sur les côtés."
+    "quick_tips": "Conseils de Connaisseur",
+    "tip_joints_title": "Indices de Construction",
+    "tip_joints_desc": "Cherchez les queues d'aronde. La coupe à la machine par rapport à la coupe à la main indique l'époque. L'irrégularité est votre alliée.",
+    "tip_glass_title": "Usure de la Base",
+    "tip_glass_desc": "L'usure authentique doit être sur la base, pas sur les côtés. Cherchez les marques de 'pontil'.",
+    "tip_veneer_title": "Épaisseur du Placage",
+    "tip_veneer_desc": "Vérifiez les bords. Un placage épais (1-2mm) signifie généralement avant 1850. Le placage ultra-fin est moderne.",
+    "tip_hardware_title": "Audit de la Quincaillerie",
+    "tip_hardware_desc": "Regardez derrière les poignées. Des trous supplémentaires suggèrent que la quincaillerie a été remplacée.",
+    "tip_smell_title": "Le Test de l'Odeur",
+    "tip_smell_desc": "Le vieux bois a une odeur distincte, de renfermé mais pas de pourri. Les vernis récents sentent les produits chimiques."
   },
   "analysis": {
     "title": "Résultats de l'analyse",
