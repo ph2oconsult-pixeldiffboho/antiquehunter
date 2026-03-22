@@ -23,6 +23,21 @@ service cloud.firestore {
     //   - status: string (required)
     //   - createdAt: timestamp (required)
     //
+    // Collection: analysis_feedback
+    // Document ID: feedbackId
+    // Fields:
+    //   - userId: string (required)
+    //   - itemCategory: string (required)
+    //   - predictedPriceRange: map (required)
+    //   - confidenceLevel: string (required)
+    //   - confidenceScore: number (required)
+    //   - userAction: string (required, enum: ['bought', 'not_bought', 'still_deciding'])
+    //   - pricePaid: number (optional)
+    //   - notBoughtReason: string (optional, enum: ['too_expensive', 'no_trust', 'condition_issue', 'seller_issue', 'other'])
+    //   - isHelpful: bool (required)
+    //   - timestamp: timestamp (required)
+    //   - itemId: string (optional)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -84,6 +99,23 @@ service cloud.firestore {
              (data.description == null || (data.description is string && data.description.size() < 2048));
     }
 
+    function isValidFeedback(data) {
+      return hasOnlyAllowedFields(['userId', 'itemCategory', 'predictedPriceRange', 'confidenceLevel', 'confidenceScore', 'userAction', 'pricePaid', 'notBoughtReason', 'isHelpful', 'timestamp', 'itemId']) &&
+             (data.userId == 'anonymous' || (isAuthenticated() && data.userId == request.auth.uid)) &&
+             data.itemCategory is string && data.itemCategory.size() < 128 &&
+             data.predictedPriceRange is map &&
+             data.predictedPriceRange.low is number &&
+             data.predictedPriceRange.high is number &&
+             data.confidenceLevel is string && data.confidenceLevel.size() < 64 &&
+             data.confidenceScore is number &&
+             data.userAction in ['bought', 'not_bought', 'still_deciding'] &&
+             (data.pricePaid == null || data.pricePaid is number) &&
+             (data.notBoughtReason == null || data.notBoughtReason in ['too_expensive', 'no_trust', 'condition_issue', 'seller_issue', 'other']) &&
+             data.isHelpful is bool &&
+             data.timestamp is timestamp &&
+             (data.itemId == null || (data.itemId is string && data.itemId.size() < 256));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -103,6 +135,11 @@ service cloud.firestore {
                       request.resource.data.userId == resource.data.userId &&
                       request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /analysis_feedback/{feedbackId} {
+      allow read: if isAdmin();
+      allow create: if isValidFeedback(request.resource.data);
     }
   }
 }
