@@ -13,6 +13,7 @@ interface DescriptionInputProps {
   onAddImage: () => void;
   onRemoveImage: (index: number) => void;
   autoStartListening?: boolean;
+  currency: string;
 }
 
 export const DescriptionInput: React.FC<DescriptionInputProps> = ({ 
@@ -23,7 +24,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   isDetailedScan,
   onAddImage,
   onRemoveImage,
-  autoStartListening = false
+  autoStartListening = false,
+  currency: globalCurrency
 }) => {
   const { t } = useTranslation();
   const [showHint, setShowHint] = useState(() => {
@@ -32,12 +34,16 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState(globalCurrency);
   const [sellerType, setSellerType] = useState('Market/Fair');
   const [category, setCategory] = useState<AntiqueCategory>('unknown');
   const [location, setLocation] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
+
+  React.useEffect(() => {
+    setCurrency(globalCurrency);
+  }, [globalCurrency]);
   const isSpeechSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   const toggleListening = () => {
