@@ -23,11 +23,17 @@
     "upload_subtitle": "Desde la galería",
     "describe_subtitle": "Análisis de texto",
     "history_subtitle": "Tu registro de caza",
-    "quick_tips": "Consejos rápidos",
-    "tip_joints_title": "Comprobación de juntas",
-    "tip_joints_desc": "Busca colas de milano. El corte a máquina frente al corte a mano indica la época.",
-    "tip_glass_title": "Desgaste del vidrio",
-    "tip_glass_desc": "Los patrones de desgaste auténticos deben estar en la base, no en los lados."
+    "quick_tips": "Consejos del Experto",
+    "tip_joints_title": "Pistas de Construcción",
+    "tip_joints_desc": "Busca colas de milano. El corte a máquina frente al corte a mano indica la época. La irregularidad es tu amiga.",
+    "tip_glass_title": "Desgaste de la Base",
+    "tip_glass_desc": "El desgaste auténtico debe estar en la base, no en los lados. Busca marcas de 'pontil'.",
+    "tip_veneer_title": "Grosor de la Chapa",
+    "tip_veneer_desc": "Comprueba los bordes. La chapa gruesa (1-2mm) suele ser anterior a 1850. La chapa fina es moderna.",
+    "tip_hardware_title": "Auditoría de Herrajes",
+    "tip_hardware_desc": "Mira detrás de los tiradores. Los agujeros extra sugieren que los herrajes fueron reemplazados.",
+    "tip_smell_title": "La Prueba del Olfato",
+    "tip_smell_desc": "La madera vieja tiene un olor distinto, a humedad pero no a podrido. Los barnices nuevos huelen a químicos."
   },
   "analysis": {
     "title": "Resultados del análisis",
