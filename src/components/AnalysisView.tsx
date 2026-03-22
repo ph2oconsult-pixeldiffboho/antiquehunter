@@ -53,6 +53,44 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const showDealerContent = isDealer || isTierD;
   const isHardPass = currentItem.buy_decision.score < 25;
 
+  const lockedFeatures = [
+    { 
+      show: showPaywall, 
+      title: t('analysis.price_guidance'), 
+      description: "See the real price vs what sellers ask", 
+      icon: Info,
+      plan: "Pro"
+    },
+    { 
+      show: !showDealerContent, 
+      title: t('analysis.dealer_perspective'), 
+      description: "How a dealer would actually position this piece", 
+      icon: Gavel,
+      plan: "Dealer"
+    },
+    { 
+      show: !showProContent, 
+      title: t('analysis.negotiation_strategy'), 
+      description: "Exact offer range and negotiation strategy", 
+      icon: Handshake,
+      plan: "Pro"
+    },
+    { 
+      show: showPaywall, 
+      title: t('analysis.when_to_walk_away'), 
+      description: "Conditions that make this a bad buy", 
+      icon: OctagonX,
+      plan: "Pro"
+    },
+    { 
+      show: !showProContent, 
+      title: t('analysis.market_insight'), 
+      description: "How strong demand is and what actually drives value", 
+      icon: Info,
+      plan: "Pro"
+    },
+  ].filter(f => f.show);
+
   const [copied, setCopied] = React.useState(false);
 
   const handleShare = async () => {
@@ -721,7 +759,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 5. Warning High Stakes Section (Teaser Insight for Free Users) */}
       {showPaywall && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div className="space-y-3">
             <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted px-1">{t('paywall.urgency')}</h3>
             
@@ -761,18 +799,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               )}
             </div>
           </div>
+
+          {/* Paywall Section moved up */}
+          <PaywallCard />
         </div>
       )}
 
       {/* 5. Price Guidance Card */}
-      {showPaywall ? (
-        <UpgradePlaceholder 
-          title={t('analysis.price_guidance')} 
-          description="See the real price vs what sellers ask"
-          icon={Info} 
-          requiredPlan="Pro" 
-        />
-      ) : (
+      {!showPaywall && (
         <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-6">
           <div className="flex items-center gap-2 text-muted">
             <Info className="w-4 h-4" />
@@ -812,15 +846,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </section>
       )}
 
-      {/* 6. Dealer Analysis Headline */}
-      <div className="pt-8 pb-4">
-        <h2 className="text-2xl font-bold text-ink tracking-tight">
-          {showDealerContent ? "Dealer Analysis" : "Unlock Dealer Analysis"}
-        </h2>
-      </div>
-
       {/* 6. Dealer Take Card */}
-      {showDealerContent ? (
+      {showDealerContent && (
         <section className="p-6 bg-paper rounded-[32px] border border-border-custom space-y-4">
           <div className="flex items-center gap-2 text-gold">
             <Gavel className="w-4 h-4" />
@@ -847,17 +874,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
           </div>
         </section>
-      ) : (
-        <UpgradePlaceholder 
-          title={t('analysis.dealer_perspective')} 
-          description="How a dealer would actually position this piece"
-          icon={Gavel} 
-          requiredPlan="Dealer" 
-        />
       )}
 
       {/* 7. Negotiation Strategy Card */}
-      {showProContent ? (
+      {showProContent && (
         <section className="p-8 bg-white border border-border-custom rounded-[44px] shadow-sm space-y-8">
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-decision-green/70">
@@ -896,24 +916,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
           </div>
         </section>
-      ) : (
-        <UpgradePlaceholder 
-          title={t('analysis.negotiation_strategy')} 
-          description="Exact offer range and negotiation strategy"
-          icon={Handshake} 
-          requiredPlan="Pro" 
-        />
       )}
 
       {/* 8. Walk Away Card */}
-      {showPaywall ? (
-        <UpgradePlaceholder 
-          title={t('analysis.when_to_walk_away')} 
-          description="Conditions that make this a bad buy"
-          icon={OctagonX} 
-          requiredPlan="Pro" 
-        />
-      ) : (
+      {!showPaywall && (
         <section className="p-6 bg-decision-red/5 border border-decision-red/20 rounded-[32px] space-y-4">
           <div className="flex items-center gap-2 text-decision-red">
             <OctagonX className="w-4 h-4" />
@@ -984,7 +990,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 11. Market Insight Card */}
-      {showProContent ? (
+      {showProContent && (
         <section className="p-6 bg-paper rounded-[32px] border border-border-custom space-y-4">
           <div className="flex items-center gap-2 text-muted">
             <Info className="w-4 h-4" />
@@ -1011,20 +1017,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
           </div>
         </section>
-      ) : (
-        <UpgradePlaceholder 
-          title={t('analysis.market_insight')} 
-          description="How strong demand is and what actually drives value"
-          icon={Info} 
-          requiredPlan="Pro" 
-        />
       )}
 
       {/* 12. Buy Score Card - Moved to bottom for final verdict */}
       <div className="space-y-6">
-        {showPaywall ? (
-          <PaywallCard />
-        ) : (
+        {!showPaywall && (
           <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
             <div className={`absolute top-0 right-0 w-64 h-64 ${decisionStyles.blur} blur-[100px] rounded-full -mr-32 -mt-32 transition-colors duration-500`} />
             
@@ -1107,6 +1104,30 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       {/* 13. Feedback System */}
       {!showPaywall && (
         <FeedbackSection currentItem={currentItem} />
+      )}
+
+      {/* Locked Features Row and Paywall at the bottom */}
+      {(lockedFeatures.length > 0 || showPaywall) && (
+        <section className="space-y-8 pt-12 border-t border-border-custom">
+          {lockedFeatures.length > 0 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold tracking-tight text-ink px-1">{t('paywall.cta')}</h2>
+              <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory -mx-6 px-6">
+                {lockedFeatures.map((feature, i) => (
+                  <div key={i} className="flex-shrink-0 w-72 snap-center">
+                    <UpgradePlaceholder 
+                      title={feature.title} 
+                      description={feature.description} 
+                      icon={feature.icon} 
+                      requiredPlan={feature.plan} 
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {showPaywall && <PaywallCard />}
+        </section>
       )}
 
       {/* 12. Disclaimer */}
