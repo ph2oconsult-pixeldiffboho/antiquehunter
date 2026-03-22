@@ -118,6 +118,12 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
 
   const categories: AntiqueCategory[] = [
     'furniture', 
+    'bedroom_furniture',
+    'chairs',
+    'fine_wine',
+    'mirrors',
+    'watches',
+    'jewellery',
     'chandelier_lighting', 
     'painting_art', 
     'sculpture_object', 
