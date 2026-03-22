@@ -15,21 +15,21 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       title: "Don’t overpay for antiques",
       subtext: "Get dealer-level insight before you buy",
       icon: <Sparkles className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1531058020387-3be344556be6?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1618220179428-22790b461013?auto=format&fit=crop&q=80&w=800"
     },
     {
       id: 'step2',
       title: "Snap. Analyse. Decide.",
-      subtext: "Upload a photo or describe the item. Get pricing, risks, and negotiation strategy.",
+      subtext: "Instant condition reports and market demand scores at your fingertips.",
       icon: <Camera className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?auto=format&fit=crop&q=80&w=800"
     },
     {
       id: 'step3',
       title: "Avoid costly mistakes",
-      subtext: "Know when to buy, negotiate, or walk away",
+      subtext: "Know exactly when to negotiate or walk away from a deal.",
       icon: <ShieldCheck className="w-12 h-12 text-gold" />,
-      image: "https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?auto=format&fit=crop&q=80&w=800"
+      image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=800"
     }
   ];
 
@@ -81,25 +81,64 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-ink/40 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-transparent to-transparent" />
                 
-                {/* Value Comparison Overlay for Step 1 */}
+                {/* Step 1: Price Comparison Overlay */}
                 {currentStep === 0 && (
                   <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                    className="absolute top-8 left-1/2 -translate-x-1/2 w-[80%] bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-4 flex flex-col gap-1 items-center"
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ delay: 0.4, duration: 0.6 }}
+                    className="absolute top-12 left-1/2 -translate-x-1/2 w-[85%] bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[32px] p-6 flex flex-col gap-4 items-center shadow-2xl"
                   >
-                    <p className="text-[9px] uppercase tracking-widest font-bold text-white/60">Asking Price</p>
-                    <p className="text-xl font-medium text-white/40 line-through decoration-decision-red decoration-2">£950</p>
-                    <div className="w-px h-4 bg-white/20 my-1" />
-                    <p className="text-[9px] uppercase tracking-widest font-bold text-decision-gold">Real Market Value</p>
-                    <p className="text-2xl font-bold text-white tracking-tight">£450 – £600</p>
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/50 mb-1">Asking Price</p>
+                      <p className="text-2xl font-light text-white/40 line-through decoration-decision-red/60 decoration-2">£1,250</p>
+                    </div>
+                    
+                    <div className="w-8 h-px bg-white/20" />
+                    
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-gold mb-1">Real Market Value</p>
+                      <p className="text-4xl font-bold text-white tracking-tight">£650 – £800</p>
+                    </div>
                   </motion.div>
                 )}
 
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-20 h-20 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/20">
+                {/* Step 2: Buy Score & Checklist Overlay */}
+                {currentStep === 1 && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ delay: 0.4, duration: 0.6 }}
+                    className="absolute inset-x-6 top-12 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[32px] p-6 shadow-2xl"
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/50 mb-1">Buy Score</p>
+                        <p className="text-3xl font-bold text-white">84<span className="text-lg text-white/40 font-light">/100</span></p>
+                      </div>
+                      <div className="w-12 h-12 rounded-full border-4 border-gold/30 border-t-gold flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-gold">A+</span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {[
+                        { label: 'Authenticity', status: 'Verified' },
+                        { label: 'Condition', status: 'Excellent' },
+                        { label: 'Demand', status: 'High' }
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center justify-between text-[11px]">
+                          <span className="text-white/60">{item.label}</span>
+                          <span className="text-gold font-bold uppercase tracking-wider">{item.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-20 h-20 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/20 shadow-inner">
                   {steps[currentStep].icon}
                 </div>
               </div>
@@ -108,7 +147,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                 <h1 className="serif text-4xl font-light tracking-tight leading-tight text-ink">
                   {steps[currentStep].title}
                 </h1>
-                <p className="text-muted text-lg font-light leading-relaxed">
+                <p className="text-muted text-lg font-light leading-relaxed px-4">
                   {steps[currentStep].subtext}
                 </p>
               </div>
