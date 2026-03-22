@@ -22,6 +22,28 @@ export default function App() {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [plan, setPlan] = useState<'free' | 'pro' | 'dealer'>('free');
+  const [currency, setCurrency] = useState<string>(() => {
+    const saved = localStorage.getItem('user_currency');
+    if (saved) return saved;
+    
+    try {
+      const locale = navigator.language.toLowerCase();
+      if (locale.includes('gb')) return 'GBP';
+      if (locale.includes('us')) return 'USD';
+      if (locale.includes('au')) return 'AUD';
+      if (locale.includes('de') || locale.includes('fr') || locale.includes('es') || locale.includes('it')) return 'EUR';
+      
+      const inferred = new Intl.NumberFormat().resolvedOptions().currency;
+      if (inferred && ['GBP', 'USD', 'EUR', 'AUD'].includes(inferred)) return inferred;
+    } catch (e) {}
+    
+    return 'USD';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('user_currency', currency);
+  }, [currency]);
+
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return localStorage.getItem('onboarding_complete') !== 'true';
   });
@@ -78,7 +100,7 @@ export default function App() {
         inputIsImage ? "Analyze this antique from the images provided." : input,
         allImages.length > 0 ? allImages : undefined,
         details.askingPrice,
-        details.currency,
+        currency, // Use global currency
         details.sellerType,
         i18n.language,
         details.priceType,
@@ -188,6 +210,16 @@ export default function App() {
     );
   }
 
+  const handleCheckout = (packId: string) => {
+    // In a real app, this would trigger a payment gateway (Stripe, etc.)
+    console.log(`Initiating checkout for: ${packId}`);
+    
+    // For demo purposes, we'll simulate a successful purchase
+    // and upgrade the user to 'pro' status
+    setPlan('pro');
+    alert(`Success! You've unlocked the ${packId === 'single' ? 'Single Analysis' : packId === '3pack' ? '3-Pack' : '10-Pack'}.`);
+  };
+
   const renderScreen = () => {
     switch (currentScreen) {
       case 'home':
@@ -272,6 +304,7 @@ export default function App() {
             onAddImage={() => fileInputRef.current?.click()}
             onRemoveImage={(index) => setCapturedImages(prev => prev.filter((_, i) => i !== index))}
             autoStartListening={autoStartListening}
+            currency={currency}
           />
         );
       case 'analysis':
@@ -294,8 +327,9 @@ export default function App() {
                 images={capturedImages}
                 onSave={handleSaveFind}
                 onBack={() => setCurrentScreen('home')}
-                onUpgrade={setPlan}
+                onUpgrade={handleCheckout}
                 plan={plan}
+                currency={currency}
               />
             )}
           </div>
@@ -318,6 +352,8 @@ export default function App() {
             onBack={() => setCurrentScreen('home')} 
             plan={plan}
             onUpgrade={setPlan}
+            currency={currency}
+            onCurrencyChange={setCurrency}
           />
         );
       default:
