@@ -7,6 +7,7 @@ import { Collection } from './components/Collection';
 import { CameraCapture } from './components/CameraCapture';
 import { DescriptionInput } from './components/DescriptionInput';
 import { AnalysisView } from './components/AnalysisView';
+import { Profile } from './components/Profile';
 import { Settings } from './components/Settings';
 import { Onboarding } from './components/Onboarding';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -16,7 +17,7 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'f
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Sparkles } from 'lucide-react';
 
-type Screen = 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'upload-choice';
+type Screen = 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'upload-choice' | 'profile';
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -354,6 +355,14 @@ export default function App() {
             onUpgrade={setPlan}
             currency={currency}
             onCurrencyChange={setCurrency}
+          />
+        );
+      case 'profile':
+        return (
+          <Profile 
+            onBack={() => setCurrentScreen('home')} 
+            plan={plan}
+            onSignOut={() => auth.signOut()}
           />
         );
       default:
