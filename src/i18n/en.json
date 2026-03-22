@@ -136,6 +136,8 @@
     "title": "Settings",
     "language": "Language",
     "profile": "Profile",
+    "feedback_history": "Feedback History",
+    "feedback_history_subtitle": "Your contributions to AI accuracy",
     "sign_out": "Sign Out",
     "about": "About Antique Hunter"
   },
@@ -159,6 +161,6 @@
     "yes": "Yes",
     "no": "No",
     "submit": "Submit Feedback",
-    "thanks": "Thanks — this helps improve future valuations."
+    "thanks": "Thank you, your feedback is much appreciated"
   }
 }
