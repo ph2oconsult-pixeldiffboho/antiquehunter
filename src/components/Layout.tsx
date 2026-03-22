@@ -36,7 +36,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
             >
               <Settings className="w-5 h-5" />
             </button>
-            <button className="p-2 hover:bg-white/50 rounded-full transition-colors">
+            <button 
+              onClick={() => onViewChange?.('profile')}
+              className="p-2 hover:bg-white/50 rounded-full transition-colors"
+            >
               <User className="w-5 h-5" />
             </button>
           </div>
