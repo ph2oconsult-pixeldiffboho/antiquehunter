@@ -50,6 +50,9 @@
     "dealer_perspective": "Trade View",
     "negotiation_strategy": "The Play",
     "when_to_walk_away": "Walk-Away Price",
+    "confidence_high_desc": "High certainty — clear markers detected",
+    "confidence_medium_desc": "Medium certainty — based on visible features only",
+    "confidence_low_desc": "Low certainty — limited visual data",
     "disclaimer": "AI analysis is probabilistic. Always verify in person before purchasing."
   },
   "paywall": {
