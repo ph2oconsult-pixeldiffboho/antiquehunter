@@ -5,6 +5,12 @@ const API_KEY = process.env.GEMINI_API_KEY || "";
 
 export type AntiqueCategory = 
   | 'furniture' 
+  | 'bedroom_furniture'
+  | 'chairs'
+  | 'fine_wine'
+  | 'mirrors'
+  | 'watches'
+  | 'jewellery'
   | 'chandelier_lighting' 
   | 'painting_art' 
   | 'sculpture_object' 
@@ -29,6 +35,12 @@ export const searchAntiques = async (
   
   const categoryPrompts: Record<AntiqueCategory, string> = {
     furniture: `Focus on: joinery (dovetails, mortise/tenon), wood type (solid vs veneer), back panels (hand-planed?), wear patterns, stripping/refinishing evidence, hardware authenticity, carving quality, and resale constraints from size.`,
+    bedroom_furniture: `Focus on: period authenticity, construction methods, wood type, hardware, and signs of wear consistent with age.`,
+    chairs: `Focus on: joint stability, upholstery condition, wood type, period style, and signs of wear.`,
+    fine_wine: `Focus on: label condition, fill level, provenance, vintage, and storage history.`,
+    mirrors: `Focus on: glass condition (foxing, silvering), frame material, carving quality, and period authenticity.`,
+    watches: `Focus on: movement authenticity, dial condition, case wear, service history, and maker's marks.`,
+    jewellery: `Focus on: hallmark authenticity, gemstone quality/treatment, metal purity, construction techniques, and period style.`,
     chandelier_lighting: `Focus on: casting quality (sharpness of detail), metal quality (bronze vs spelter), patina authenticity, wiring changes, evidence of drilling, structural modifications, replacement parts, and crystal/glass quality (lead content, hand-cut).`,
     painting_art: `Focus on: support (panel, canvas, paper), surface texture (impasto, cracks), brushwork vs print dots, stretcher/canvas age clues, varnish condition, restoration/overpainting, signature credibility, and provenance clues on the back.`,
     sculpture_object: `Focus on: casting marks, foundry stamps, material authenticity (bronze vs resin), patina wear, base attachment, and evidence of repairs or re-patination.`,
