@@ -279,9 +279,9 @@ export default function Main() {
               </button>
               <button
                 onClick={() => setCurrentScreen('describe')}
-                className="w-full py-4 bg-paper text-ink rounded-full font-medium hover:bg-border-custom transition-all border border-border-custom"
+                className="w-full py-4 bg-paper text-ink rounded-full font-medium hover:bg-border-custom transition-all border border-border-custom opacity-70"
               >
-                {t('upload_choice.add_details', 'Add More Details')}
+                {t('upload_choice.add_details', 'Add more details (optional)')}
               </button>
             </div>
             
@@ -323,7 +323,8 @@ export default function Main() {
                   <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-gold animate-pulse" />
                 </div>
                 <div className="text-center space-y-2">
-                  <p className="serif text-2xl font-light text-ink">Analyzing Artifact</p>
+                  <p className="serif text-2xl font-light text-ink">Checking market value and dealer signals</p>
+                  <p className="text-xs text-muted mt-2">This is where most buyers overpay — we’re checking for that.</p>
                   <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted">Consulting historical databases and market trends...</p>
                 </div>
               </div>
