@@ -1,18 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Globe, User, LogOut, Info, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Globe, User, LogOut, Info, ChevronRight, MessageSquare } from 'lucide-react';
 import { auth } from '../firebase';
+import { FeedbackHistory } from './FeedbackHistory';
 
 interface SettingsProps {
   onBack: () => void;
+  onNavigateToLegal: () => void;
   plan: 'free' | 'pro' | 'dealer';
   onUpgrade: (plan: 'free' | 'pro' | 'dealer') => void;
   currency: string;
   onCurrencyChange: (currency: string) => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade, currency, onCurrencyChange }) => {
+export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, plan, onUpgrade, currency, onCurrencyChange }) => {
   const { t, i18n } = useTranslation();
+  const [showHistory, setShowHistory] = useState(false);
+
+  if (showHistory) {
+    return <FeedbackHistory onBack={() => setShowHistory(false)} currency={currency} />;
+  }
 
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
@@ -71,6 +78,16 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade, cur
                 </div>
               </div>
             </div>
+            <button 
+              onClick={() => setShowHistory(true)}
+              className="w-full p-6 flex items-center justify-between hover:bg-paper transition-colors border-b border-paper"
+            >
+              <div className="flex items-center gap-4">
+                <MessageSquare className="w-5 h-5 text-muted" />
+                <span className="font-medium text-ink">{t('settings.feedback_history')}</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted/40" />
+            </button>
             <button 
               onClick={() => auth.signOut()}
               className="w-full p-6 flex items-center gap-4 text-decision-red hover:bg-decision-red/5 transition-colors text-left"
@@ -172,10 +189,13 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, plan, onUpgrade, cur
               <span className="text-muted">Version</span>
               <span className="font-medium text-ink">1.0.0</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
+            <button 
+              onClick={onNavigateToLegal}
+              className="w-full flex items-center justify-between text-sm hover:opacity-70 transition-opacity"
+            >
               <span className="text-muted">Legal</span>
               <ChevronRight className="w-4 h-4 text-muted/40" />
-            </div>
+            </button>
           </div>
         </section>
       </div>
