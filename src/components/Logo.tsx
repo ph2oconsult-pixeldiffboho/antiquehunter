@@ -10,13 +10,17 @@ const Logo: React.FC<LogoProps> = ({ className = "w-10 h-10", variant = 'full' }
     <div className={`flex items-center gap-3 ${className}`}>
       {/* Monogram */}
       <svg viewBox="0 0 100 100" className="w-10 h-10 text-gold" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M50 10 L20 90 M50 10 L80 90 M35 50 L65 50" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M20 10 L20 90 M80 10 L80 90" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
+        <circle cx="50" cy="50" r="48" stroke="currentColor" strokeWidth="1" />
+        <circle cx="50" cy="50" r="44" stroke="currentColor" strokeWidth="1" />
+        <path d="M30 80 L50 20 L70 80 M38 55 L62 55" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M25 80 L35 80" stroke="currentColor" strokeWidth="4" />
+        <path d="M65 80 L75 80" stroke="currentColor" strokeWidth="4" />
+        <path d="M47 20 L53 20" stroke="currentColor" strokeWidth="4" />
       </svg>
       
       {/* Wordmark */}
       {variant === 'full' && (
-        <span className="serif text-xl font-medium tracking-tight text-ink">Antique Hunter</span>
+        <span className="serif text-2xl font-medium tracking-wide text-ink uppercase">Antique Hunter</span>
       )}
     </div>
   );
