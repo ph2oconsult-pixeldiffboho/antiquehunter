@@ -20,6 +20,11 @@ interface AnalysisViewProps {
 export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free', currency }) => {
   const { t, i18n } = useTranslation();
   const [currentIndex, setCurrentIndex] = React.useState(0);
+  const [localResult, setLocalResult] = useState(result);
+
+  useEffect(() => {
+    setLocalResult(result);
+  }, [result]);
 
   const formatPrice = (amount: number) => {
     const displayCurrency = currentItem?.price_guidance?.currency || currency;
@@ -35,7 +40,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     }
   };
 
-  const items = Array.isArray(result) ? result : [result];
+  const items = Array.isArray(localResult) ? localResult : [localResult];
   const rawItem = items[currentIndex];
 
   const [selectedPack, setSelectedPack] = useState('3pack');
@@ -803,6 +808,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                     if (data.success) {
                       // Handle the updated analysis result here
                       console.log('Analysis rerun successfully:', data.updatedAnalysis);
+                      setLocalResult(data.updatedAnalysis);
                       setShowMoreDetails(false);
                       setMoreDetailsText('');
                     }
