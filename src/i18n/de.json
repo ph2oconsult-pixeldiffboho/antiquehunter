@@ -115,6 +115,12 @@
   },
   "categories": {
     "furniture": "Möbel",
+    "bedroom_furniture": "Schlafzimmermöbel",
+    "chairs": "Stühle",
+    "fine_wine": "Feinweine",
+    "mirrors": "Spiegel",
+    "watches": "Uhren",
+    "jewellery": "Schmuck",
     "chandelier_lighting": "Kronleuchter & Beleuchtung",
     "painting_art": "Gemälde & Kunst",
     "sculpture_object": "Skulptur & Objekte",
