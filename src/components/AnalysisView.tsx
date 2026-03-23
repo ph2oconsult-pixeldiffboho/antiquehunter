@@ -1002,13 +1002,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <p className="serif text-3xl font-medium text-white italic leading-snug">
                 "{currentItem.item_summary.snap_judgement}"
               </p>
-              <div className="p-4 bg-white/10 rounded-2xl border border-white/10">
-                <p className="text-xs text-white/70 font-medium leading-relaxed">
-                  {buyingGoal === 'investment' && "For investment, the high cost of restoration is the primary risk factor impacting your potential ROI."}
-                  {buyingGoal === 'must_have' && "For personal enjoyment, the condition is secondary to your aesthetic preference, but budget for restoration."}
-                  {buyingGoal === 'resale' && "For resale, the high restoration cost severely limits your margin. Proceed with caution."}
-                </p>
-              </div>
             </div>
 
             <div className="space-y-6 relative z-10">
@@ -1034,6 +1027,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <div className="space-y-2">
                 <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
                 <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
+                
+                {/* Bolder Risk Analysis Statement */}
+                <div className="mt-4 p-4 bg-white/10 rounded-2xl border border-white/20">
+                  <p className="text-sm text-white font-semibold leading-relaxed">
+                    {buyingGoal === 'investment' && "Investment Perspective: The high restoration cost is the primary risk factor impacting your potential ROI."}
+                    {buyingGoal === 'must_have' && "Must-Have Perspective: A great purchase for personal enjoyment. The condition is secondary to your aesthetic preference, but do budget for restoration."}
+                    {buyingGoal === 'resale' && "Resale Perspective: The high restoration cost severely limits your margin. Proceed with caution."}
+                  </p>
+                </div>
+
                 <div className="flex items-center gap-2 pt-1">
                   <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
                   <div className="flex flex-col">
