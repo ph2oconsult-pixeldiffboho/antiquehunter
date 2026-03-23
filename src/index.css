@@ -4,13 +4,13 @@
   --font-serif: "Cormorant Garamond", serif;
   --font-sans: "Inter", sans-serif;
   --color-paper: #F7F4EF;
-  --color-ink: #1A1A1A;
+  --color-ink: #000000;
   --color-muted: #6B6B6B;
   --color-card: #111111;
   --color-border-custom: #E5E0D8;
-  --color-gold: #997520;
+  --color-gold: #856820;
   --color-decision-green: #2F6F4F;
-  --color-decision-gold: #997520;
+  --color-decision-gold: #856820;
   --color-decision-red: #8B2E2E;
 }
 
