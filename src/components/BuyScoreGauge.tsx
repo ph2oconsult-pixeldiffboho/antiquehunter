@@ -18,7 +18,7 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence 
   };
 
   return (
-    <div className="relative w-24 h-24 flex items-center justify-center">
+    <div className="relative w-24 h-24 flex items-center justify-center border border-white/10 rounded-full">
       <svg className="w-full h-full transform -rotate-90">
         <circle
           cx="48"
@@ -45,11 +45,11 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence 
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold">{score}</span>
+        <span className="text-3xl font-bold tracking-tighter">{score}</span>
         <div className="flex flex-col items-center -mt-1">
-          <span className="text-[7px] uppercase tracking-widest font-bold text-white/40">Buy Score</span>
+          <span className="text-[7px] uppercase tracking-widest font-bold text-white/60">Investment Rating</span>
           {confidence && (
-            <span className="text-[6px] uppercase tracking-widest font-bold text-white/20">{confidence.replace('_', ' ')}</span>
+            <span className="text-[6px] uppercase tracking-widest font-bold text-white/30">{confidence.replace('_', ' ')}</span>
           )}
         </div>
       </div>
