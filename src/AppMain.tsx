@@ -19,7 +19,7 @@ import { Loader2, Sparkles } from 'lucide-react';
 
 type Screen = 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'upload-choice' | 'profile';
 
-export default function App() {
+export default function Main() {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [plan, setPlan] = useState<'free' | 'pro' | 'dealer'>('free');
