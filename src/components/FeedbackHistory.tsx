@@ -156,7 +156,7 @@ export const FeedbackHistory: React.FC<FeedbackHistoryProps> = ({ onBack, curren
                   <div className="flex items-center gap-2 px-3 py-2 bg-gold/5 rounded-xl">
                     <AlertCircle className="w-3 h-3 text-gold" />
                     <p className="text-[10px] text-gold font-medium">
-                      AI Confidence was {item.confidenceScore}% ({item.confidenceLevel})
+                      {t('analysis.confidence')}: {t(`analysis.confidence_${item.confidenceLevel}`)}
                     </p>
                   </div>
                 </div>
