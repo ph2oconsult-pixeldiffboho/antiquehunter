@@ -1,48 +1,86 @@
-11:05:11.955 Running build in Washington, D.C., USA (East) – iad1
-11:05:11.956 Build machine configuration: 2 cores, 8 GB
-11:05:12.771 Cloning github.com/ph2oconsult-pixeldiffboho/antiquehunter (Branch: main, Commit: 77dffef)
-11:05:13.302 Cloning completed: 531.000ms
-11:05:13.465 Restored build cache from previous deployment (5SGx5sXrYpw87Egx6z3pkaUb33A2)
-11:05:14.035 Running "vercel build"
-11:05:14.654 Vercel CLI 50.35.0
-11:05:15.156 Installing dependencies...
-11:05:18.848 
-11:05:18.849 up to date in 3s
-11:05:18.849 
-11:05:18.850 108 packages are looking for funding
-11:05:18.850   run `npm fund` for details
-11:05:18.884 Running "npm run build"
-11:05:18.981 
-11:05:18.981 > react-example@0.0.0 build
-11:05:18.982 > npm run clean && vite build
-11:05:18.982 
-11:05:19.080 
-11:05:19.081 > react-example@0.0.0 clean
-11:05:19.081 > rm -rf dist
-11:05:19.081 
-11:05:19.508 [36mvite v6.4.1 [32mbuilding for production...[36m[39m
-11:05:19.588 transforming...
-11:05:31.341 [32m✓[39m 2149 modules transformed.
-11:05:31.343 [31m✗[39m Build failed in 11.79s
-11:05:31.344 [31merror during build:
-11:05:31.344 [31msrc/App.tsx (4:9): "Layout" is not exported by "src/components/Layout.tsx", imported by "src/App.tsx".[31m
-11:05:31.344 file: [36m/vercel/path0/src/App.tsx:4:9[31m
-11:05:31.346 [33m
-11:05:31.346 2: import { motion, AnimatePresence } from 'motion/react';
-11:05:31.346 3: import { useTranslation } from 'react-i18next';
-11:05:31.346 4: import { Layout } from './components/Layout';
-11:05:31.346             ^
-11:05:31.346 5: import { Home } from './components/Home';
-11:05:31.347 6: import { Collection } from './components/Collection';
-11:05:31.347 [31m
-11:05:31.347     at getRollupError (file:///vercel/path0/node_modules/rollup/dist/es/shared/parseAst.js:402:41)
-11:05:31.347     at error (file:///vercel/path0/node_modules/rollup/dist/es/shared/parseAst.js:398:42)
-11:05:31.347     at Module.error (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:17040:16)
-11:05:31.347     at Module.traceVariable (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:17452:29)
-11:05:31.348     at ModuleScope.findVariable (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:15070:39)
-11:05:31.348     at FunctionScope.findVariable (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
-11:05:31.348     at FunctionBodyScope.findVariable (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
-11:05:31.348     at Identifier.bind (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:5447:40)
-11:05:31.348     at CallExpression.bind (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:2825:28)
-11:05:31.348     at CallExpression.bind (file:///vercel/path0/node_modules/rollup/dist/es/shared/node-entry.js:12179:15)[39m
-11:05:31.390 Error: Command "npm run build" exited with 1
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Menu, User, Settings, Home, BookOpen } from 'lucide-react';
+import Logo from './Logo';
+
+interface LayoutProps {
+  children: React.ReactNode;
+  onViewChange?: (view: any) => void;
+}
+
+export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
+  const { t } = useTranslation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const menuItems = [
+    { label: t('common.home', 'Home'), view: 'home', icon: Home },
+    { label: t('common.collection', 'Collection'), view: 'collection', icon: BookOpen },
+    { label: t('common.settings', 'Settings'), view: 'settings', icon: Settings },
+    { label: t('common.profile', 'Profile'), view: 'profile', icon: User },
+  ];
+
+  return (
+    <div className="min-h-screen bg-paper text-ink selection:bg-gold/20 selection:text-ink">
+      <nav className="fixed top-0 left-0 right-0 z-40 bg-paper/80 backdrop-blur-md border-b border-border-custom">
+        <div className="max-w-2xl mx-auto flex items-center justify-between h-16 px-6">
+          <div className="flex items-center gap-4 relative">
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-2 hover:bg-white/50 rounded-full transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            {isMenuOpen && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-border-custom rounded-2xl shadow-xl z-50 py-2">
+                {menuItems.map((item) => (
+                  <button
+                    key={item.view}
+                    onClick={() => {
+                      onViewChange?.(item.view);
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-paper transition-colors text-sm font-medium text-ink"
+                  >
+                    <item.icon className="w-4 h-4 text-muted" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+            <Logo variant="icon" className="w-8 h-8" />
+            <button 
+              onClick={() => onViewChange?.('home')}
+              className="serif text-xl tracking-tight font-light text-ink"
+            >
+              {t('common.app_name', 'Antique Hunter')}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => onViewChange?.('settings')}
+              className="p-2 hover:bg-white/50 rounded-full transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={() => onViewChange?.('profile')}
+              className="p-2 hover:bg-white/50 rounded-full transition-colors"
+            >
+              <User className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <main className="pt-16">
+        {children}
+      </main>
+    </div>
+  );
+};
+
+export default Layout;
