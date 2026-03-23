@@ -596,7 +596,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   'bg-decision-red'
                 }`} />
                 <span className="text-[10px] uppercase tracking-widest font-bold text-muted">
-                  {currentItem.item_summary.confidence.replace('_', ' ')} {t('analysis.confidence')}
+                  {t(`analysis.confidence_${currentItem.item_summary.confidence}`)} {t('analysis.confidence')}
                 </span>
               </div>
               <p className="text-[8px] text-muted/60 font-medium italic pr-1">
@@ -604,16 +604,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                  currentItem.item_summary.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
                  t('analysis.confidence_low_desc')}
               </p>
-              <div className="w-24 h-0.5 bg-border-custom rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all duration-1000 ease-out rounded-full ${
-                    currentItem.item_summary.confidence === 'high' ? 'bg-decision-green' : 
-                    currentItem.item_summary.confidence === 'medium' ? 'bg-decision-gold' : 
-                    'bg-decision-red'
-                  }`}
-                  style={{ width: `${currentItem.item_summary.confidence_score}%` }}
-                />
-              </div>
             </div>
           )}
         </div>
@@ -690,9 +680,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               currentItem.item_summary.confidence === 'medium' ? 'text-decision-gold' : 
               'text-decision-red'
             }`}>
-              {currentItem.item_summary.confidence_score}%
+              {t(`analysis.confidence_${currentItem.item_summary.confidence}`)}
             </span>
-            <span className="text-[9px] uppercase tracking-widest font-bold text-muted opacity-60">Evidence Score</span>
+            <span className="text-[9px] uppercase tracking-widest font-bold text-muted opacity-60">{t('analysis.confidence')}</span>
           </div>
         </div>
         
@@ -705,33 +695,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             }`} />
             <div className="flex flex-col">
               <p className="text-xl font-medium text-ink capitalize leading-tight">
-                {currentItem.item_summary.confidence.replace('_', ' ')} Confidence
+                {t(`analysis.confidence_${currentItem.item_summary.confidence}`)} {t('analysis.confidence')}
               </p>
               <p className="text-xs text-muted font-medium italic mt-2 leading-relaxed">
                 {currentItem.item_summary.confidence === 'high' ? t('analysis.confidence_high_desc') : 
                  currentItem.item_summary.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
                  t('analysis.confidence_low_desc')}
               </p>
-            </div>
-          </div>
-
-          {/* Confidence Meter */}
-          <div className="space-y-2">
-            <div className="h-3 w-full bg-paper rounded-full overflow-hidden border border-border-custom/50">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${currentItem.item_summary.confidence_score}%` }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-                className={`h-full rounded-full ${
-                  currentItem.item_summary.confidence === 'high' ? 'bg-gradient-to-r from-decision-green/60 to-decision-green' : 
-                  currentItem.item_summary.confidence === 'medium' ? 'bg-gradient-to-r from-decision-gold/60 to-decision-gold' : 
-                  'bg-gradient-to-r from-decision-red/60 to-decision-red'
-                }`}
-              />
-            </div>
-            <div className="flex justify-between text-[9px] uppercase tracking-widest font-bold text-muted/60 px-1">
-              <span>Low Quality</span>
-              <span>High Quality</span>
             </div>
           </div>
 
