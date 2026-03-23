@@ -9,6 +9,7 @@ import { DescriptionInput } from './components/DescriptionInput';
 import { AnalysisView } from './components/AnalysisView';
 import { Profile } from './components/Profile';
 import { Settings } from './components/Settings';
+import { Legal } from './components/Legal';
 import { Onboarding } from './components/Onboarding';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { searchAntiques } from './services/gemini';
@@ -17,7 +18,7 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'f
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Sparkles } from 'lucide-react';
 
-type Screen = 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'upload-choice' | 'profile';
+type Screen = 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'legal' | 'upload-choice' | 'profile';
 
 export default function Main() {
   const { t, i18n } = useTranslation();
@@ -351,10 +352,17 @@ export default function Main() {
         return (
           <Settings 
             onBack={() => setCurrentScreen('home')} 
+            onNavigateToLegal={() => setCurrentScreen('legal')}
             plan={plan}
             onUpgrade={setPlan}
             currency={currency}
             onCurrencyChange={setCurrency}
+          />
+        );
+      case 'legal':
+        return (
+          <Legal 
+            onBack={() => setCurrentScreen('settings')} 
           />
         );
       case 'profile':
