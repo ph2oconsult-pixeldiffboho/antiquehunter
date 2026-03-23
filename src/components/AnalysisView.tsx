@@ -752,6 +752,53 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               </div>
             </div>
           )}
+          {showMoreDetails ? (
+            <div className="mt-4 p-4 bg-paper rounded-2xl border border-border-custom space-y-4">
+              <textarea 
+                className="w-full p-3 bg-white border border-border-custom rounded-xl text-sm focus:border-gold focus:outline-none" 
+                placeholder="Add more details or context..." 
+                value={moreDetailsText}
+                onChange={(e) => setMoreDetailsText(e.target.value)}
+              />
+              <input type="file" multiple className="text-xs text-muted w-full" />
+              <button 
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    const response = await fetch('/api/rerun-analysis', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        originalItem: currentItem, 
+                        newText: moreDetailsText 
+                      })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                      // Handle the updated analysis result here
+                      console.log('Analysis rerun successfully:', data.updatedAnalysis);
+                      setShowMoreDetails(false);
+                      setMoreDetailsText('');
+                    }
+                  } catch (error) {
+                    console.error('Error rerunning analysis:', error);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="w-full py-3 bg-gold text-ink rounded-xl text-xs font-bold hover:bg-gold/90 transition-all"
+              >
+                {loading ? 'Rerunning Analysis...' : 'Submit Details'}
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setShowMoreDetails(true)} 
+              className="mt-4 w-full py-3 bg-paper border border-border-custom rounded-2xl text-xs font-bold text-ink hover:border-gold/30 transition-all"
+            >
+              Provide More Details
+            </button>
+          )}
         </div>
       </section>
 
