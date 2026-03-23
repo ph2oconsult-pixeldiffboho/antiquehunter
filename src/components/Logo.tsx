@@ -1,15 +1,24 @@
 import React from 'react';
 
-const Logo: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => {
+interface LogoProps {
+  className?: string;
+  variant?: 'full' | 'icon';
+}
+
+const Logo: React.FC<LogoProps> = ({ className = "w-10 h-10", variant = 'full' }) => {
   return (
-    <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Magnifying Glass */}
-      <circle cx="45" cy="45" r="30" stroke="currentColor" strokeWidth="8" />
-      <line x1="65" y1="65" x2="90" y2="90" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
+    <div className={`flex items-center gap-3 ${className}`}>
+      {/* Monogram */}
+      <svg viewBox="0 0 100 100" className="w-10 h-10 text-gold" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 10 L20 90 M50 10 L80 90 M35 50 L65 50" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M20 10 L20 90 M80 10 L80 90" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
+      </svg>
       
-      {/* Serif A inside */}
-      <path d="M45 25 L30 65 M45 25 L60 65 M35 50 L55 50" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+      {/* Wordmark */}
+      {variant === 'full' && (
+        <span className="serif text-xl font-medium tracking-tight text-ink">Antique Hunter</span>
+      )}
+    </div>
   );
 };
 
