@@ -179,6 +179,32 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const contextualMessage = getContextualPaywallMessage();
 
   const [selectedPack, setSelectedPack] = useState('3pack');
+  const [buyingGoal, setBuyingGoal] = useState<'investment' | 'must_have' | 'resale'>('investment');
+
+  const BuyingGoalSelector = () => (
+    <div className="space-y-3 mb-8">
+      <p className="text-[10px] uppercase tracking-widest font-bold text-muted">My Buying Goal</p>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { id: 'investment', label: 'Investment' },
+          { id: 'must_have', label: 'Must-Have' },
+          { id: 'resale', label: 'Resale/Flip' }
+        ].map((goal) => (
+          <button
+            key={goal.id}
+            onClick={() => setBuyingGoal(goal.id as any)}
+            className={`py-3 rounded-2xl border text-xs font-bold transition-all ${
+              buyingGoal === goal.id 
+                ? 'bg-gold border-ink text-ink' 
+                : 'bg-white border-border-custom text-muted hover:border-gold/30'
+            }`}
+          >
+            {goal.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   const getPackPrices = (currencyCode: string) => {
     const prices: Record<string, any> = {
@@ -638,7 +664,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 3. Item Description (Item Summary Card) */}
       <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-4">
-        <h1 className="serif text-3xl font-light tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
+        <h1 className="serif text-3xl font-normal tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
         <div className="grid grid-cols-2 gap-y-3 gap-x-4">
           <div>
             <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Type</p>
@@ -945,6 +971,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 12. Buy Score Card - Moved to bottom for final verdict */}
       <div className="space-y-6">
+        <BuyingGoalSelector />
         {!showPaywall && (
           <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
             <div className={`absolute top-0 right-0 w-64 h-64 ${decisionStyles.blur} blur-[100px] rounded-full -mr-32 -mt-32 transition-colors duration-500`} />
@@ -975,6 +1002,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <p className="serif text-3xl font-medium text-white italic leading-snug">
                 "{currentItem.item_summary.snap_judgement}"
               </p>
+              <div className="p-4 bg-white/10 rounded-2xl border border-white/10">
+                <p className="text-xs text-white/70 font-medium leading-relaxed">
+                  {buyingGoal === 'investment' && "For investment, the high cost of restoration is the primary risk factor impacting your potential ROI."}
+                  {buyingGoal === 'must_have' && "For personal enjoyment, the condition is secondary to your aesthetic preference, but budget for restoration."}
+                  {buyingGoal === 'resale' && "For resale, the high restoration cost severely limits your margin. Proceed with caution."}
+                </p>
+              </div>
             </div>
 
             <div className="space-y-6 relative z-10">
