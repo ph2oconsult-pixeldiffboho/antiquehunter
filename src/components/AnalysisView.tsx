@@ -326,8 +326,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h2 className="serif text-3xl sm:text-4xl font-light leading-tight">
               {t('paywall.title')}
             </h2>
-            <p className="text-gold text-base font-bold italic leading-relaxed max-w-[280px] mx-auto">
-              “{contextualMessage}”
+            <p className="text-white/80 text-base leading-relaxed max-w-[280px] mx-auto">
+              {t('paywall.subtitle')}
             </p>
           </div>
         </div>
@@ -363,7 +363,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         <div className="space-y-4 pt-4">
           <button 
             onClick={() => handleCheckout(selectedPack)}
-            className="w-full py-5 bg-gold text-ink rounded-full font-bold hover:opacity-90 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-gold/40 border border-gold/20 flex flex-col items-center justify-center gap-0.5 group"
+            className="w-full py-5 bg-gold text-ink rounded-full font-bold hover:opacity-90 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-gold/50 border border-gold/20 flex flex-col items-center justify-center gap-0.5 group"
           >
             <div className="flex items-center gap-3">
               <span className="text-lg">{t('paywall.cta')}</span>
@@ -605,7 +605,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <button 
             onClick={handleSubmit}
             disabled={outcome === null || helpful === null || (outcome === 'not_bought' && !reason) || loading}
-            className="w-full py-4 bg-ink text-white rounded-2xl font-bold text-sm disabled:opacity-30 transition-all hover:opacity-95 shadow-xl shadow-ink/10"
+            className="w-full py-4 bg-ink text-white rounded-2xl font-bold text-sm disabled:opacity-30 transition-all hover:opacity-95 shadow-2xl shadow-ink/20"
           >
             {loading ? t('common.loading') : t('feedback.submit')}
           </button>
@@ -805,6 +805,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.price_guidance')}</h3>
           </div>
           
+          <h3 className="serif text-xl font-light text-ink">What this is actually worth</h3>
+
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Value Insight</p>
@@ -829,6 +831,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <p className="text-lg font-medium text-decision-red">
                 {formatPrice(currentItem.price_guidance.overpaying_above)}
               </p>
+              <p className="text-[9px] text-decision-red/60 mt-1 italic">This is where buyers overpay</p>
             </div>
           </div>
 
@@ -851,6 +854,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <p className="text-lg font-medium text-ink">
                 {formatPrice(currentItem.dealer_take.target_buy_price_low)} - {formatPrice(currentItem.dealer_take.target_buy_price_high)}
               </p>
+              <p className="text-[9px] text-muted/60 mt-1 italic">Dealers would not pay this</p>
             </div>
             <div>
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">Exit Strategy</p>
@@ -877,7 +881,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.negotiation_strategy')}</h3>
             </div>
             <h2 className="serif text-3xl font-light tracking-tight text-ink">Buying Strategy</h2>
-            <p className="text-muted text-sm font-light italic">What experienced dealers would do</p>
+            <p className="text-muted text-sm font-light italic">How dealers actually buy this</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -919,6 +923,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
           <div className="space-y-3">
             <p className="text-sm font-bold text-decision-red">Walk-away price: {formatPrice(currentItem.negotiation_strategy.walk_away_price)}</p>
+            <p className="text-[10px] font-bold text-decision-red uppercase tracking-widest">Above this, you are likely overpaying. Proceed carefully.</p>
             <div className="space-y-2">
               {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
                 <p key={i} className="text-sm text-decision-red/80 leading-relaxed flex gap-2">
@@ -1014,6 +1019,18 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       {/* 12. Buy Score Card - Moved to bottom for final verdict */}
       <div className="space-y-6">
         <BuyingGoalSelector />
+
+        {/* Value Analysis (Snap Judgement) - Visible even with paywall */}
+        <div className="relative z-10 space-y-4 p-6 bg-white/5 border border-white/10 rounded-3xl mb-6">
+          <div className="flex items-center gap-2 text-white/40">
+            <Info className="w-4 h-4" />
+            <p className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.snap_judgement')}</p>
+          </div>
+          <p className="serif text-xl font-medium text-white italic leading-snug">
+            "{currentItem.item_summary.snap_judgement}"
+          </p>
+        </div>
+
         {!showPaywall && (
           <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
             <div className={`absolute top-0 right-0 w-64 h-64 ${decisionStyles.blur} blur-[100px] rounded-full -mr-32 -mt-32 transition-colors duration-500`} />
@@ -1034,17 +1051,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 </div>
               </div>
             )}
-
-            {/* Value Analysis (Snap Judgement) at the top */}
-            <div className="relative z-10 space-y-4">
-              <div className="flex items-center gap-2 text-white/40">
-                <Info className="w-4 h-4" />
-                <p className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.snap_judgement')}</p>
-              </div>
-              <p className="serif text-3xl font-medium text-white italic leading-snug">
-                "{currentItem.item_summary.snap_judgement}"
-              </p>
-            </div>
 
             <div className="space-y-6 relative z-10">
               <div className="space-y-4">
@@ -1070,6 +1076,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <div className="space-y-2">
                   <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
                   <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
+                  {currentItem.buy_decision.score < 65 && <p className="text-[11px] text-muted italic mt-2">At this price, risk increases</p>}
                   
                   <div className="flex items-center gap-2 pt-1">
                     <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
@@ -1150,7 +1157,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </button>
           <button
             onClick={() => onSave('watching')}
-            className="flex-1 py-4 bg-ink text-paper rounded-full font-medium hover:opacity-90 transition-colors flex items-center justify-center gap-2 shadow-xl shadow-ink/20"
+            className="flex-1 py-4 bg-ink text-paper rounded-full font-medium hover:opacity-90 transition-colors flex items-center justify-center gap-2 shadow-2xl shadow-ink/30"
           >
             <Save className="w-5 h-5" />
             {t('common.save')}
