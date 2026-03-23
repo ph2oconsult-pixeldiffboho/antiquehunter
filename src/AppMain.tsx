@@ -54,6 +54,7 @@ export default function Main() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDetailedScan, setIsDetailedScan] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [iterationCount, setIterationCount] = useState(0);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [lastDetails, setLastDetails] = useState<any>(null);
   const [isFromCollection, setIsFromCollection] = useState(false);
@@ -83,6 +84,7 @@ export default function Main() {
     setIsAnalyzing(true);
     setLastDetails(details);
     setIsFromCollection(false);
+    setIterationCount(prev => prev + 1);
     
     let allImages = [...capturedImages];
     if (inputIsImage) {
@@ -189,6 +191,7 @@ export default function Main() {
       setAnalysisResult(null);
       setCapturedImages([]);
       setIsFromCollection(false);
+      setIterationCount(0);
       action();
     }
   };
@@ -197,6 +200,7 @@ export default function Main() {
     setAnalysisResult(null);
     setCapturedImages([]);
     setIsFromCollection(false);
+    setIterationCount(0);
     setShowResetPrompt(false);
     if (pendingAction) {
       pendingAction();
@@ -332,6 +336,8 @@ export default function Main() {
                 onUpgrade={handleCheckout}
                 plan={plan}
                 currency={currency}
+                onAddMoreDetails={() => setCurrentScreen('upload-choice')}
+                iterationCount={iterationCount}
               />
             )}
           </div>
