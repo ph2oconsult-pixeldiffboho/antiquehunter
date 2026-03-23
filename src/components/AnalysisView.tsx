@@ -15,9 +15,11 @@ interface AnalysisViewProps {
   isSaved?: boolean;
   plan?: 'free' | 'pro' | 'dealer' | string;
   currency: string;
+  onAddMoreDetails: () => void;
+  iterationCount: number;
 }
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free', currency }) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, iterationCount }) => {
   const { t, i18n } = useTranslation();
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [localResult, setLocalResult] = useState(result);
@@ -782,50 +784,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               </div>
             </div>
           )}
-          {showMoreDetails ? (
-            <div className="mt-4 p-4 bg-paper rounded-2xl border border-border-custom space-y-4">
-              <textarea 
-                className="w-full p-3 bg-white border border-border-custom rounded-xl text-sm focus:border-gold focus:outline-none" 
-                placeholder="Add more details or context..." 
-                value={moreDetailsText}
-                onChange={(e) => setMoreDetailsText(e.target.value)}
-              />
-              <input type="file" multiple className="text-xs text-muted w-full" />
-              <button 
-                onClick={async (e) => {
-                  e.preventDefault();
-                  setRerunLoading(true);
-                  try {
-                    const response = await fetch('/api/rerun-analysis', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                        originalItem: currentItem, 
-                        newText: moreDetailsText 
-                      })
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      // Handle the updated analysis result here
-                      console.log('Analysis rerun successfully:', data.updatedAnalysis);
-                      setLocalResult(data.updatedAnalysis);
-                      setShowMoreDetails(false);
-                      setMoreDetailsText('');
-                    }
-                  } catch (error) {
-                    console.error('Error rerunning analysis:', error);
-                  } finally {
-                    setRerunLoading(false);
-                  }
-                }}
-                className="w-full py-3 bg-gold text-ink rounded-xl text-xs font-bold hover:bg-gold/90 transition-all"
-              >
-                {rerunLoading ? 'Rerunning Analysis...' : 'Submit Details'}
-              </button>
-            </div>
-          ) : (
+          {iterationCount < 3 && (
             <button 
-              onClick={(e) => { e.preventDefault(); setShowMoreDetails(true); }} 
+              onClick={(e) => { e.preventDefault(); onAddMoreDetails(); }} 
               className="mt-4 w-full py-3 bg-paper border border-border-custom rounded-2xl text-xs font-bold text-ink hover:border-gold/30 transition-all"
             >
               Provide More Details
