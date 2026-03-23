@@ -175,7 +175,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
           <Sparkles className="w-3 h-3" />
           <span className="text-[9px] uppercase tracking-widest font-bold">Try an item — even something nearby</span>
         </div>
-        <h1 className="serif text-4xl mb-2 tracking-tight text-ink">{t('describe.title')}</h1>
+        <h1 className="serif text-4xl mb-1 tracking-tight text-ink">{t('describe.title')}</h1>
+        <p className="text-[10px] text-muted uppercase tracking-widest font-bold mb-4">Most users just upload a photo — details are optional.</p>
         <p className="text-muted text-sm leading-relaxed">{t('home.describe_subtitle')}</p>
         
         <AnimatePresence>
@@ -399,7 +400,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
         <button
           type="submit"
           disabled={isAnalyzing || !description.trim()}
-          className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-ink/10"
+          className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-2xl shadow-ink/20"
         >
           {isAnalyzing ? (
             <>
@@ -417,3 +418,4 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
     </div>
   );
 };
+
