@@ -49,13 +49,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
             )}
           </div>
 
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-            <Logo variant="icon" className="w-8 h-8" />
+          <div className="absolute left-1/2 -translate-x-1/2">
             <button 
               onClick={() => onViewChange?.('home')}
-              className="serif text-xl tracking-tight font-light text-ink"
             >
-              {t('common.app_name', 'Antique Hunter')}
+              <Logo variant="centered" className="text-xl" />
             </button>
           </div>
 
