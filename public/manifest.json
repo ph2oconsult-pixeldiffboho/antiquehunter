@@ -1,0 +1,15 @@
+{
+  "name": "Antique Hunter",
+  "short_name": "Antique Hunter",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F4EF",
+  "theme_color": "#1A1A1A",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
