@@ -762,7 +762,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               />
               <input type="file" multiple className="text-xs text-muted w-full" />
               <button 
-                onClick={async () => {
+                onClick={async (e) => {
+                  e.preventDefault();
                   setLoading(true);
                   try {
                     const response = await fetch('/api/rerun-analysis', {
@@ -793,7 +794,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
           ) : (
             <button 
-              onClick={() => setShowMoreDetails(true)} 
+              onClick={(e) => { e.preventDefault(); setShowMoreDetails(true); }} 
               className="mt-4 w-full py-3 bg-paper border border-border-custom rounded-2xl text-xs font-bold text-ink hover:border-gold/30 transition-all"
             >
               Provide More Details
