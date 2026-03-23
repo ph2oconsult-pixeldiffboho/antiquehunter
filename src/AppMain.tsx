@@ -9,7 +9,7 @@ import { DescriptionInput } from './components/DescriptionInput';
 import { AnalysisView } from './components/AnalysisView';
 import { Profile } from './components/Profile';
 import { Settings } from './components/Settings';
-import { Legal } from './components/Legal';
+import { Legal } from '@/components/Legal';
 import { Onboarding } from './components/Onboarding';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { searchAntiques } from './services/gemini';
