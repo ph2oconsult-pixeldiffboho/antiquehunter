@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2 } from 'lucide-react';
 import { BuyScoreGauge } from './BuyScoreGauge';
@@ -36,7 +36,33 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   };
 
   const items = Array.isArray(result) ? result : [result];
-  const currentItem = items[currentIndex];
+  const rawItem = items[currentIndex];
+
+  const [selectedPack, setSelectedPack] = useState('3pack');
+  const [buyingGoal, setBuyingGoal] = useState<'investment' | 'must_have' | 'resale'>('investment');
+
+  const currentItem = useMemo(() => {
+    if (!rawItem) return null;
+    const originalDecision = rawItem.buy_decision;
+    let score = originalDecision.score;
+    let label = originalDecision.label;
+
+    // Logic to adjust score based on goal
+    if (buyingGoal === 'investment') {
+        score = Math.max(0, score - 10);
+    } else if (buyingGoal === 'must_have') {
+        score = Math.min(100, score + 15);
+    } else if (buyingGoal === 'resale') {
+        score = Math.max(0, score - 5);
+    }
+
+    // Update label based on new score
+    if (score >= 65) label = 'Strong Buy';
+    else if (score >= 45) label = 'Risky Buy';
+    else label = 'Hard Pass';
+
+    return { ...rawItem, buy_decision: { ...originalDecision, score, label } };
+  }, [rawItem, buyingGoal]);
 
   if (!currentItem) return null;
 
@@ -178,10 +204,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   const contextualMessage = getContextualPaywallMessage();
 
-  const [selectedPack, setSelectedPack] = useState('3pack');
-  const [buyingGoal, setBuyingGoal] = useState<'investment' | 'must_have' | 'resale'>('investment');
   const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [moreDetailsText, setMoreDetailsText] = useState('');
+  const [rerunLoading, setRerunLoading] = useState(false);
 
   const BuyingGoalSelector = () => (
     <div className="space-y-3 mb-8">
@@ -764,7 +789,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <button 
                 onClick={async (e) => {
                   e.preventDefault();
-                  setLoading(true);
+                  setRerunLoading(true);
                   try {
                     const response = await fetch('/api/rerun-analysis', {
                       method: 'POST',
@@ -784,12 +809,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   } catch (error) {
                     console.error('Error rerunning analysis:', error);
                   } finally {
-                    setLoading(false);
+                    setRerunLoading(false);
                   }
                 }}
                 className="w-full py-3 bg-gold text-ink rounded-xl text-xs font-bold hover:bg-gold/90 transition-all"
               >
-                {loading ? 'Rerunning Analysis...' : 'Submit Details'}
+                {rerunLoading ? 'Rerunning Analysis...' : 'Submit Details'}
               </button>
             </div>
           ) : (
