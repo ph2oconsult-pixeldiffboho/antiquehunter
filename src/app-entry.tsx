@@ -1,11 +1,12 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import AppMain from './AppMain.tsx';
+import App from './App';
 import './index.css';
 import './i18n/config';
 
+// Force rebuild
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppMain />
+    <App />
   </StrictMode>,
 );
