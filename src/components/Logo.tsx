@@ -8,8 +8,8 @@ interface LogoProps {
 const Logo: React.FC<LogoProps> = ({ className = "", variant = 'left' }) => {
   return (
     <div className={`flex ${variant === 'centered' ? 'justify-center' : 'justify-start'} ${className}`}>
-      <span className="serif font-light tracking-[0.2em] text-ink uppercase">
-        Antique <span className="text-gold">Hunter</span>
+      <span className="font-serif font-medium tracking-tight text-ink uppercase">
+        <span className="relative before:absolute before:-top-1 before:-right-1 before:w-1.5 before:h-1.5 before:bg-paper before:rotate-45">A</span>ntique <span className="text-gold">Hunter</span>
       </span>
     </div>
   );
