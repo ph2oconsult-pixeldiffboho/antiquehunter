@@ -6,7 +6,7 @@ interface BuyScoreGaugeProps {
   confidence?: string;
 }
 
-const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence }) => {
+export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence }) => {
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
@@ -56,5 +56,3 @@ const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence }) => {
     </div>
   );
 };
-
-export default BuyScoreGauge;
