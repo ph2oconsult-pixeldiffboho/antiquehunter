@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2 } from 'lucide-react';
-import { BuyScoreGauge } from './BuyScoreGauge';
+import { BuyGaugeScore } from './BuyGaugeScore';
 import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -1093,9 +1093,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   </div>
                 </div>
                 <div className="scale-125 origin-right">
-                  <BuyScoreGauge 
+                  <BuyGaugeScore 
                     score={currentItem.buy_decision.score} 
                     confidence={currentItem.buy_decision.confidence}
+                    goal={buyingGoal}
                   />
                 </div>
               </div>
@@ -1103,9 +1104,24 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               {/* Bolder Risk Analysis Statement - Moved below gauge for better layout */}
               <div className="mt-8 p-5 bg-white/10 rounded-2xl border border-white/20">
                 <p className="text-sm text-white font-semibold leading-relaxed">
-                  {buyingGoal === 'investment' && "Investment Perspective: The high restoration cost is the primary risk factor impacting your potential ROI."}
-                  {buyingGoal === 'must_have' && "Must-Have Perspective: A great purchase for personal enjoyment. The condition is secondary to your aesthetic preference, but do budget for restoration."}
-                  {buyingGoal === 'resale' && "Resale Perspective: The high restoration cost severely limits your margin. Proceed with caution."}
+                  {buyingGoal === 'investment' && (
+                    <>
+                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Investment Perspective</span>
+                      {currentItem.buy_decision.investment_insight || "The high restoration cost is the primary risk factor impacting your potential ROI."}
+                    </>
+                  )}
+                  {buyingGoal === 'must_have' && (
+                    <>
+                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Personal Enjoyment</span>
+                      {currentItem.buy_decision.must_have_insight || "A great purchase for personal enjoyment. The condition is secondary to your aesthetic preference, but do budget for restoration."}
+                    </>
+                  )}
+                  {buyingGoal === 'resale' && (
+                    <>
+                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Resale Potential</span>
+                      {currentItem.buy_decision.resale_insight || "The high restoration cost severely limits your margin. Proceed with caution."}
+                    </>
+                  )}
                 </p>
               </div>
             </div>
