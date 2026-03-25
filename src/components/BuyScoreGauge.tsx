@@ -1,12 +1,13 @@
 import React from 'react';
 import { motion } from 'motion/react';
 
-interface BuyScoreGaugeProps {
+interface BuyGaugeScoreProps {
   score: number;
   confidence?: string;
+  goal?: 'investment' | 'must_have' | 'resale';
 }
 
-export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence }) => {
+export const BuyGaugeScore: React.FC<BuyGaugeScoreProps> = ({ score, confidence, goal = 'investment' }) => {
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
@@ -47,7 +48,9 @@ export const BuyScoreGauge: React.FC<BuyScoreGaugeProps> = ({ score, confidence 
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-3xl font-bold tracking-tighter">{score}</span>
         <div className="flex flex-col items-center -mt-1">
-          <span className="text-[7px] uppercase tracking-widest font-bold text-white/60">Investment Rating</span>
+          <span className="text-[7px] uppercase tracking-widest font-bold text-white/60">
+            {goal === 'investment' ? 'Investment' : goal === 'must_have' ? 'Personal' : 'Resale'} Rating
+          </span>
           {confidence && (
             <span className="text-[6px] uppercase tracking-widest font-bold text-white/30">{confidence.replace('_', ' ')}</span>
           )}
