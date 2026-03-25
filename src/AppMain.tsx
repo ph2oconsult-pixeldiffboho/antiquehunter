@@ -80,6 +80,28 @@ export default function Main() {
     }
   };
 
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const loadingMessages = [
+    "Checking market value and dealer signals...",
+    "Consulting historical databases...",
+    "Analyzing construction and materials...",
+    "Checking for modern reproductions...",
+    "Calculating investment potential...",
+    "Finalizing expert appraisal..."
+  ];
+
+  useEffect(() => {
+    let interval: any;
+    if (isAnalyzing) {
+      interval = setInterval(() => {
+        setLoadingMessageIndex(prev => (prev + 1) % loadingMessages.length);
+      }, 2500);
+    } else {
+      setLoadingMessageIndex(0);
+    }
+    return () => clearInterval(interval);
+  }, [isAnalyzing]);
+
   const handleAnalyze = async (input: string, details: any, inputIsImage = false, additionalImages: string[] = []) => {
     setIsAnalyzing(true);
     setLastDetails(details);
@@ -317,15 +339,42 @@ export default function Main() {
         return (
           <div className="max-w-2xl mx-auto px-6 py-8">
             {isAnalyzing ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-6">
+              <div className="flex flex-col items-center justify-center py-20 gap-8">
                 <div className="relative">
-                  <Loader2 className="w-12 h-12 text-gold animate-spin" />
-                  <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-gold animate-pulse" />
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    className="w-24 h-24 border-t-2 border-r-2 border-gold rounded-full"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Sparkles className="w-8 h-8 text-gold animate-pulse" />
+                  </div>
                 </div>
-                <div className="text-center space-y-2">
-                  <p className="serif text-2xl font-light text-ink">Checking market value and dealer signals</p>
-                  <p className="text-xs text-muted mt-2">This is where most buyers overpay — we’re checking for that.</p>
-                  <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted">Consulting historical databases and market trends...</p>
+                <div className="text-center space-y-4 max-w-xs">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={loadingMessageIndex}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.4 }}
+                    >
+                      <p className="serif text-2xl font-light text-ink leading-tight">
+                        {loadingMessages[loadingMessageIndex]}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted">This is where most buyers overpay — we’re checking for that.</p>
+                    <div className="flex justify-center gap-1">
+                      {loadingMessages.map((_, i) => (
+                        <div 
+                          key={i} 
+                          className={`w-1 h-1 rounded-full transition-all duration-500 ${i === loadingMessageIndex ? 'bg-gold w-4' : 'bg-gold/20'}`} 
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
