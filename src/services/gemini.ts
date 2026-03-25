@@ -1,1185 +1,428 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion } from 'motion/react';
-import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2 } from 'lucide-react';
-import { BuyGaugeScore } from './BuyGaugeScore';
-import { useTranslation } from 'react-i18next';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { getGlossaryPrompt } from "../i18n/glossary";
 
-interface AnalysisViewProps {
-  result: any; // Can be a single object or an array of objects
-  images?: string[];
-  onSave?: (status: string) => void;
-  onBack: () => void;
-  onUpgrade?: (packId: string) => void;
-  isSaved?: boolean;
-  plan?: 'free' | 'pro' | 'dealer' | string;
-  currency: string;
-  onAddMoreDetails: () => void;
-  iterationCount: number;
-}
+const API_KEY = process.env.GEMINI_API_KEY || "";
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, iterationCount }) => {
-  const { t, i18n } = useTranslation();
-  const [currentIndex, setCurrentIndex] = React.useState(0);
-  const [localResult, setLocalResult] = useState(result);
+export type AntiqueCategory = 
+  | 'furniture' 
+  | 'bedroom_furniture'
+  | 'chairs'
+  | 'fine_wine'
+  | 'mirrors'
+  | 'watches'
+  | 'jewellery'
+  | 'chandelier_lighting' 
+  | 'painting_art' 
+  | 'sculpture_object' 
+  | 'rug_textile' 
+  | 'china_ceramic' 
+  | 'decorative_object' 
+  | 'unknown';
 
-  useEffect(() => {
-    setLocalResult(result);
-  }, [result]);
-
-  const formatPrice = (amount: number) => {
-    const displayCurrency = currentItem?.price_guidance?.currency || currency;
-    try {
-      return new Intl.NumberFormat(i18n.language, {
-        style: 'currency',
-        currency: displayCurrency,
-        maximumFractionDigits: 0
-      }).format(amount);
-    } catch (e) {
-      const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', JPY: '¥' };
-      return `${symbols[displayCurrency] || '$'}${amount}`;
-    }
+export const searchAntiques = async (
+  query: string, 
+  imagesBase64?: string[], 
+  askingPrice?: number, 
+  currency?: string, 
+  sellerType?: string,
+  language: string = 'en',
+  priceType: 'offered' | 'paid' = 'offered',
+  category: AntiqueCategory = 'unknown',
+  location?: string
+) => {
+  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const model = "gemini-3.1-flash-lite-preview";
+  
+  const categoryPrompts: Record<AntiqueCategory, string> = {
+    furniture: `Focus on: joinery (dovetails, mortise/tenon), wood type (solid vs veneer), back panels (hand-planed?), wear patterns, stripping/refinishing evidence, hardware authenticity, carving quality, and resale constraints from size.`,
+    bedroom_furniture: `Focus on: period authenticity, construction methods, wood type, hardware, and signs of wear consistent with age.`,
+    chairs: `Focus on: joint stability, upholstery condition, wood type, period style, and signs of wear.`,
+    fine_wine: `Focus on: label condition, fill level, provenance, vintage, and storage history.`,
+    mirrors: `Focus on: glass condition (foxing, silvering), frame material, carving quality, and period authenticity.`,
+    watches: `Focus on: movement authenticity, dial condition, case wear, service history, and maker's marks.`,
+    jewellery: `Focus on: hallmark authenticity, gemstone quality/treatment, metal purity, construction techniques, and period style.`,
+    chandelier_lighting: `Focus on: casting quality (sharpness of detail), metal quality (bronze vs spelter), patina authenticity, wiring changes, evidence of drilling, structural modifications, replacement parts, and crystal/glass quality (lead content, hand-cut).`,
+    painting_art: `Focus on: support (panel, canvas, paper), surface texture (impasto, cracks), brushwork vs print dots, stretcher/canvas age clues, varnish condition, restoration/overpainting, signature credibility, and provenance clues on the back.`,
+    sculpture_object: `Focus on: casting marks, foundry stamps, material authenticity (bronze vs resin), patina wear, base attachment, and evidence of repairs or re-patination.`,
+    rug_textile: `Focus on: knot density, dye type (natural vs synthetic), fringe attachment, wear patterns, repairs/re-weaving, and origin-specific motifs.`,
+    china_ceramic: `Focus on: maker's marks, glaze quality, firing cracks vs damage, hand-painted vs transfer-ware, and evidence of professional restoration.`,
+    decorative_object: `Focus on: material quality, maker's marks, style consistency, and signs of age vs modern reproduction techniques.`,
+    unknown: `Infer the category first, then apply specialist knowledge. Focus on construction, materials, and signs of authentic age.`
   };
 
-  const items = Array.isArray(localResult) ? localResult : [localResult];
-  const rawItem = items[currentIndex];
+  const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'JPY' ? '¥' : currency === 'AUD' ? 'A$' : '£';
 
-  const [selectedPack, setSelectedPack] = useState('3pack');
-  const [buyingGoal, setBuyingGoal] = useState<'investment' | 'must_have' | 'resale'>('investment');
+  const systemInstruction = `You are an expert antique dealer, restorer, and auction specialist. 
+Your role is to help a user decide whether an antique is worth buying in real-world conditions.
+You must behave like a practical, experienced dealer giving fast, useful, and slightly opinionated advice. 
+Your advice MUST be highly specific to the item's category, material, and reported condition. 
+Avoid generic statements. If the condition is poor, explain exactly how that impacts value for THIS specific item type. 
+For example, if it's furniture, mention specific joinery or wood issues. If it's glass, mention specific wear or pontil marks.
 
-  const currentItem = useMemo(() => {
-    if (!rawItem) return null;
-    const originalDecision = rawItem.buy_decision;
-    let score = originalDecision.score;
-    let label = originalDecision.label;
+### VALUE TIER CLASSIFICATION
+Before scoring, classify the item into one of these tiers based on visual cues, category, and context:
+- Tier A: Investment (${currencySymbol}5000+) - High-end, museum-quality, or rare investment pieces.
+- Tier B: Mid (${currencySymbol}200–${currencySymbol}5000) - Standard collectible antiques, quality furniture, fine art.
+- Tier C: Decorative (${currencySymbol}20–${currencySymbol}200) - Common vintage items, decorative home goods, minor collectibles.
+- Tier D: Utility (<${currencySymbol}20) - Modern mass-produced items, common household goods, low-value bric-a-brac.
 
-    // Logic to adjust score based on goal
-    if (buyingGoal === 'investment') {
-        score = Math.max(0, score - 10);
-    } else if (buyingGoal === 'must_have') {
-        score = Math.min(100, score + 15);
-    } else if (buyingGoal === 'resale') {
-        score = Math.max(0, score - 5);
-    }
+### TIER-SPECIFIC RULES
+- Tier D Items: 
+  - Must have capped scores (rarely exceeding 30).
+  - Outputs must be short, decisive, and direct.
+  - Tone should be "no-nonsense" (e.g., 'This is a modern reproduction. No antique value.').
+- Tier A/B Items:
+  - Require more detailed analysis of construction and provenance.
+  - Tone should be professional and cautious.
 
-    // Update label based on new score
-    if (score >= 65) label = 'Strong Buy';
-    else if (score >= 45) label = 'Risky Buy';
-    else label = 'Hard Pass';
+### CORE PRODUCT GOAL
+Return a structured buying analysis that answers:
+- What the item likely is.
+- Value Tier (A, B, C, or D).
+- Likely origin, style, and period.
+- How confident you are.
+- What the user should check in person.
+- What the main red flags are.
+- What price range makes sense.
+- Whether it is a strong buy, worth investigating, risky, or a pass.
+- A one-sentence, direct "snap judgement" (e.g. 'Not collectible. Utility glass.').
+- How a dealer would think about it (resale, liquidity).
+- How the user should negotiate.
+- When the user should walk away.
 
-    return { ...rawItem, buy_decision: { ...originalDecision, score, label } };
-  }, [rawItem, buyingGoal]);
+### GOAL-SPECIFIC INSIGHTS
+Provide a one-sentence, highly specific insight for each potential buying goal:
+- investment_insight: Focus on long-term value retention, rarity, and historical significance for THIS specific item.
+- must_have_insight: Focus on aesthetic appeal, utility, and personal enjoyment for THIS specific item, even if financial ROI is lower.
+- resale_insight: Focus on short-term liquidity, current market trends, and potential profit margins after restoration/shipping costs for THIS specific item.
 
-  if (!currentItem) return null;
+### CONFIDENCE RULES
+Confidence is calculated from three components (Total = 100):
+1. Evidence Quality (0–40): Based on image clarity, number of angles, and visibility of key construction details.
+2. Identification Certainty (0–30): How clearly the item type, period, and maker can be identified.
+3. Risk Factors (0–30): Impact of missing views (back, base), lack of provenance, or possible restoration/ambiguity.
 
-  const isPro = plan === 'pro' || plan === 'dealer';
-  const isDealer = plan === 'dealer';
-  const isFree = plan === 'free';
+Map the total score to these labels:
+- 80–100: High confidence
+- 60–79: Medium confidence
+- 40–59: Low confidence
+- <40: Very low confidence
 
-  // Value Tier logic: Tier D (Utility) items bypass paywall
-  const isTierD = currentItem.item_summary?.value_tier === 'D';
-  const showPaywall = isFree && !isTierD;
+### TONE & CONFIDENCE
+Adjust your output tone (snap_judgement, decision_summary, negotiation_strategy) based on the confidence level:
+- High confidence: Be decisive and provide strong recommendations.
+- Medium confidence: Be slightly cautious, acknowledge the likely identification but note potential for variation.
+- Low confidence: Encourage physical inspection, avoid strong conclusions, and highlight specific risks.
+- Very low confidence: Advise the user NOT to make a decision yet based on the current evidence.
 
-  // Content visibility logic
-  const showProContent = isPro || isTierD;
-  const showDealerContent = isDealer || isTierD;
-  const isHardPass = currentItem.buy_decision.score < 25;
+*Default to Medium or Low unless evidence is exceptional. Never assign High confidence without seeing key structural markers.*
 
-  const lockedFeatures = [
-    { 
-      show: showPaywall, 
-      title: t('analysis.price_guidance'), 
-      description: "See the real price vs what sellers ask", 
-      icon: Info,
-      plan: "Pro"
-    },
-    { 
-      show: !showDealerContent, 
-      title: t('analysis.dealer_perspective'), 
-      description: "How a dealer would actually position this piece", 
-      icon: Gavel,
-      plan: "Dealer"
-    },
-    { 
-      show: !showProContent, 
-      title: t('analysis.negotiation_strategy'), 
-      description: "Exact offer range and negotiation strategy", 
-      icon: Handshake,
-      plan: "Pro"
-    },
-    { 
-      show: showPaywall, 
-      title: t('analysis.when_to_walk_away'), 
-      description: "Conditions that make this a bad buy", 
-      icon: OctagonX,
-      plan: "Pro"
-    },
-    { 
-      show: !showProContent, 
-      title: t('analysis.market_insight'), 
-      description: "How strong demand is and what actually drives value", 
-      icon: Info,
-      plan: "Pro"
-    },
-  ].filter(f => f.show);
+### UNCERTAINTY MANAGEMENT
+You must explicitly manage uncertainty:
+- Do not assume facts that are not visible.
+- Confidence must reflect real-world inspection limitations.
+- Use 'confidence_reason' to explain the basis of your certainty or doubt.
+- Format for 'confidence_reason': "Reason: [Specific missing detail or ambiguity]". Keep it concise, specific, and actionable (e.g., "Reason: Missing rear view and joinery details").
+- Use 'evidence_gaps' to list specific missing information.
 
-  const [copied, setCopied] = React.useState(false);
+### CONFIDENCE IMPROVEMENT
+Provide 2–3 specific suggestions to increase confidence in the 'confidence_improvement_suggestions' field.
+- Suggestions must be tailored to the item (e.g., "Add a photo of the back", "Provide a close-up of the signature", "Show joinery or construction details").
+- Keep them concise and actionable.
+- Do not use generic wording.
 
-  const handleShare = async () => {
-    const text = isHardPass 
-      ? `Dealer Warning: This item is a Hard Pass (Score: ${currentItem.buy_decision.score}). ${currentItem.item_summary.snap_judgement}`
-      : `Antique Hunter Alert: This ${currentItem.item_summary.title} is a Tier D utility item. ${currentItem.item_summary.snap_judgement}`;
+### PRICING LOGIC
+- estimated_market_range: The broad range a retail customer might pay.
+- good_buy_below: The price where a collector should feel they got a bargain.
+- fair_price: The standard price for this item in this condition.
+- overpaying_above: The price where the user is definitely paying too much.
+- target_buy_price: The price a dealer would aim for to make a healthy profit (usually 30-50% below retail).
+
+### SCORING INPUTS (Points distribution for a 0-100 scale)
+Price vs Market is the most influential factor. Descriptive or stylistic qualities are secondary to the financial reality.
+
+Assign points based on these categories:
+1. Authenticity: 0 to 15 points (Signs of age, maker's marks, provenance)
+2. Condition: 0 to 10 points (Impact of damage, repairs, or restoration)
+3. Rarity / Desirability: 0 to 10 points (Scarcity and collector appeal)
+4. Market Demand: 0 to 10 points (Current popularity and ease of sale)
+5. Price vs Market: 0 to 45 points (Value relative to asking price/market reality)
+6. Liquidity: 0 to 10 points (How quickly it can be converted back to cash)
+7. Risk Penalty: -40 to 0 points (Subtract for critical issues)
+
+### CRITICAL PENALTY RULES
+Apply these hard penalties to the 'risk_penalty' input:
+- Modern Reproduction Signals: -30 to -40 points (Large reduction). If you suspect it's a modern fake, the score must crash.
+- Structural Damage: -15 to -20 points (Moderate reduction). Major cracks, missing limbs, or structural instability.
+- Mismatched Components ("Marriage"): -10 to -15 points (Moderate reduction). e.g., a 19th-century top on an 18th-century base.
+- Poor Liquidity: -5 to -10 points (Small reduction). Items that are too large for most homes or extremely niche.
+
+### PRICING PENALTY & BONUS RULES
+- If an item is clearly overpriced (Asking Price > overpaying_above): Apply a strong penalty to the 'price_vs_market' score (0-10) and ensure the final recommendation is 'Avoid' or 'Hard Pass'.
+- If an item is underpriced (Asking Price < good_buy_below): Increase the 'price_vs_market' score meaningfully (35-45) to reflect the high value-to-cost ratio.
+- Pricing must have a stronger impact than descriptive or stylistic qualities. A beautiful item at a terrible price is a bad buy.
+
+The final Buy Score will be calculated as the sum of these inputs.
+
+### SPECIALIST KNOWLEDGE
+${categoryPrompts[category] || categoryPrompts.unknown}
+
+### CRITICAL FOCUS: PROVENANCE & MAKER'S MARKS
+Explicitly tell the user where to look for stamps, signatures, or labels. Mention collectible makers when relevant.
+
+### MULTIPLE ITEMS DETECTION
+If multiple distinct items are present, analyze each separately in the "items" array.
+
+### TONE ALIGNMENT
+Your tone must shift based on the final Buy Score and label:
+- Strong Buy (80–100): Confident, positive, and opportunity-focused. Highlight why this is a rare find.
+- Buy (65–79): Positive but measured. Acknowledge the value but stay grounded in dealer reality.
+- Risky (45–64): Balanced and cautious. Focus heavily on the "checks" and potential downsides.
+- Avoid (25–44): A clear, firm warning. Focus on the financial or authenticity risks.
+- Hard Pass (0–24): Blunt, decisive, and brief. Minimal explanation needed for junk or fakes.
+
+### RULES
+- Be commercially minded, not academic.
+- Prioritise avoiding bad purchases.
+- Identify negotiation leverage.
+- Flag uncertainty clearly.
+- Return valid structured JSON only. No markdown formatting.
+- Return all text fields in ${language}.
+
+${getGlossaryPrompt(language)}`;
+
+  const prompt = `
+    Item Description: ${query}
+    Price: ${askingPrice || 'Not provided'} ${currency || ''} (${priceType === 'paid' ? 'Paid' : 'Offered/Asking'})
+    Seller Type: ${sellerType || 'Not provided'}
+    Location: ${location || 'Not provided'}
+    Category: ${category}
     
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Antique Hunter Analysis',
-          text: text,
-          url: window.location.href
-        });
-      } catch (err) {
-        console.error('Error sharing:', err);
-      }
-    } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(`${text}\n${window.location.href}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    Analyze the items in the images as an expert dealer. If there are multiple distinct pieces, provide a separate analysis for each.
+    Return valid JSON only.
+  `;
+
+  const imageParts = imagesBase64?.map(img => ({
+    inlineData: {
+      mimeType: "image/jpeg",
+      data: img.split(",")[1] || img,
+    },
+  })) || [];
+
+  const contents = {
+    parts: [
+      { text: prompt },
+      ...imageParts,
+    ],
   };
 
-  const ShareButton = ({ className = "" }: { className?: string }) => (
-    <button 
-      onClick={handleShare}
-      className={`flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full border border-white/20 transition-colors text-[10px] font-bold uppercase tracking-widest text-white/80 ${className}`}
-    >
-      <Share2 className="w-3 h-3" />
-      {copied ? "Copied!" : (isHardPass ? t('paywall.share_warning') : t('paywall.send_to_friend'))}
-    </button>
-  );
+  const response = await ai.models.generateContent({
+    model,
+    contents,
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          items: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                item_summary: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    category: { type: Type.STRING },
+                    likely_origin: { type: Type.STRING },
+                    likely_style: { type: Type.STRING },
+                    likely_period: { type: Type.STRING },
+                    value_tier: { type: Type.STRING, enum: ["A", "B", "C", "D"], description: `A: Investment (${currencySymbol}5000+), B: Mid (${currencySymbol}200-${currencySymbol}5000), C: Decorative (${currencySymbol}20-${currencySymbol}200), D: Utility (<${currencySymbol}20)` },
+                    snap_judgement: { type: Type.STRING, description: "A one-sentence, direct, authoritative dealer snap judgement. Tone must match confidence level (e.g. decisive for high, cautious for low)." },
+                    confidence: { type: Type.STRING, enum: ["high", "medium", "low", "very_low"] },
+                    confidence_score: { type: Type.NUMBER },
+                    confidence_breakdown: {
+                      type: Type.OBJECT,
+                      properties: {
+                        evidence_quality: { type: Type.NUMBER },
+                        identification_certainty: { type: Type.NUMBER },
+                        risk_factors: { type: Type.NUMBER }
+                      },
+                      required: ["evidence_quality", "identification_certainty", "risk_factors"]
+                    },
+                    confidence_reason: { type: Type.STRING },
+                    confidence_improvement_suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "2-3 specific suggestions to increase confidence, tailored to the item." },
+                    evidence_gaps: { type: Type.ARRAY, items: { type: Type.STRING } }
+                  },
+                  required: ["title", "category", "likely_origin", "likely_style", "likely_period", "value_tier", "snap_judgement", "confidence", "confidence_score", "confidence_breakdown", "confidence_reason", "confidence_improvement_suggestions", "evidence_gaps"]
+                },
+                buy_decision: {
+                  type: Type.OBJECT,
+                  properties: {
+                    score: { type: Type.NUMBER },
+                    label: { type: Type.STRING, enum: ["Strong Buy", "Buy", "Risky", "Avoid", "Hard Pass"] },
+                    confidence: { type: Type.STRING, enum: ["high", "medium", "low", "very_low"] },
+                    decision_summary: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3-5 bullet points explaining the score. Tone must match confidence level." },
+                    investment_insight: { type: Type.STRING, description: "One-sentence specific investment advice for this item." },
+                    must_have_insight: { type: Type.STRING, description: "One-sentence specific personal enjoyment advice for this item." },
+                    resale_insight: { type: Type.STRING, description: "One-sentence specific resale advice for this item." }
+                  },
+                  required: ["score", "label", "confidence", "decision_summary", "investment_insight", "must_have_insight", "resale_insight"]
+                },
+                price_guidance: {
+                  type: Type.OBJECT,
+                  properties: {
+                    currency: { type: Type.STRING },
+                    estimated_market_range_low: { type: Type.NUMBER },
+                    estimated_market_range_high: { type: Type.NUMBER },
+                    good_buy_below: { type: Type.NUMBER },
+                    fair_price_low: { type: Type.NUMBER },
+                    fair_price_high: { type: Type.NUMBER },
+                    overpaying_above: { type: Type.NUMBER },
+                    pricing_reasoning: { type: Type.STRING }
+                  },
+                  required: ["currency", "estimated_market_range_low", "estimated_market_range_high", "good_buy_below", "fair_price_low", "fair_price_high", "overpaying_above", "pricing_reasoning"]
+                },
+                dealer_take: {
+                  type: Type.OBJECT,
+                  properties: {
+                    target_buy_price_low: { type: Type.NUMBER },
+                    target_buy_price_high: { type: Type.NUMBER },
+                    resale_strategy: { type: Type.STRING },
+                    dealer_view: { type: Type.ARRAY, items: { type: Type.STRING } }
+                  },
+                  required: ["target_buy_price_low", "target_buy_price_high", "resale_strategy", "dealer_view"]
+                },
+                negotiation_strategy: {
+                  type: Type.OBJECT,
+                  properties: {
+                    opening_offer: { type: Type.NUMBER },
+                    target_price_low: { type: Type.NUMBER },
+                    target_price_high: { type: Type.NUMBER },
+                    walk_away_price: { type: Type.NUMBER },
+                    points_to_raise: { type: Type.ARRAY, items: { type: Type.STRING } }
+                  },
+                  required: ["opening_offer", "target_price_low", "target_price_high", "walk_away_price", "points_to_raise"]
+                },
+                walk_away_if: { type: Type.ARRAY, items: { type: Type.STRING } },
+                top_checks: { type: Type.ARRAY, items: { type: Type.STRING } },
+                red_flags: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      severity: { type: Type.STRING, enum: ["high", "medium", "minor"] },
+                      issue: { type: Type.STRING },
+                      reason: { type: Type.STRING }
+                    },
+                    required: ["severity", "issue", "reason"]
+                  }
+                },
+                market_insight: {
+                  type: Type.OBJECT,
+                  properties: {
+                    demand: { type: Type.STRING, enum: ["high", "medium", "low"] },
+                    resale_ease: { type: Type.STRING, enum: ["high", "medium", "low", "medium_low"] },
+                    drivers_of_value: { type: Type.ARRAY, items: { type: Type.STRING } }
+                  },
+                  required: ["demand", "resale_ease", "drivers_of_value"]
+                },
+                scoring_inputs: {
+                  type: Type.OBJECT,
+                  properties: {
+                    authenticity: { type: Type.NUMBER },
+                    condition: { type: Type.NUMBER },
+                    rarity_desirability: { type: Type.NUMBER },
+                    market_demand: { type: Type.NUMBER },
+                    price_vs_market: { type: Type.NUMBER },
+                    liquidity: { type: Type.NUMBER },
+                    risk_penalty: { type: Type.NUMBER, description: "Negative value (0 to -40) for critical issues like reproductions or damage." }
+                  },
+                  required: ["authenticity", "condition", "rarity_desirability", "market_demand", "price_vs_market", "liquidity", "risk_penalty"]
+                },
+                disclaimer: { type: Type.STRING },
+                teaser_insight: { type: Type.STRING, description: "A short, commercially sharp dealer warning or hint at risk/value impact for free users. e.g. 'There are signs this may not be a fully original set.'" }
+              },
+              required: [
+                "item_summary", "buy_decision", "price_guidance", "dealer_take",
+                "negotiation_strategy", "walk_away_if", "top_checks", "red_flags",
+                "market_insight", "scoring_inputs", "disclaimer", "teaser_insight"
+              ]
+            }
+          }
+        },
+        required: ["items"]
+      }
+    }
+  });
 
-  const getDecisionStyles = (score: number) => {
-    if (score >= 65) { // Buy & Strong Buy
-      return {
-        text: 'text-decision-green',
-        accent: 'bg-decision-green/10',
-        border: 'border-decision-green/20',
-        dot: 'bg-decision-green',
-        cardBg: 'bg-card',
-        blur: 'bg-decision-green/10'
-      };
+  const result = JSON.parse(response.text);
+  
+  // Scoring configuration for easy tuning
+  const getBuyLabel = (score: number) => {
+    if (score >= 80) return "Strong Buy";
+    if (score >= 65) return "Buy";
+    if (score >= 45) return "Risky";
+    if (score >= 25) return "Avoid";
+    return "Hard Pass";
+  };
+
+  const getConfidenceLabel = (score: number) => {
+    if (score >= 80) return "high";
+    if (score >= 60) return "medium";
+    if (score >= 40) return "low";
+    return "very_low";
+  };
+
+  // Calculate Buy Score in code based on scoring_inputs
+  const items = result.items.map((item: any) => {
+    const s = item.scoring_inputs;
+    const c = item.item_summary.confidence_breakdown;
+    
+    // Calculate confidence score from breakdown
+    const confScore = (c.evidence_quality || 0) + (c.identification_certainty || 0) + (c.risk_factors || 0);
+    const finalConfScore = Math.max(1, Math.min(100, Math.round(confScore)));
+    const confLabel = getConfidenceLabel(finalConfScore);
+
+    const calculatedScore = 
+      (s.authenticity || 0) +
+      (s.condition || 0) +
+      (s.rarity_desirability || 0) +
+      (s.market_demand || 0) +
+      (s.price_vs_market || 0) +
+      (s.liquidity || 0) +
+      (s.risk_penalty || 0);
+    
+    // Apply additional penalty for clearly overpriced items if not already reflected
+    let finalBaseScore = calculatedScore;
+    const askingPriceNum = Number(askingPrice);
+    if (askingPriceNum && item.price_guidance.overpaying_above && askingPriceNum > item.price_guidance.overpaying_above) {
+      // Ensure a strong penalty for overpaying
+      finalBaseScore = Math.min(finalBaseScore, 40); 
     }
-    if (score >= 45) { // Risky
-      return {
-        text: 'text-decision-gold',
-        accent: 'bg-decision-gold/10',
-        border: 'border-decision-gold/20',
-        dot: 'bg-decision-gold',
-        cardBg: 'bg-card',
-        blur: 'bg-decision-gold/10'
-      };
-    }
-    // Avoid & Hard Pass
+    
+    const finalScore = Math.max(1, Math.min(100, Math.round(finalBaseScore)));
+    
+    // Tier D Cap: Utility items should not have high scores
+    const cappedScore = item.item_summary.value_tier === 'D' ? Math.min(finalScore, 30) : finalScore;
+    
     return {
-      text: 'text-decision-red',
-      accent: 'bg-decision-red/10',
-      border: 'border-decision-red/20',
-      dot: 'bg-decision-red',
-      cardBg: 'bg-card',
-      blur: 'bg-decision-red/10'
-    };
-  };
-
-  const decisionStyles = getDecisionStyles(currentItem.buy_decision.score);
-
-  const getContextualPaywallMessage = () => {
-    const category = currentItem.item_summary?.category?.toLowerCase() || '';
-    const score = currentItem.buy_decision?.score || 50;
-
-    if (score < 45) {
-      return "This category is often overpriced by inexperienced buyers";
-    }
-    if (category.includes('furniture') || category.includes('ceramic') || category.includes('china')) {
-      return "Value is highly condition-dependent";
-    }
-    if (category.includes('art') || category.includes('painting') || category.includes('jewelry')) {
-      return "Small details will significantly impact price";
-    }
-    return t('paywall.description');
-  };
-
-  const contextualMessage = getContextualPaywallMessage();
-
-  const [showMoreDetails, setShowMoreDetails] = useState(false);
-  const [moreDetailsText, setMoreDetailsText] = useState('');
-  const [rerunLoading, setRerunLoading] = useState(false);
-
-  const BuyingGoalSelector = () => (
-    <div className="space-y-3 mb-8">
-      <p className="text-[10px] uppercase tracking-widest font-bold text-muted">My Buying Goal</p>
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { id: 'investment', label: 'Investment' },
-          { id: 'must_have', label: 'Must-Have' },
-          { id: 'resale', label: 'Resale/Flip' }
-        ].map((goal) => (
-          <button
-            key={goal.id}
-            onClick={() => setBuyingGoal(goal.id as any)}
-            className={`py-3 rounded-2xl border text-xs font-bold transition-all ${
-              buyingGoal === goal.id 
-                ? 'bg-gold border-ink text-ink' 
-                : 'bg-white border-border-custom text-muted hover:border-gold/30'
-            }`}
-          >
-            {goal.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const getPackPrices = (currencyCode: string) => {
-    const prices: Record<string, any> = {
-      GBP: { 
-        single: '£4.99', 
-        pack3: '£9.99', 
-        pack10: '£29.99', 
-        singlePer: '£4.99/ea', 
-        pack3Per: '£3.33/ea', 
-        pack10Per: '£2.99/ea',
-        pack3Label: 'Best value',
-        pack10Label: 'Best for regular buyers'
+      ...item,
+      item_summary: {
+        ...item.item_summary,
+        confidence: confLabel,
+        confidence_score: finalConfScore
       },
-      USD: { 
-        single: '$6.99', 
-        pack3: '$13.99', 
-        pack10: '$39.99', 
-        singlePer: '$6.99/ea', 
-        pack3Per: '$4.66/ea', 
-        pack10Per: '$3.99/ea' 
-      },
-      EUR: { 
-        single: '€5.99', 
-        pack3: '€11.99', 
-        pack10: '€34.99', 
-        singlePer: '€5.99/ea', 
-        pack3Per: '€3.99/ea', 
-        pack10Per: '€3.49/ea' 
-      },
-      AUD: { 
-        single: 'A$9.99', 
-        pack3: 'A$19.99', 
-        pack10: 'A$59.99', 
-        singlePer: 'A$9.99/ea', 
-        pack3Per: 'A$6.66/ea', 
-        pack10Per: 'A$5.99/ea' 
-      },
-    };
-    return prices[currencyCode] || prices.USD;
-  };
-
-  const currentPackPrices = getPackPrices(currency);
-
-  const packs = [
-    { 
-      id: 'single', 
-      title: t('paywall.pack_single_title'), 
-      price: currentPackPrices.single, 
-      per: currentPackPrices.singlePer 
-    },
-    { 
-      id: '3pack', 
-      title: t('paywall.pack_3_title'), 
-      price: currentPackPrices.pack3, 
-      per: currentPackPrices.pack3Per, 
-      featured: true,
-      label: currentPackPrices.pack3Label || t('paywall.best_value')
-    },
-    { 
-      id: '10pack', 
-      title: t('paywall.pack_10_title'), 
-      price: currentPackPrices.pack10, 
-      per: currentPackPrices.pack10Per,
-      label: currentPackPrices.pack10Label
-    },
-  ];
-
-  const handleCheckout = (packId: string) => {
-    // Call the upgrade function with the selected pack
-    onUpgrade?.(packId as any);
-  };
-
-  const PaywallCard = () => (
-    <section className={`p-8 sm:p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
-      <div className={`absolute top-0 right-0 w-80 h-80 ${decisionStyles.blur} blur-[120px] rounded-full -mr-40 -mt-40 transition-colors duration-500`} />
-      
-      <div className="relative z-10 space-y-8">
-        <div className="text-center space-y-6">
-          <div className={`inline-flex items-center gap-2 px-4 py-1.5 ${decisionStyles.accent} rounded-full border ${decisionStyles.border}`}>
-            <ShieldAlert className={`w-3.5 h-3.5 ${decisionStyles.text}`} />
-            <span className={`text-[11px] font-bold uppercase tracking-widest ${decisionStyles.text}`}>{t('paywall.urgency')}</span>
-          </div>
-          
-          <div className="space-y-4">
-            <h2 className="serif text-3xl sm:text-4xl font-light leading-tight">
-              {t('paywall.title')}
-            </h2>
-            <p className="text-white/80 text-base leading-relaxed max-w-[280px] mx-auto">
-              {t('paywall.subtitle')}
-            </p>
-          </div>
-        </div>
-
-        {/* Pricing Options */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {packs.map((pack) => (
-            <motion.div
-              key={pack.id}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedPack(pack.id)}
-              className={`relative p-6 rounded-3xl border-2 transition-all cursor-pointer flex flex-col items-center text-center gap-2 ${
-                selectedPack === pack.id 
-                  ? 'border-gold bg-gold/10' 
-                  : pack.featured
-                    ? 'border-gold/30 bg-gold/5 hover:border-gold/50'
-                    : 'border-white/10 bg-white/5 hover:border-white/20'
-              }`}
-            >
-              {pack.label && (
-                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 ${pack.featured ? 'bg-gold text-ink' : 'bg-white/10 text-white/60 border border-white/10'} text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg whitespace-nowrap`}>
-                  {pack.label}
-                </div>
-              )}
-              <h3 className="text-xs font-bold uppercase tracking-wider opacity-60">{pack.title}</h3>
-              <div className="text-2xl font-bold">{pack.price}</div>
-              <div className="text-[10px] opacity-40 font-medium">{pack.per}</div>
-            </motion.div>
-          ))}
-        </div>
-
-        <div className="space-y-4 pt-4">
-          <button 
-            onClick={() => handleCheckout(selectedPack)}
-            className="w-full py-5 bg-gold text-ink rounded-full font-bold hover:opacity-90 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-gold/50 border border-gold/20 flex flex-col items-center justify-center gap-0.5 group"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-lg">{t('paywall.cta')}</span>
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </div>
-            <span className="text-[10px] uppercase tracking-widest font-bold opacity-60">
-              {t('paywall.cta_strategy')}
-            </span>
-          </button>
-          <p className="text-[11px] text-muted font-medium tracking-wide text-center">
-            {t('paywall.cta_footer')}
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-
-  const UpgradePlaceholder = ({ title, description, icon: Icon, requiredPlan }: { title: string, description: string, icon: any, requiredPlan: string }) => (
-    <div className="p-6 bg-paper border border-border-custom border-dashed rounded-[32px] flex flex-col items-center justify-center gap-3 text-center opacity-60">
-      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-        <Icon className="w-5 h-5 text-muted" />
-      </div>
-      <div className="space-y-1">
-        <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted">{title}</h3>
-        <p className="text-sm font-medium text-ink leading-tight">{description}</p>
-        <p className={`text-[10px] ${decisionStyles.text} font-bold pt-1 uppercase tracking-tighter`}>Unlock {title}</p>
-      </div>
-    </div>
-  );
-
-  const FeedbackSection = ({ currentItem }: { currentItem: any }) => {
-    const { t } = useTranslation();
-    const [outcome, setOutcome] = useState<'bought' | 'not_bought' | 'still_deciding' | null>(null);
-    const [pricePaid, setPricePaid] = useState('');
-    const [reason, setReason] = useState<string | null>(null);
-    const [helpful, setHelpful] = useState<boolean | null>(null);
-    const [submitted, setSubmitted] = useState(false);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-      if (submitted) {
-        const timer = setTimeout(() => {
-          onBack();
-        }, 3000);
-        return () => clearTimeout(timer);
-      }
-    }, [submitted]);
-
-    const handleSubmit = async () => {
-      if (outcome === null || helpful === null) return;
-      if (outcome === 'not_bought' && !reason) return;
-      
-      setLoading(true);
-      try {
-        const feedbackData = {
-          userId: auth.currentUser?.uid || 'anonymous',
-          itemCategory: currentItem.item_summary.category,
-          predictedPriceRange: {
-            low: currentItem.price_guidance.estimated_market_range_low,
-            high: currentItem.price_guidance.estimated_market_range_high
-          },
-          confidenceLevel: currentItem.item_summary.confidence,
-          confidenceScore: currentItem.item_summary.confidence_score,
-          userAction: outcome,
-          pricePaid: outcome === 'bought' ? parseFloat(pricePaid) || null : null,
-          notBoughtReason: outcome === 'not_bought' ? reason : null,
-          isHelpful: helpful,
-          timestamp: serverTimestamp(),
-          itemId: currentItem.item_summary.title,
-          currency: currentItem.price_guidance.currency || currency
-        };
-
-        await addDoc(collection(db, 'analysis_feedback'), feedbackData);
-        setSubmitted(true);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.CREATE, 'analysis_feedback');
-      } finally {
-        setLoading(false);
+      buy_decision: {
+        ...item.buy_decision,
+        score: cappedScore,
+        label: getBuyLabel(cappedScore),
+        confidence: confLabel
       }
     };
+  });
 
-    if (submitted) {
-      return (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-8 bg-decision-green/5 border border-decision-green/20 rounded-[44px] text-center space-y-2"
-        >
-          <CheckCircle className="w-8 h-8 text-decision-green mx-auto" />
-          <p className="text-sm font-bold text-decision-green">{t('feedback.thanks')}</p>
-        </motion.div>
-      );
-    }
-
-    return (
-      <section className="p-8 bg-white border border-border-custom rounded-[44px] shadow-sm space-y-8">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-muted">
-            <Info className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('feedback.title')}</h3>
-          </div>
-          <p className="text-sm text-muted font-medium">{t('feedback.subtitle')}</p>
-        </div>
-
-        <div className="space-y-6">
-          {/* Question 1: What happened? */}
-          <div className="space-y-3">
-            <p className="text-sm font-bold text-ink">{t('feedback.outcome_question')}</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'bought', label: t('feedback.bought') },
-                { id: 'not_bought', label: t('feedback.not_bought') },
-                { id: 'still_deciding', label: t('feedback.still_deciding') }
-              ].map((opt) => (
-                <button 
-                  key={opt.id}
-                  onClick={() => {
-                    setOutcome(opt.id as any);
-                    setReason(null);
-                    setHelpful(null);
-                  }}
-                  className={`px-4 py-2.5 rounded-2xl border text-xs font-bold transition-all ${outcome === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted hover:border-gold/30'}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Conditional: Bought it */}
-          {outcome === 'bought' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-6 pt-2"
-            >
-              <div className="space-y-3">
-                <p className="text-sm font-bold text-ink">{t('feedback.price_paid_label')}</p>
-                <input 
-                  type="number"
-                  value={pricePaid}
-                  onChange={(e) => setPricePaid(e.target.value)}
-                  placeholder={t('feedback.price_paid_placeholder')}
-                  className="w-full px-5 py-3 bg-paper border border-border-custom rounded-2xl text-sm font-medium focus:outline-none focus:border-gold transition-colors"
-                />
-              </div>
-              <div className="space-y-3">
-                <p className="text-sm font-bold text-ink">{t('feedback.helpful_question')}</p>
-                <div className="flex gap-2">
-                  {[
-                    { id: true, label: t('feedback.yes') },
-                    { id: false, label: t('feedback.no') }
-                  ].map((opt) => (
-                    <button 
-                      key={String(opt.id)}
-                      onClick={() => setHelpful(opt.id)}
-                      className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Conditional: Didn't buy */}
-          {outcome === 'not_bought' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-6 pt-2"
-            >
-              <div className="space-y-3">
-                <p className="text-sm font-bold text-ink">{t('feedback.why_not_bought_question')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'too_expensive', label: t('feedback.reason_expensive') },
-                    { id: 'no_trust', label: t('feedback.reason_trust') },
-                    { id: 'condition_issue', label: t('feedback.reason_condition') },
-                    { id: 'seller_issue', label: t('feedback.reason_seller') },
-                    { id: 'other', label: t('feedback.reason_other') }
-                  ].map((opt) => (
-                    <button 
-                      key={opt.id}
-                      onClick={() => setReason(opt.id)}
-                      className={`px-4 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${reason === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-3">
-                <p className="text-sm font-bold text-ink">{t('feedback.helpful_question')}</p>
-                <div className="flex gap-2">
-                  {[
-                    { id: true, label: t('feedback.yes') },
-                    { id: false, label: t('feedback.no') }
-                  ].map((opt) => (
-                    <button 
-                      key={String(opt.id)}
-                      onClick={() => setHelpful(opt.id)}
-                      className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Conditional: Still deciding */}
-          {outcome === 'still_deciding' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-3 pt-2"
-            >
-              <p className="text-sm font-bold text-ink">{t('feedback.helpful_so_far_question')}</p>
-              <div className="flex gap-2">
-                {[
-                  { id: true, label: t('feedback.yes') },
-                  { id: false, label: t('feedback.no') }
-                ].map((opt) => (
-                  <button 
-                    key={String(opt.id)}
-                    onClick={() => setHelpful(opt.id)}
-                    className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          <button 
-            onClick={handleSubmit}
-            disabled={outcome === null || helpful === null || (outcome === 'not_bought' && !reason) || loading}
-            className="w-full py-4 bg-ink text-white rounded-2xl font-bold text-sm disabled:opacity-30 transition-all hover:opacity-95 shadow-2xl shadow-ink/20"
-          >
-            {loading ? t('common.loading') : t('feedback.submit')}
-          </button>
-        </div>
-      </section>
-    );
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto px-6 py-8 space-y-6 pb-32">
-      {/* 1. Header & Navigation */}
-      <header className="flex items-center justify-between">
-        <button 
-          onClick={onBack}
-          className="p-2 hover:bg-paper rounded-full transition-colors text-ink"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        
-        <div className="flex items-center gap-3">
-          <span className="px-2 py-0.5 bg-gold/10 text-gold text-[8px] font-bold uppercase tracking-widest rounded-full">{plan}</span>
-          {items.length > 1 ? (
-            <div className="flex items-center gap-4 bg-paper px-4 py-2 rounded-full border border-border-custom">
-              <button 
-                onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
-                disabled={currentIndex === 0}
-                className="disabled:opacity-30 text-ink"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
-                {currentIndex + 1} / {items.length}
-              </span>
-              <button 
-                onClick={() => setCurrentIndex(prev => Math.min(items.length - 1, prev + 1))}
-                disabled={currentIndex === items.length - 1}
-                className="disabled:opacity-30 text-ink"
-              >
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-end gap-1">
-              <div className="px-4 py-1.5 bg-paper rounded-full flex items-center gap-2 border border-border-custom">
-                <div className={`w-2 h-2 rounded-full ${
-                  currentItem.item_summary.confidence === 'high' ? 'bg-decision-green' : 
-                  currentItem.item_summary.confidence === 'medium' ? 'bg-decision-gold' : 
-                  'bg-decision-red'
-                }`} />
-                <span className="text-[10px] uppercase tracking-widest font-bold text-muted">
-                  {t(`analysis.confidence_${currentItem.item_summary.confidence}`)} {t('analysis.confidence')}
-                </span>
-              </div>
-              <p className="text-[8px] text-muted/60 font-medium italic pr-1">
-                {currentItem.item_summary.confidence === 'high' ? t('analysis.confidence_high_desc') : 
-                 currentItem.item_summary.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
-                 t('analysis.confidence_low_desc')}
-              </p>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* 2. Image Gallery */}
-      {images.length > 0 && (
-        <section className="relative group">
-          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
-            {images.map((img, i) => (
-              <motion.div 
-                key={i}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.1 }}
-                className="relative flex-shrink-0 w-full aspect-[4/3] rounded-[32px] overflow-hidden bg-paper snap-center border border-border-custom"
-              >
-                <img 
-                  src={img} 
-                  alt={`Analysis ${i + 1}`}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute bottom-4 left-4 px-3 py-1 bg-black/50 backdrop-blur-md rounded-full text-[10px] text-white font-bold uppercase tracking-widest">
-                  {i + 1} / {images.length}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 3. Item Description (Item Summary Card) */}
-      <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-4">
-        <h1 className="serif text-3xl font-normal tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
-        <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-          <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Type</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.category}</p>
-          </div>
-          <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Provenance</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_origin}</p>
-          </div>
-          <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Aesthetic</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_style}</p>
-          </div>
-          <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Era</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_period}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Data Quality Assessment */}
-      <section className={`p-8 bg-white border-2 rounded-[44px] shadow-md space-y-6 transition-all duration-500 ${
-        currentItem.item_summary.confidence === 'high' ? 'border-decision-green/20 shadow-decision-green/5' : 
-        currentItem.item_summary.confidence === 'medium' ? 'border-decision-gold/20 shadow-decision-gold/5' : 
-        'border-decision-red/20 shadow-decision-red/5'
-      }`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-muted">
-            <ShieldAlert className={`w-5 h-5 ${
-              currentItem.item_summary.confidence === 'high' ? 'text-decision-green' : 
-              currentItem.item_summary.confidence === 'medium' ? 'text-decision-gold' : 
-              'text-decision-red'
-            }`} />
-            <h3 className="text-[11px] uppercase tracking-[0.2em] font-bold">Data Quality Assessment</h3>
-          </div>
-          <div className="flex flex-col items-end">
-            <span className={`text-2xl font-bold tracking-tight ${
-              currentItem.item_summary.confidence === 'high' ? 'text-decision-green' : 
-              currentItem.item_summary.confidence === 'medium' ? 'text-decision-gold' : 
-              'text-decision-red'
-            }`}>
-              {t(`analysis.confidence_${currentItem.item_summary.confidence}`)}
-            </span>
-            <span className="text-[9px] uppercase tracking-widest font-bold text-muted opacity-60">{t('analysis.confidence')}</span>
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          <div className="flex items-start gap-4">
-            <div className={`w-4 h-4 rounded-full mt-1.5 shrink-0 ${
-              currentItem.item_summary.confidence === 'high' ? 'bg-decision-green shadow-[0_0_12px_rgba(34,197,94,0.4)]' : 
-              currentItem.item_summary.confidence === 'medium' ? 'bg-decision-gold shadow-[0_0_12px_rgba(234,179,8,0.4)]' : 
-              'bg-decision-red shadow-[0_0_12px_rgba(239,68,68,0.4)]'
-            }`} />
-            <div className="flex flex-col">
-              <p className="text-xl font-medium text-ink capitalize leading-tight">
-                {t(`analysis.confidence_${currentItem.item_summary.confidence}`)} {t('analysis.confidence')}
-              </p>
-              <p className="text-xs text-muted font-medium italic mt-2 leading-relaxed">
-                {currentItem.item_summary.confidence === 'high' ? t('analysis.confidence_high_desc') : 
-                 currentItem.item_summary.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
-                 t('analysis.confidence_low_desc')}
-              </p>
-            </div>
-          </div>
-
-          {currentItem.item_summary.confidence_reason && (
-            <p className="text-xs text-muted leading-relaxed italic bg-paper/50 p-4 rounded-2xl border border-border-custom/50">
-              {currentItem.item_summary.confidence_reason}
-            </p>
-          )}
-
-          {currentItem.item_summary.confidence_improvement_suggestions?.length > 0 && (
-            <div className="pt-2 space-y-3">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-muted">How to improve analysis accuracy</p>
-              <div className="grid grid-cols-1 gap-2">
-                {currentItem.item_summary.confidence_improvement_suggestions.map((suggestion: string, i: number) => (
-                  <div key={i} className="flex items-start gap-2 p-2 bg-paper/30 rounded-lg border border-border-custom/30">
-                    <div className="w-1 h-1 rounded-full bg-muted mt-1.5 shrink-0" />
-                    <p className="text-[10px] text-muted font-medium leading-tight">{suggestion}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {iterationCount < 3 && (
-            <button 
-              onClick={(e) => { e.preventDefault(); onAddMoreDetails(); }} 
-              className="mt-4 w-full py-3 bg-paper border border-border-custom rounded-2xl text-xs font-bold text-ink hover:border-gold/30 transition-all"
-            >
-              Provide More Details
-            </button>
-          )}
-        </div>
-      </section>
-
-
-
-      {/* 5. Price Guidance Card */}
-      {!showPaywall && (
-        <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-6">
-          <div className="flex items-center gap-2 text-muted">
-            <Info className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.price_guidance')}</h3>
-          </div>
-          
-          <h3 className="serif text-xl font-light text-ink">What this is actually worth</h3>
-
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Value Insight</p>
-              <p className="text-xl font-medium text-ink">
-                {formatPrice(currentItem.price_guidance.estimated_market_range_low)} - {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">Smart Buy</p>
-              <p className="text-xl font-medium text-decision-green">
-                {formatPrice(currentItem.price_guidance.good_buy_below)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Retail Range</p>
-              <p className="text-lg font-medium text-muted">
-                {formatPrice(currentItem.price_guidance.fair_price_low)} - {formatPrice(currentItem.price_guidance.fair_price_high)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">Overpaying</p>
-              <p className="text-lg font-medium text-decision-red">
-                {formatPrice(currentItem.price_guidance.overpaying_above)}
-              </p>
-              <p className="text-[9px] text-decision-red/60 mt-1 italic">This is where buyers overpay</p>
-            </div>
-          </div>
-
-          <p className="text-xs text-muted leading-relaxed border-t border-border-custom pt-4 italic">
-            {currentItem.price_guidance.pricing_reasoning}
-          </p>
-        </section>
-      )}
-
-      {/* 6. Dealer Take Card */}
-      {showDealerContent && (
-        <section className="p-6 bg-paper rounded-[32px] border border-border-custom space-y-4">
-          <div className="flex items-center gap-2 text-gold">
-            <Gavel className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.dealer_perspective')}</h3>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">Dealer's Buy</p>
-              <p className="text-lg font-medium text-ink">
-                {formatPrice(currentItem.dealer_take.target_buy_price_low)} - {formatPrice(currentItem.dealer_take.target_buy_price_high)}
-              </p>
-              <p className="text-[9px] text-muted/60 mt-1 italic">Dealers would not pay this</p>
-            </div>
-            <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">Exit Strategy</p>
-              <p className="text-sm text-muted leading-relaxed">{currentItem.dealer_take.resale_strategy}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Trade Assessment</p>
-              {currentItem.dealer_take.dealer_view.map((view: string, i: number) => (
-                <p key={i} className="text-sm text-muted leading-relaxed flex gap-2">
-                  <span className="text-gold">•</span> {view}
-                </p>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 7. Negotiation Strategy Card */}
-      {showProContent && (
-        <section className="p-8 bg-white border border-border-custom rounded-[44px] shadow-sm space-y-8">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-decision-green/70">
-              <Handshake className="w-4 h-4" />
-              <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.negotiation_strategy')}</h3>
-            </div>
-            <h2 className="serif text-3xl font-light tracking-tight text-ink">Buying Strategy</h2>
-            <p className="text-muted text-sm font-light italic">How dealers actually buy this</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-6 bg-decision-green/5 rounded-3xl border border-decision-green/10 text-center">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70 mb-2">First Bid</p>
-              <p className="text-xl sm:text-2xl font-bold text-decision-green tracking-tight">{formatPrice(currentItem.negotiation_strategy.opening_offer)}</p>
-            </div>
-            <div className="p-6 bg-paper rounded-3xl border border-border-custom text-center">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-2">Closing Target</p>
-              <p className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
-                {formatPrice(currentItem.negotiation_strategy.target_price_low)} – {formatPrice(currentItem.negotiation_strategy.target_price_high)}
-              </p>
-            </div>
-          </div>
-          <div className="space-y-4 pt-4 border-t border-border-custom">
-            <p className="text-[10px] uppercase tracking-widest font-bold text-muted">Leverage Points</p>
-            <div className="space-y-3">
-              {currentItem.negotiation_strategy.points_to_raise.map((point: string, i: number) => (
-                <div key={i} className="flex gap-4 items-start">
-                  <div className="w-5 h-5 rounded-full bg-decision-green/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-decision-green text-[10px] font-bold">→</span>
-                  </div>
-                  <p className="text-sm text-ink leading-relaxed font-light">
-                    {point}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 8. Walk Away Card */}
-      {!showPaywall && (
-        <section className="p-6 bg-decision-red/5 border border-decision-red/20 rounded-[32px] space-y-4">
-          <div className="flex items-center gap-2 text-decision-red">
-            <OctagonX className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold opacity-80">{t('analysis.when_to_walk_away')}</h3>
-          </div>
-          <div className="space-y-3">
-            <p className="text-sm font-bold text-decision-red">Walk-away price: {formatPrice(currentItem.negotiation_strategy.walk_away_price)}</p>
-            <p className="text-[10px] font-bold text-decision-red uppercase tracking-widest">Above this, you are likely overpaying. Proceed carefully.</p>
-            <div className="space-y-2">
-              {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
-                <p key={i} className="text-sm text-decision-red/80 leading-relaxed flex gap-2">
-                  <span className="text-decision-red font-bold">!</span> {condition}
-                </p>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 9. Top 3 Checks Card */}
-      {!showPaywall && (
-        <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-muted">
-            <CheckCircle className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.checklist')}</h3>
-          </div>
-          <div className="space-y-3">
-            {currentItem.top_checks.slice(0, 3).map((check: string, i: number) => (
-              <div key={i} className="flex items-center gap-4 p-3 bg-paper rounded-2xl">
-                <div className="w-6 h-6 rounded-full bg-white border border-border-custom flex items-center justify-center text-[10px] font-bold text-muted">
-                  {i + 1}
-                </div>
-                <p className="text-sm font-medium text-muted">{check}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 10. Red Flags Card */}
-      {!showPaywall && currentItem.red_flags.length > 0 && (
-        <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-decision-red">
-            <ShieldAlert className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.red_flags')}</h3>
-          </div>
-          <div className="space-y-3">
-            {currentItem.red_flags.map((flag: any, i: number) => (
-              <div key={i} className={`p-4 rounded-2xl space-y-2 border ${
-                flag.severity === 'high' ? 'bg-decision-red/5 border-decision-red/20' :
-                flag.severity === 'medium' ? 'bg-decision-gold/5 border-decision-gold/20' :
-                'bg-paper border-border-custom'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest ${
-                    flag.severity === 'high' ? 'bg-decision-red/10 text-decision-red' :
-                    flag.severity === 'medium' ? 'bg-decision-gold/10 text-decision-gold' :
-                    'bg-border-custom text-muted'
-                  }`}>
-                    {flag.severity}
-                  </span>
-                </div>
-                <p className="text-sm font-bold text-ink">{flag.issue}</p>
-                <p className="text-xs text-muted leading-relaxed">{flag.reason}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 11. Market Insight Card */}
-      {showProContent && (
-        <section className="p-6 bg-paper rounded-[32px] border border-border-custom space-y-4">
-          <div className="flex items-center gap-2 text-muted">
-            <Info className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.market_insight')}</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Appetite</p>
-              <p className="text-sm font-medium text-ink capitalize">{currentItem.market_insight.demand}</p>
-            </div>
-            <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Liquidity</p>
-              <p className="text-sm font-medium text-ink capitalize">{currentItem.market_insight.resale_ease.replace('_', ' ')}</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted">What Sells This</p>
-            <div className="flex flex-wrap gap-2">
-              {currentItem.market_insight.drivers_of_value.map((driver: string, i: number) => (
-                <span key={i} className="px-3 py-1 bg-white border border-border-custom rounded-full text-[10px] text-muted">
-                  {driver}
-                </span>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 12. Buy Score Card - Moved to bottom for final verdict */}
-      <div className="space-y-6">
-        <BuyingGoalSelector />
-
-        {/* Value Analysis (Snap Judgement) - Visible even with paywall */}
-        <div className="relative z-10 space-y-4 p-6 bg-white/5 border border-white/10 rounded-3xl mb-6">
-          <div className="flex items-center gap-2 text-white/40">
-            <Info className="w-4 h-4" />
-            <p className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.snap_judgement')}</p>
-          </div>
-          <p className="serif text-xl font-medium text-white italic leading-snug">
-            "{currentItem.item_summary.snap_judgement}"
-          </p>
-        </div>
-
-        {!showPaywall && (
-          <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
-            <div className={`absolute top-0 right-0 w-64 h-64 ${decisionStyles.blur} blur-[100px] rounded-full -mr-32 -mt-32 transition-colors duration-500`} />
-            
-            {isTierD && isFree && (
-              <div className="relative z-10 px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 mb-6">
-                <p className="text-sm font-medium text-gold leading-relaxed italic">
-                  {t('paywall.low_value_notice')}
-                </p>
-                <p className="text-[11px] font-bold text-white/60 mt-1 uppercase tracking-wider">
-                  {t('paywall.value_anchor', { 
-                    low: formatPrice(currentItem.price_guidance.estimated_market_range_low), 
-                    high: formatPrice(currentItem.price_guidance.estimated_market_range_high) 
-                  })}
-                </p>
-                <div className="mt-4">
-                  <ShareButton />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-6 relative z-10">
-              <div className="space-y-4">
-                {currentItem.buy_decision.decision_summary.slice(0, 3).map((point: string, i: number) => (
-                  <div key={i} className="flex gap-4 items-start">
-                    <div className={`w-1.5 h-1.5 rounded-full ${decisionStyles.dot} opacity-50 mt-2 shrink-0`} />
-                    <p className="text-base text-white/80 leading-relaxed italic font-light">
-                      {point}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              {isHardPass && (
-                <div className="pt-4">
-                  <ShareButton className="w-full justify-center py-4 text-xs" />
-                </div>
-              )}
-            </div>
-
-            {/* Buy Score at the bottom */}
-            <div className="relative z-10 pt-8 border-t border-white/10">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
-                  <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
-                  {currentItem.buy_decision.score < 65 && <p className="text-[11px] text-muted italic mt-2">At this price, risk increases</p>}
-                  
-                  <div className="flex items-center gap-2 pt-1">
-                    <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
-                    <div className="flex flex-col">
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-paper/60">
-                        {currentItem.buy_decision.confidence.replace('_', ' ')} Confidence
-                      </span>
-                      <p className="text-[8px] text-paper/40 font-light italic">
-                        {currentItem.buy_decision.confidence === 'high' ? t('analysis.confidence_high_desc') : 
-                         currentItem.buy_decision.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
-                         t('analysis.confidence_low_desc')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="scale-125 origin-right">
-                  <BuyGaugeScore 
-                    score={currentItem.buy_decision.score} 
-                    confidence={currentItem.buy_decision.confidence}
-                    goal={buyingGoal}
-                  />
-                </div>
-              </div>
-
-              {/* Bolder Risk Analysis Statement - Moved below gauge for better layout */}
-              <div className="mt-8 p-5 bg-white/10 rounded-2xl border border-white/20">
-                <p className="text-sm text-white font-semibold leading-relaxed">
-                  {buyingGoal === 'investment' && (
-                    <>
-                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Investment Perspective</span>
-                      {currentItem.buy_decision.investment_insight || "The high restoration cost is the primary risk factor impacting your potential ROI."}
-                    </>
-                  )}
-                  {buyingGoal === 'must_have' && (
-                    <>
-                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Personal Enjoyment</span>
-                      {currentItem.buy_decision.must_have_insight || "A great purchase for personal enjoyment. The condition is secondary to your aesthetic preference, but do budget for restoration."}
-                    </>
-                  )}
-                  {buyingGoal === 'resale' && (
-                    <>
-                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Resale Potential</span>
-                      {currentItem.buy_decision.resale_insight || "The high restoration cost severely limits your margin. Proceed with caution."}
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
-          </section>
-        )}
-      </div>
-
-      {/* 13. Feedback System */}
-      {!showPaywall && (
-        <FeedbackSection currentItem={currentItem} />
-      )}
-
-      {/* Locked Features Row and Paywall at the bottom */}
-      {(lockedFeatures.length > 0 || showPaywall) && (
-        <section className="space-y-8 pt-12 border-t border-border-custom">
-          {lockedFeatures.length > 0 && (
-            <div className="space-y-6">
-              <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory -mx-6 px-6">
-                {lockedFeatures.map((feature, i) => (
-                  <div key={i} className="flex-shrink-0 w-72 snap-center">
-                    <UpgradePlaceholder 
-                      title={feature.title} 
-                      description={feature.description} 
-                      icon={feature.icon} 
-                      requiredPlan={feature.plan} 
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {showPaywall && <PaywallCard />}
-        </section>
-      )}
-
-      {/* 12. Disclaimer */}
-      <p className="text-[10px] text-muted leading-relaxed text-center px-8 pt-4">
-        {currentItem.disclaimer}
-      </p>
-
-      {/* 12. Sticky Bottom Action Bar */}
-      {!isSaved && onSave && (
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-border-custom flex gap-4 z-50">
-          <button
-            onClick={onBack}
-            className="flex-1 py-4 bg-paper text-ink rounded-full font-medium hover:bg-border-custom transition-colors"
-          >
-            {t('common.back')}
-          </button>
-          <button
-            onClick={() => onSave('watching')}
-            className="flex-1 py-4 bg-ink text-paper rounded-full font-medium hover:opacity-90 transition-colors flex items-center justify-center gap-2 shadow-2xl shadow-ink/30"
-          >
-            <Save className="w-5 h-5" />
-            {t('common.save')}
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  return items;
 };
