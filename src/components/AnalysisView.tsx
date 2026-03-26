@@ -64,12 +64,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     }
 
     // Update label based on new score
-    if (score >= 65) label = 'Strong Buy';
-    else if (score >= 45) label = 'Risky Buy';
-    else label = 'Hard Pass';
+    if (score >= 65) label = t('analysis.confidence_high'); // Using high as proxy for Strong Buy if not defined
+    else if (score >= 45) label = t('analysis.confidence_medium'); // Using medium as proxy for Risky Buy
+    else label = t('analysis.confidence_low'); // Using low as proxy for Hard Pass
 
     return { ...rawItem, buy_decision: { ...originalDecision, score, label } };
-  }, [rawItem, buyingGoal]);
+  }, [rawItem, buyingGoal, t]);
 
   if (!currentItem) return null;
 
@@ -128,13 +128,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   const handleShare = async () => {
     const text = isHardPass 
-      ? `Dealer Warning: This item is a Hard Pass (Score: ${currentItem.buy_decision.score}). ${currentItem.item_summary.snap_judgement}`
-      : `Antique Hunter Alert: This ${currentItem.item_summary.title} is a Tier D utility item. ${currentItem.item_summary.snap_judgement}`;
+      ? t('analysis.share_hard_pass', { score: currentItem.buy_decision.score, judgement: currentItem.item_summary.snap_judgement })
+      : t('analysis.share_tier_d', { title: currentItem.item_summary.title, judgement: currentItem.item_summary.snap_judgement });
     
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Antique Hunter Analysis',
+          title: t('analysis.share_title'),
           text: text,
           url: window.location.href
         });
@@ -155,7 +155,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       className={`flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full border border-white/20 transition-colors text-[10px] font-bold uppercase tracking-widest text-white/80 ${className}`}
     >
       <Share2 className="w-3 h-3" />
-      {copied ? "Copied!" : (isHardPass ? t('paywall.share_warning') : t('paywall.send_to_friend'))}
+      {copied ? t('analysis.copied') : (isHardPass ? t('paywall.share_warning') : t('paywall.send_to_friend'))}
     </button>
   );
 
@@ -198,13 +198,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const score = currentItem.buy_decision?.score || 50;
 
     if (score < 45) {
-      return "This category is often overpriced by inexperienced buyers";
+      return t('paywall.overpriced_warning', 'This category is often overpriced by inexperienced buyers');
     }
     if (category.includes('furniture') || category.includes('ceramic') || category.includes('china')) {
-      return "Value is highly condition-dependent";
+      return t('paywall.condition_warning', 'Value is highly condition-dependent');
     }
     if (category.includes('art') || category.includes('painting') || category.includes('jewelry')) {
-      return "Small details will significantly impact price";
+      return t('paywall.detail_warning', 'Small details will significantly impact price');
     }
     return t('paywall.description');
   };
@@ -228,13 +228,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   }, [plan]);
 
   const BuyingGoalSelector = () => (
-    <div className="space-y-3 mb-8">
-      <p className="text-[10px] uppercase tracking-widest font-bold text-muted">My Buying Goal</p>
+    <div className="space-y-2">
+      <p className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('analysis.buying_goal')}</p>
       <div className="grid grid-cols-3 gap-2">
         {[
-          { id: 'investment', label: 'Investment' },
-          { id: 'must_have', label: 'Must-Have' },
-          { id: 'resale', label: 'Resale/Flip' }
+          { id: 'investment', label: t('analysis.goal_investment') },
+          { id: 'must_have', label: t('analysis.goal_must_have') },
+          { id: 'resale', label: t('analysis.goal_resale') }
         ].map((goal) => (
           <button
             key={goal.id}
@@ -258,35 +258,35 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         single: '£4.99', 
         pack3: '£9.99', 
         pack10: '£29.99', 
-        singlePer: '£4.99/ea', 
-        pack3Per: '£3.33/ea', 
-        pack10Per: '£2.99/ea',
-        pack3Label: 'Best value',
-        pack10Label: 'Best for regular buyers'
+        singlePer: `£4.99${t('analysis.per_item')}`, 
+        pack3Per: `£3.33${t('analysis.per_item')}`, 
+        pack10Per: `£2.99${t('analysis.per_item')}`,
+        pack3Label: t('analysis.best_value'),
+        pack10Label: t('analysis.regular_buyers')
       },
       USD: { 
         single: '$6.99', 
         pack3: '$13.99', 
         pack10: '$39.99', 
-        singlePer: '$6.99/ea', 
-        pack3Per: '$4.66/ea', 
-        pack10Per: '$3.99/ea' 
+        singlePer: `$6.99${t('analysis.per_item')}`, 
+        pack3Per: `$4.66${t('analysis.per_item')}`, 
+        pack10Per: `$3.99${t('analysis.per_item')}` 
       },
       EUR: { 
         single: '€5.99', 
         pack3: '€11.99', 
         pack10: '€34.99', 
-        singlePer: '€5.99/ea', 
-        pack3Per: '€3.99/ea', 
-        pack10Per: '€3.49/ea' 
+        singlePer: `€5.99${t('analysis.per_item')}`, 
+        pack3Per: `€3.99${t('analysis.per_item')}`, 
+        pack10Per: `€3.49${t('analysis.per_item')}` 
       },
       AUD: { 
         single: 'A$9.99', 
         pack3: 'A$19.99', 
         pack10: 'A$59.99', 
-        singlePer: 'A$9.99/ea', 
-        pack3Per: 'A$6.66/ea', 
-        pack10Per: 'A$5.99/ea' 
+        singlePer: `A$9.99${t('analysis.per_item')}`, 
+        pack3Per: `A$6.66${t('analysis.per_item')}`, 
+        pack10Per: `A$5.99${t('analysis.per_item')}` 
       },
     };
     return prices[currencyCode] || prices.USD;
@@ -324,7 +324,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   };
 
   const PaywallCard = () => (
-    <section className={`p-8 sm:p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
+    <section className={`p-6 sm:p-8 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-8 relative overflow-hidden transition-all duration-500 border border-white/5`}>
       <div className={`absolute top-0 right-0 w-80 h-80 ${decisionStyles.blur} blur-[120px] rounded-full -mr-40 -mt-40 transition-colors duration-500`} />
       
       <div className="relative z-10 space-y-8">
@@ -401,7 +401,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       <div className="space-y-1">
         <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted">{title}</h3>
         <p className="text-sm font-medium text-ink leading-tight">{description}</p>
-        <p className={`text-[10px] ${decisionStyles.text} font-bold pt-1 uppercase tracking-tighter`}>Unlock {title}</p>
+        <p className={`text-[10px] ${decisionStyles.text} font-bold pt-1 uppercase tracking-tighter`}>{t('analysis.unlock', { title })}</p>
       </div>
     </div>
   );
@@ -627,7 +627,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8 space-y-6 pb-32">
+    <div className="max-w-2xl mx-auto px-6 py-8 space-y-4 pb-32">
       {/* 1. Header & Navigation */}
       <header className="flex items-center justify-between">
         <button 
@@ -744,7 +744,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               currentItem.item_summary.confidence === 'medium' ? 'text-decision-gold' : 
               'text-decision-red'
             }`} />
-            <h3 className="text-[11px] uppercase tracking-[0.2em] font-bold">Data Quality Assessment</h3>
+            <h3 className="text-[11px] uppercase tracking-[0.2em] font-bold">{t('analysis.data_quality_assessment')}</h3>
           </div>
           <div className="flex flex-col items-end">
             <span className={`text-2xl font-bold tracking-tight ${
@@ -785,7 +785,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
           {currentItem.item_summary.confidence_improvement_suggestions?.length > 0 && (
             <div className="pt-2 space-y-3">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-muted">How to improve analysis accuracy</p>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('analysis.how_to_improve_accuracy')}</p>
               <div className="grid grid-cols-1 gap-2">
                 {currentItem.item_summary.confidence_improvement_suggestions.map((suggestion: string, i: number) => (
                   <div key={i} className="flex items-start gap-2 p-2 bg-paper/30 rounded-lg border border-border-custom/30">
@@ -801,7 +801,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               onClick={(e) => { e.preventDefault(); onAddMoreDetails(); }} 
               className="mt-4 w-full py-3 bg-paper border border-border-custom rounded-2xl text-xs font-bold text-ink hover:border-gold/30 transition-all"
             >
-              Provide More Details
+              {t('analysis.provide_more_details')}
             </button>
           )}
         </div>
@@ -818,33 +818,33 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.price_guidance')}</h3>
           </div>
           
-          <h3 className="serif text-xl font-light text-ink">What this is actually worth</h3>
+          <h3 className="serif text-xl font-light text-ink">{t('analysis.what_it_is_worth')}</h3>
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Value Insight</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.value_insight')}</p>
               <p className="text-xl font-medium text-ink">
                 {formatPrice(currentItem.price_guidance.estimated_market_range_low)} - {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">Smart Buy</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">{t('analysis.smart_buy')}</p>
               <p className="text-xl font-medium text-decision-green">
                 {formatPrice(currentItem.price_guidance.good_buy_below)}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Retail Range</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.retail_range')}</p>
               <p className="text-lg font-medium text-muted">
                 {formatPrice(currentItem.price_guidance.fair_price_low)} - {formatPrice(currentItem.price_guidance.fair_price_high)}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">Overpaying</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">{t('analysis.overpaying')}</p>
               <p className="text-lg font-medium text-decision-red">
                 {formatPrice(currentItem.price_guidance.overpaying_above)}
               </p>
-              <p className="text-[9px] text-decision-red/60 mt-1 italic">This is where buyers overpay</p>
+              <p className="text-[9px] text-decision-red/60 mt-1 italic">{t('analysis.overpaying_desc')}</p>
             </div>
           </div>
 
@@ -863,18 +863,18 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
           <div className="space-y-4">
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">Dealer's Buy</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">{t('analysis.dealers_buy')}</p>
               <p className="text-lg font-medium text-ink">
                 {formatPrice(currentItem.dealer_take.target_buy_price_low)} - {formatPrice(currentItem.dealer_take.target_buy_price_high)}
               </p>
-              <p className="text-[9px] text-muted/60 mt-1 italic">Dealers would not pay this</p>
+              <p className="text-[9px] text-muted/60 mt-1 italic">{t('analysis.dealers_buy_desc')}</p>
             </div>
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">Exit Strategy</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-1">{t('analysis.exit_strategy')}</p>
               <p className="text-sm text-muted leading-relaxed">{currentItem.dealer_take.resale_strategy}</p>
             </div>
             <div className="space-y-2">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Trade Assessment</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.trade_assessment')}</p>
               {currentItem.dealer_take.dealer_view.map((view: string, i: number) => (
                 <p key={i} className="text-sm text-muted leading-relaxed flex gap-2">
                   <span className="text-gold">•</span> {view}
@@ -893,24 +893,24 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <Handshake className="w-4 h-4" />
               <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.negotiation_strategy')}</h3>
             </div>
-            <h2 className="serif text-3xl font-light tracking-tight text-ink">Buying Strategy</h2>
-            <p className="text-muted text-sm font-light italic">How dealers actually buy this</p>
+            <h2 className="serif text-3xl font-light tracking-tight text-ink">{t('analysis.buying_strategy')}</h2>
+            <p className="text-muted text-sm font-light italic">{t('analysis.buying_strategy_desc')}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-6 bg-decision-green/5 rounded-3xl border border-decision-green/10 text-center">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70 mb-2">First Bid</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70 mb-2">{t('analysis.first_bid')}</p>
               <p className="text-xl sm:text-2xl font-bold text-decision-green tracking-tight">{formatPrice(currentItem.negotiation_strategy.opening_offer)}</p>
             </div>
             <div className="p-6 bg-paper rounded-3xl border border-border-custom text-center">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-2">Closing Target</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-2">{t('analysis.closing_target')}</p>
               <p className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
                 {formatPrice(currentItem.negotiation_strategy.target_price_low)} – {formatPrice(currentItem.negotiation_strategy.target_price_high)}
               </p>
             </div>
           </div>
           <div className="space-y-4 pt-4 border-t border-border-custom">
-            <p className="text-[10px] uppercase tracking-widest font-bold text-muted">Leverage Points</p>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('analysis.leverage_points')}</p>
             <div className="space-y-3">
               {currentItem.negotiation_strategy.points_to_raise.map((point: string, i: number) => (
                 <div key={i} className="flex gap-4 items-start">
@@ -935,8 +935,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h3 className="text-[10px] uppercase tracking-widest font-bold opacity-80">{t('analysis.when_to_walk_away')}</h3>
           </div>
           <div className="space-y-3">
-            <p className="text-sm font-bold text-decision-red">Walk-away price: {formatPrice(currentItem.negotiation_strategy.walk_away_price)}</p>
-            <p className="text-[10px] font-bold text-decision-red uppercase tracking-widest">Above this, you are likely overpaying. Proceed carefully.</p>
+            <p className="text-sm font-bold text-decision-red">{t('analysis.walk_away_price_label')} {formatPrice(currentItem.negotiation_strategy.walk_away_price)}</p>
+            <p className="text-[10px] font-bold text-decision-red uppercase tracking-widest">{t('analysis.walk_away_desc')}</p>
             <div className="space-y-2">
               {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
                 <p key={i} className="text-sm text-decision-red/80 leading-relaxed flex gap-2">
@@ -988,7 +988,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                     flag.severity === 'medium' ? 'bg-decision-gold/10 text-decision-gold' :
                     'bg-border-custom text-muted'
                   }`}>
-                    {flag.severity}
+                    {t(`analysis.severity_${flag.severity}`)}
                   </span>
                 </div>
                 <p className="text-sm font-bold text-ink">{flag.issue}</p>
@@ -1008,16 +1008,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Appetite</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.appetite')}</p>
               <p className="text-sm font-medium text-ink capitalize">{currentItem.market_insight.demand}</p>
             </div>
             <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Liquidity</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.liquidity')}</p>
               <p className="text-sm font-medium text-ink capitalize">{currentItem.market_insight.resale_ease.replace('_', ' ')}</p>
             </div>
           </div>
           <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted">What Sells This</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.what_sells_this')}</p>
             <div className="flex flex-wrap gap-2">
               {currentItem.market_insight.drivers_of_value.map((driver: string, i: number) => (
                 <span key={i} className="px-3 py-1 bg-white border border-border-custom rounded-full text-[10px] text-muted">
@@ -1030,11 +1030,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 12. Buy Score Card - Moved to bottom for final verdict */}
-      <div className="space-y-6">
+      <div className="space-y-2">
         <BuyingGoalSelector />
 
         {/* Value Analysis (Snap Judgement) - Visible even with paywall */}
-        <div className="relative z-10 space-y-4 p-6 bg-white/5 border border-white/10 rounded-3xl mb-6">
+        <div className="relative z-10 space-y-3 p-4 bg-white/5 border border-white/10 rounded-3xl">
           <div className="flex items-center gap-2 text-white/40">
             <Info className="w-4 h-4" />
             <p className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.snap_judgement')}</p>
@@ -1045,7 +1045,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
 
         {!showPaywall && (
-          <section className={`p-10 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-10 relative overflow-hidden transition-all duration-500 border border-white/5`}>
+          <section className={`p-8 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-8 relative overflow-hidden transition-all duration-500 border border-white/5`}>
             <div className={`absolute top-0 right-0 w-64 h-64 ${decisionStyles.blur} blur-[100px] rounded-full -mr-32 -mt-32 transition-colors duration-500`} />
             
             {isTierD && isFree && (
@@ -1089,13 +1089,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <div className="space-y-2">
                   <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
                   <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
-                  {currentItem.buy_decision.score < 65 && <p className="text-[11px] text-muted italic mt-2">At this price, risk increases</p>}
+                  {currentItem.buy_decision.score < 65 && <p className="text-[11px] text-muted italic mt-2">{t('analysis.risk_increases')}</p>}
                   
                   <div className="flex items-center gap-2 pt-1">
                     <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
                     <div className="flex flex-col">
                       <span className="text-[10px] uppercase tracking-widest font-bold text-paper/60">
-                        {currentItem.buy_decision.confidence.replace('_', ' ')} Confidence
+                        {t(`analysis.confidence_${currentItem.buy_decision.confidence}`)} {t('analysis.confidence_label')}
                       </span>
                       <p className="text-[8px] text-paper/40 font-light italic">
                         {currentItem.buy_decision.confidence === 'high' ? t('analysis.confidence_high_desc') : 
@@ -1119,20 +1119,20 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <p className="text-sm text-white font-semibold leading-relaxed">
                   {buyingGoal === 'investment' && (
                     <>
-                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Investment Perspective</span>
-                      {currentItem.buy_decision.investment_insight || "The high restoration cost is the primary risk factor impacting your potential ROI."}
+                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">{t('analysis.investment_perspective')}</span>
+                      {currentItem.buy_decision.investment_insight || t('analysis.investment_insight_fallback')}
                     </>
                   )}
                   {buyingGoal === 'must_have' && (
                     <>
-                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Personal Enjoyment</span>
-                      {currentItem.buy_decision.must_have_insight || "A great purchase for personal enjoyment. The condition is secondary to your aesthetic preference, but do budget for restoration."}
+                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">{t('analysis.personal_enjoyment')}</span>
+                      {currentItem.buy_decision.must_have_insight || t('analysis.must_have_insight_fallback')}
                     </>
                   )}
                   {buyingGoal === 'resale' && (
                     <>
-                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">Resale Potential</span>
-                      {currentItem.buy_decision.resale_insight || "The high restoration cost severely limits your margin. Proceed with caution."}
+                      <span className="text-paper/60 uppercase tracking-widest text-[10px] block mb-2">{t('analysis.resale_potential_label')}</span>
+                      {currentItem.buy_decision.resale_insight || t('analysis.resale_insight_fallback')}
                     </>
                   )}
                 </p>
