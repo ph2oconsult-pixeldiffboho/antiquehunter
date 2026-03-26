@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp } from 'lucide-react';
 import { BuyGaugeScore } from './BuyGaugeScore';
 import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
@@ -264,8 +264,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         singlePer: `GBP £4.99${t('analysis.per_item')}`, 
         pack3Per: `GBP £3.33${t('analysis.per_item')}`, 
         pack10Per: `GBP £2.99${t('analysis.per_item')}`,
-        pack3Label: t('analysis.best_value'),
-        pack10Label: t('analysis.regular_buyers')
+        pack3Label: t('paywall.most_popular'),
+        pack10Label: t('paywall.best_value')
       },
       USD: { 
         single: 'USD $6.99', 
@@ -336,7 +336,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       price: currentPackPrices.pack3, 
       per: currentPackPrices.pack3Per, 
       featured: true,
-      label: currentPackPrices.pack3Label || t('paywall.best_value')
+      label: currentPackPrices.pack3Label || t('paywall.most_popular')
     },
     { 
       id: '10pack', 
@@ -370,7 +370,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <p className="text-white/80 text-base leading-relaxed max-w-[280px] mx-auto">
               {t('paywall.subtitle')}
             </p>
+            <p className="text-[10px] text-white/40 font-bold tracking-widest uppercase">
+              {t('paywall.risk_reinforcement')}
+            </p>
           </div>
+        </div>
+
+        <div className="text-center px-4">
+          <p className="text-sm font-bold text-gold/90 leading-tight">
+            {t('paywall.value_reframe')}
+          </p>
         </div>
 
         {/* Pricing Options */}
@@ -414,6 +423,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               {t('paywall.cta_strategy')}
             </span>
           </button>
+          <p className="text-[10px] text-gold/60 font-bold tracking-widest uppercase text-center">
+            {t('paywall.urgency_microcopy')}
+          </p>
           <div className="space-y-1">
             <p className="text-[11px] text-muted font-medium tracking-wide text-center">
               {t('paywall.cta_footer')}
@@ -1192,7 +1204,20 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               </div>
             </div>
           )}
-          {showPaywall && <PaywallCard />}
+          {showPaywall && (
+            <div className="space-y-6">
+              <div className="p-6 bg-gold/5 border border-gold/20 rounded-[32px] flex items-center gap-4">
+                <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-gold" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold mb-1">Market Signal</h3>
+                  <p className="text-sm font-bold text-ink leading-tight">{t('paywall.teaser_insight')}</p>
+                </div>
+              </div>
+              <PaywallCard />
+            </div>
+          )}
         </section>
       )}
 
