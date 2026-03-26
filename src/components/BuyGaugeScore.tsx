@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 
 interface BuyGaugeScoreProps {
   score: number;
@@ -8,6 +9,7 @@ interface BuyGaugeScoreProps {
 }
 
 export const BuyGaugeScore: React.FC<BuyGaugeScoreProps> = ({ score, confidence, goal = 'investment' }) => {
+  const { t } = useTranslation();
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
@@ -49,7 +51,7 @@ export const BuyGaugeScore: React.FC<BuyGaugeScoreProps> = ({ score, confidence,
         <span className="text-3xl font-bold tracking-tighter">{score}</span>
         <div className="flex flex-col items-center -mt-1">
           <span className="text-[7px] uppercase tracking-widest font-bold text-white/60">
-            {goal === 'investment' ? 'Investment' : goal === 'must_have' ? 'Personal' : 'Resale'} Rating
+            {t(`analysis.goal_${goal}`)} {t('analysis.rating')}
           </span>
           {confidence && (
             <span className="text-[6px] uppercase tracking-widest font-bold text-white/30">{confidence.replace('_', ' ')}</span>

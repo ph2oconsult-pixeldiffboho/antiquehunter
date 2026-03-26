@@ -90,10 +90,10 @@ export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) =>
             className="bg-paper border-none rounded-2xl pl-4 pr-10 py-3 text-sm appearance-none focus:ring-2 focus:ring-gold/10 transition-all outline-none text-ink"
           >
             <option value="all">{t('common.view_all')}</option>
-            <option value="watching">Watching</option>
-            <option value="bought">Bought</option>
-            <option value="passed">Passed</option>
-            <option value="sold">Sold</option>
+            <option value="watching">{t('common.status_watching')}</option>
+            <option value="bought">{t('common.status_bought')}</option>
+            <option value="passed">{t('common.status_passed')}</option>
+            <option value="sold">{t('common.status_sold')}</option>
           </select>
           <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted/40 pointer-events-none" />
         </div>

@@ -27,7 +27,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   autoStartListening = false,
   currency: globalCurrency
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [showHint, setShowHint] = useState(() => {
     return localStorage.getItem('input_hint_shown') !== 'true';
   });
@@ -63,7 +63,16 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
+    
+    // Map i18n language to BCP 47 tags
+    const langMap: Record<string, string> = {
+      'en': 'en-US',
+      'fr': 'fr-FR',
+      'es': 'es-ES',
+      'de': 'de-DE'
+    };
+    recognition.lang = langMap[i18n.language] || i18n.language || 'en-US';
+    
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
@@ -150,14 +159,14 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
         {showGuide && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
-              <h2 className="serif text-2xl mb-4">How to get the best result</h2>
+              <h2 className="serif text-2xl mb-4">{t('describe.hint_title')}</h2>
               <ol className="list-decimal list-inside space-y-2 text-sm text-muted mb-6">
-                <li>Upload clear images of your item.</li>
-                <li>Select the category and location.</li>
-                <li>Describe the item in detail.</li>
+                <li>{t('describe.hint_step1')}</li>
+                <li>{t('describe.hint_step2')}</li>
+                <li>{t('describe.hint_step3')}</li>
               </ol>
               <p className="text-sm text-ink font-medium mb-6">
-                Remember: The more information you provide, the more confident the result.
+                {t('describe.hint_footer')}
               </p>
               <button
                 onClick={() => {
@@ -166,17 +175,17 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                 }}
                 className="w-full py-3 bg-ink text-paper rounded-xl font-bold text-sm hover:opacity-90"
               >
-                Got it
+                {t('describe.got_it')}
               </button>
             </div>
           </div>
         )}
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-gold/10 text-gold rounded-full border border-gold/20 mb-4">
           <Sparkles className="w-3 h-3" />
-          <span className="text-[9px] uppercase tracking-widest font-bold">Try an item — even something nearby</span>
+          <span className="text-[9px] uppercase tracking-widest font-bold">{t('describe.try_item')}</span>
         </div>
         <h1 className="serif text-4xl mb-1 tracking-tight text-ink">{t('describe.title')}</h1>
-        <p className="text-[10px] text-muted uppercase tracking-widest font-bold mb-4">Most users just upload a photo — details are optional.</p>
+        <p className="text-[10px] text-muted uppercase tracking-widest font-bold mb-4">{t('describe.upload_photo_hint')}</p>
         <p className="text-muted text-sm leading-relaxed">{t('home.describe_subtitle')}</p>
         
         <AnimatePresence>
@@ -189,7 +198,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
             >
               <div className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse shrink-0" />
               <p className="text-xs text-muted italic">
-                “Start with something simple — even a glass or small item”
+                {t('describe.simple_start_hint')}
               </p>
               <button 
                 onClick={() => {
@@ -289,7 +298,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
             <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('common.describe')}</label>
             <div className="flex items-center gap-2">
               {!isSpeechSupported && (
-                <span className="text-[9px] text-muted/60 italic">Voice input not supported in this browser</span>
+                <span className="text-[9px] text-muted/60 italic">{t('describe.not_supported')}</span>
               )}
               {isSpeechSupported && (
                 <button
@@ -303,7 +312,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                 >
                   {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                   <span className="text-[10px] font-bold uppercase tracking-widest">
-                    {isListening ? 'Stop Listening' : 'Voice Input'}
+                    {isListening ? t('describe.stop_listening') : t('describe.voice_input')}
                   </span>
                 </button>
               )}
@@ -313,7 +322,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={isListening ? 'Listening... Describe what you see' : t('describe.placeholder')}
+              placeholder={isListening ? t('describe.listening_placeholder') : t('describe.placeholder')}
               className={`w-full h-40 p-4 bg-paper border rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all resize-none text-sm leading-relaxed text-ink placeholder:text-muted/40 ${
                 isListening ? 'border-gold ring-2 ring-gold/10' : 'border-border-custom'
               }`}
@@ -332,7 +341,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                       />
                     ))}
                   </div>
-                  <span className="text-[10px] font-bold text-gold uppercase tracking-widest">Listening...</span>
+                  <span className="text-[10px] font-bold text-gold uppercase tracking-widest">{t('describe.listening_label')}</span>
                 </div>
               </div>
             )}

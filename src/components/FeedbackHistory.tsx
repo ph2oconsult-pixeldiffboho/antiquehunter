@@ -105,7 +105,7 @@ export const FeedbackHistory: React.FC<FeedbackHistoryProps> = ({ onBack, curren
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-paper rounded-2xl space-y-1">
-                    <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Outcome</p>
+                    <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('feedback_history.outcome')}</p>
                     <div className="flex items-center gap-2">
                       {item.userAction === 'bought' ? (
                         <CheckCircle2 className="w-4 h-4 text-decision-green" />
@@ -114,19 +114,19 @@ export const FeedbackHistory: React.FC<FeedbackHistoryProps> = ({ onBack, curren
                       ) : (
                         <HelpCircle className="w-4 h-4 text-decision-gold" />
                       )}
-                      <span className="text-sm font-medium text-ink capitalize">{item.userAction.replace('_', ' ')}</span>
+                      <span className="text-sm font-medium text-ink capitalize">{t(`feedback.${item.userAction}`)}</span>
                     </div>
                   </div>
 
                   <div className="p-4 bg-paper rounded-2xl space-y-1">
-                    <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Helpful?</p>
+                    <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('feedback_history.helpful')}</p>
                     <div className="flex items-center gap-2">
                       {item.isHelpful ? (
                         <CheckCircle2 className="w-4 h-4 text-decision-green" />
                       ) : (
                         <XCircle className="w-4 h-4 text-decision-red" />
                       )}
-                      <span className="text-sm font-medium text-ink">{item.isHelpful ? 'Yes' : 'No'}</span>
+                      <span className="text-sm font-medium text-ink">{item.isHelpful ? t('feedback.yes') : t('feedback.no')}</span>
                     </div>
                   </div>
                 </div>
@@ -134,21 +134,21 @@ export const FeedbackHistory: React.FC<FeedbackHistoryProps> = ({ onBack, curren
                 <div className="space-y-4 pt-4 border-t border-paper">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <p className="text-[9px] uppercase tracking-widest font-bold text-muted">Predicted Range</p>
+                      <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('feedback_history.predicted_range')}</p>
                       <p className="text-sm font-medium text-ink">
                         {formatPrice(item.predictedPriceRange.low, item.currency)} - {formatPrice(item.predictedPriceRange.high, item.currency)}
                       </p>
                     </div>
                     {item.pricePaid && (
                       <div className="space-y-1 text-right">
-                        <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green">Price Paid</p>
+                        <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green">{t('feedback_history.price_paid')}</p>
                         <p className="text-sm font-bold text-decision-green">{formatPrice(item.pricePaid, item.currency)}</p>
                       </div>
                     )}
                     {item.notBoughtReason && (
                       <div className="space-y-1 text-right">
-                        <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red">Reason</p>
-                        <p className="text-sm font-medium text-decision-red capitalize">{item.notBoughtReason.replace('_', ' ')}</p>
+                        <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red">{t('feedback_history.reason')}</p>
+                        <p className="text-sm font-medium text-decision-red capitalize">{t(`feedback.reason_${item.notBoughtReason}`)}</p>
                       </div>
                     )}
                   </div>
@@ -170,9 +170,9 @@ export const FeedbackHistory: React.FC<FeedbackHistoryProps> = ({ onBack, curren
             <MessageSquare className="w-8 h-8 text-muted/20" />
           </div>
           <div className="space-y-2">
-            <p className="text-ink font-medium">No feedback yet</p>
+            <p className="text-ink font-medium">{t('feedback_history.no_feedback')}</p>
             <p className="text-sm text-muted max-w-xs mx-auto">
-              Submit feedback on your analysis results to help improve the dealer engine.
+              {t('feedback_history.no_feedback_desc')}
             </p>
           </div>
         </div>

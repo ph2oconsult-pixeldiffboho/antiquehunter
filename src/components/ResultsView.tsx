@@ -2,6 +2,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { motion } from 'motion/react';
 import { Bell, ExternalLink, Info } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ResultsViewProps {
   results: string;
@@ -10,16 +11,18 @@ interface ResultsViewProps {
 }
 
 export const ResultsView: React.FC<ResultsViewProps> = ({ results, groundingChunks, onSetAlert }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="max-w-4xl mx-auto px-6 pb-20">
       <div className="flex justify-between items-center mb-12 border-b border-border-custom pb-6">
-        <h2 className="serif text-3xl font-light text-ink">Curator's Findings</h2>
+        <h2 className="serif text-3xl font-light text-ink">{t('results.title')}</h2>
         <button
           onClick={onSetAlert}
           className="flex items-center gap-2 px-6 py-3 rounded-full border border-border-custom hover:bg-ink hover:text-paper transition-all group"
         >
           <Bell className="w-4 h-4 group-hover:animate-bounce" />
-          <span className="text-sm font-medium">Set Alert</span>
+          <span className="text-sm font-medium">{t('results.set_alert')}</span>
         </button>
       </div>
 
@@ -39,7 +42,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ results, groundingChun
             <div className="bg-white p-8 rounded-3xl border border-border-custom shadow-sm">
               <div className="flex items-center gap-2 mb-6 text-muted">
                 <Info className="w-4 h-4" />
-                <span className="text-[10px] uppercase tracking-widest font-semibold">Verified Sources</span>
+                <span className="text-[10px] uppercase tracking-widest font-semibold">{t('results.verified_sources')}</span>
               </div>
               <div className="space-y-4">
                 {groundingChunks.map((chunk, i) => (
@@ -68,15 +71,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ results, groundingChun
           )}
 
           <div className="bg-gold/5 p-8 rounded-3xl border border-gold/10">
-            <h3 className="serif text-xl mb-4 text-ink">Can't find it?</h3>
+            <h3 className="serif text-xl mb-4 text-ink">{t('results.cant_find_it')}</h3>
             <p className="text-sm text-muted leading-relaxed mb-6">
-              Our global network of curators and auction houses is constantly updating. Set an alert and we'll notify you the moment it appears.
+              {t('results.cant_find_it_desc')}
             </p>
             <button
               onClick={onSetAlert}
               className="w-full py-4 bg-gold text-ink rounded-full font-medium hover:opacity-90 transition-colors shadow-lg shadow-gold/20"
             >
-              Set Global Alert
+              {t('results.set_global_alert')}
             </button>
           </div>
         </div>

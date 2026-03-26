@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { MapPin, Calendar, ArrowRight, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface FindCardProps {
   find: {
@@ -19,6 +20,7 @@ interface FindCardProps {
 }
 
 export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) => {
+  const { t } = useTranslation();
   const date = find.createdAt?.toDate ? find.createdAt.toDate().toLocaleDateString() : new Date(find.createdAt).toLocaleDateString();
   const displayImage = find.images?.[0] || find.image;
   
@@ -57,10 +59,10 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
           </div>
         )}
         <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
-          {find.status}
+          {t(`common.status_${find.status}`)}
         </div>
         <div className={`absolute bottom-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm text-white ${getScoreColor(score)}`}>
-          Score: {score}
+          {t('common.score')}: {score}
         </div>
       </div>
 

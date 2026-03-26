@@ -90,35 +90,35 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     { 
       show: showPaywall, 
       title: t('analysis.price_guidance'), 
-      description: "See the real price vs what sellers ask", 
+      description: t('analysis.price_guidance_desc'), 
       icon: Info,
       plan: "Pro"
     },
     { 
       show: !showDealerContent, 
       title: t('analysis.dealer_perspective'), 
-      description: "How a dealer would actually position this piece", 
+      description: t('analysis.dealer_perspective_desc'), 
       icon: Gavel,
       plan: "Dealer"
     },
     { 
       show: !showProContent, 
       title: t('analysis.negotiation_strategy'), 
-      description: "Exact offer range and negotiation strategy", 
+      description: t('analysis.negotiation_strategy_desc'), 
       icon: Handshake,
       plan: "Pro"
     },
     { 
       show: showPaywall, 
       title: t('analysis.when_to_walk_away'), 
-      description: "Conditions that make this a bad buy", 
+      description: t('analysis.when_to_walk_away_desc'), 
       icon: OctagonX,
       plan: "Pro"
     },
     { 
       show: !showProContent, 
       title: t('analysis.market_insight'), 
-      description: "How strong demand is and what actually drives value", 
+      description: t('analysis.market_insight_desc'), 
       icon: Info,
       plan: "Pro"
     },
@@ -198,13 +198,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const score = currentItem.buy_decision?.score || 50;
 
     if (score < 45) {
-      return t('paywall.overpriced_warning', 'This category is often overpriced by inexperienced buyers');
+      return t('paywall.overpriced_warning');
     }
     if (category.includes('furniture') || category.includes('ceramic') || category.includes('china')) {
-      return t('paywall.condition_warning', 'Value is highly condition-dependent');
+      return t('paywall.condition_warning');
     }
     if (category.includes('art') || category.includes('painting') || category.includes('jewelry')) {
-      return t('paywall.detail_warning', 'Small details will significantly impact price');
+      return t('paywall.detail_warning');
     }
     return t('paywall.description');
   };
@@ -713,19 +713,19 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         <h1 className="serif text-3xl font-normal tracking-tight leading-tight">{currentItem.item_summary.title}</h1>
         <div className="grid grid-cols-2 gap-y-3 gap-x-4">
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Type</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('describe.category')}</p>
             <p className="text-sm font-medium text-ink">{currentItem.item_summary.category}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Provenance</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.origin')}</p>
             <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_origin}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Aesthetic</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.style')}</p>
             <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_style}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">Era</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.period')}</p>
             <p className="text-sm font-medium text-ink">{currentItem.item_summary.likely_period}</p>
           </div>
         </div>

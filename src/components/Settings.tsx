@@ -29,20 +29,24 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
     { code: 'en', name: 'English' },
     { code: 'fr', name: 'Français' },
     { code: 'es', name: 'Español' },
-    { code: 'de', name: 'Deutsch' }
+    { code: 'de', name: 'Deutsch' },
+    { code: 'zh', name: '中文' },
+    { code: 'ja', name: '日本語' }
   ];
 
   const currencies = [
     { code: 'GBP', symbol: '£', name: 'British Pound' },
     { code: 'USD', symbol: '$', name: 'US Dollar' },
     { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' }
+    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+    { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
+    { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
   ];
 
   const plans = [
-    { id: 'free', name: 'Free', desc: 'Basic analysis' },
-    { id: 'pro', name: 'Pro', desc: 'Advanced market insights' },
-    { id: 'dealer', name: 'Dealer', desc: 'Full commercial strategy' }
+    { id: 'free', name: t('settings.plan_free_name'), desc: t('settings.plan_free_desc') },
+    { id: 'pro', name: t('settings.plan_pro_name'), desc: t('settings.plan_pro_desc') },
+    { id: 'dealer', name: t('settings.plan_dealer_name'), desc: t('settings.plan_dealer_desc') }
   ];
 
   return (
@@ -100,7 +104,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
 
         {/* Plan Selection */}
         <section className="space-y-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">Subscription Plan</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">{t('settings.subscription_plan')}</h2>
           <div className="bg-white border border-border-custom rounded-[32px] overflow-hidden">
             {plans.map((p) => (
               <button
@@ -120,7 +124,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
                   <span className="text-xs text-muted">{p.desc}</span>
                 </div>
                 {plan === p.id ? (
-                  <span className="text-[10px] font-bold text-muted uppercase tracking-widest">Active</span>
+                  <span className="text-[10px] font-bold text-muted uppercase tracking-widest">{t('settings.active')}</span>
                 ) : (
                   <ChevronRight className="w-4 h-4 text-muted/40" />
                 )}
@@ -155,9 +159,9 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
 
         {/* Currency Selection */}
         <section className="space-y-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">Currency</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">{t('settings.currency')}</h2>
           <div className="bg-white border border-border-custom rounded-[32px] overflow-hidden">
-            <div className="grid grid-cols-2">
+            <div className="grid grid-cols-2 md:grid-cols-3">
               {currencies.map((curr) => (
                 <button
                   key={curr.code}
@@ -186,14 +190,14 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
           <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">{t('settings.about')}</h2>
           <div className="bg-white border border-border-custom rounded-[32px] p-6 space-y-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted">Version</span>
+              <span className="text-muted">{t('settings.version')}</span>
               <span className="font-medium text-ink">1.0.0</span>
             </div>
             <button 
               onClick={onNavigateToLegal}
               className="w-full flex items-center justify-between text-sm hover:opacity-70 transition-opacity"
             >
-              <span className="text-muted">Legal</span>
+              <span className="text-muted">{t('settings.legal')}</span>
               <ChevronRight className="w-4 h-4 text-muted/40" />
             </button>
           </div>

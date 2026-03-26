@@ -32,7 +32,7 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
       <section className="space-y-6 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-gold/10 text-gold rounded-full border border-gold/20">
           <Sparkles className="w-3 h-3" />
-          <span className="text-[9px] uppercase tracking-widest font-bold">Try an item — even something nearby</span>
+          <span className="text-[9px] uppercase tracking-widest font-bold">{t('describe.try_item')}</span>
         </div>
         <h1 className="serif text-5xl font-light tracking-tight leading-tight text-ink">{t('home.hero_title')}</h1>
         <p className="text-muted max-w-md mx-auto leading-relaxed">
@@ -106,8 +106,8 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
                     <Mic className="w-5 h-5 text-gold" />
                   </div>
                   <div className="text-left">
-                    <h3 className="serif text-lg font-light text-ink">Voice Appraisal</h3>
-                    <p className="text-[9px] text-muted uppercase tracking-widest font-bold">Speak to describe your item</p>
+                    <h3 className="serif text-lg font-light text-ink">{t('home.voice_appraisal')}</h3>
+                    <p className="text-[9px] text-muted uppercase tracking-widest font-bold">{t('home.voice_appraisal_subtitle')}</p>
                   </div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-muted group-hover:translate-x-1 transition-transform" />
@@ -179,7 +179,7 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
               <div className="p-8 border-b border-border-custom flex items-center justify-between sticky top-0 bg-white z-10">
                 <div className="space-y-1">
                   <h3 className="serif text-2xl font-light text-ink">{t('home.quick_tips')}</h3>
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-gold">Expert Field Knowledge</p>
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-gold">{t('home.expert_field_knowledge', 'Expert Field Knowledge')}</p>
                 </div>
                 <button 
                   onClick={() => setShowAllTips(false)}
@@ -235,7 +235,7 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
                 onClick={() => setSelectedTip(null)}
                 className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm shadow-xl shadow-ink/20"
               >
-                Got it
+                {t('describe.got_it')}
               </button>
             </motion.div>
           </div>
