@@ -418,4 +418,3 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
     </div>
   );
 };
-

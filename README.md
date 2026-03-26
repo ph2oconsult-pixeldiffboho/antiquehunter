@@ -1,20 +1,64 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Antique Hunter - Professional Dealer Tool
 
-# Run and deploy your AI Studio app
+Antique Hunter is a high-end field tool for antique dealers and collectors. It uses AI to provide instant commercial analysis, risk detection, and negotiation strategies for antiques and collectibles.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/967e3fb0-03c7-4f6f-869c-663203607223
+- **Expert Analysis**: Instant identification of period, style, and provenance.
+- **Risk Detection**: Identifies "Red Flags" and construction issues.
+- **Negotiation Strategy**: Provides "First Bid" and "Closing Target" prices based on market data.
+- **Dealer Insights**: Professional "Trade View" on liquidity and resale potential.
+- **Hunting Log**: Save and track your finds in a personal collection.
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+- **Frontend**: React 19, TypeScript, Tailwind CSS 4.
+- **Backend**: Express (Vite Middleware), Firebase (Auth & Firestore).
+- **AI**: Google Gemini API via `@google/genai`.
+- **Animations**: Motion (formerly Framer Motion).
+- **Icons**: Lucide React.
 
+## Getting Started
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Prerequisites
+
+- Node.js (v18+)
+- A Google Cloud Project with Gemini API enabled.
+- A Firebase Project.
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone <your-repo-url>
+   cd antique-hunter
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   Create a `.env` file in the root directory and add the following (see `.env.example` for reference):
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key
+   VITE_FIREBASE_API_KEY=your_firebase_api_key
+   # Add other Firebase config variables as needed
+   ```
+
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Deployment
+
+This app is designed to run on Cloud Run or Vercel.
+
+- **Build**: `npm run build`
+- **Start**: `npm start`
+
+## License
+
+MIT
