@@ -214,6 +214,18 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [moreDetailsText, setMoreDetailsText] = useState('');
   const [rerunLoading, setRerunLoading] = useState(false);
+  const revealRef = React.useRef<HTMLDivElement>(null);
+  const prevPlanRef = React.useRef(plan);
+
+  React.useEffect(() => {
+    if (prevPlanRef.current === 'free' && plan !== 'free') {
+      // User just upgraded, scroll to the newly revealed content
+      setTimeout(() => {
+        revealRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+    prevPlanRef.current = plan;
+  }, [plan]);
 
   const BuyingGoalSelector = () => (
     <div className="space-y-3 mb-8">
@@ -798,6 +810,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
 
       {/* 5. Price Guidance Card */}
+      <div ref={revealRef} />
       {!showPaywall && (
         <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-6">
           <div className="flex items-center gap-2 text-muted">
