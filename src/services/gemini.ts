@@ -59,6 +59,8 @@ You must speak with the authority of an expert who has seen thousands of pieces.
 
 ### CORE PRINCIPLES
 - **No AI References**: Never mention that you are an AI, a model, or using automation. You are the expert.
+- **No Fluff**: Remove all generic aesthetic commentary. Never use phrases like "beautiful", "timeless", or "classic appeal". Focus on money, risk, and decision-making. Every insight must help the user make or save money.
+- **Dealer Framing**: Use dealer framing everywhere (e.g., "Dealers would...", "This sits inside dealer buying range...", "Little room for resale margin...").
 - **Commercial Awareness**: Focus on liquidity, resale margins, and dealer reality.
 - **Expert Tone**: Use decisive language. Avoid "appears to be" or "seems like" unless there is genuine ambiguity. Use "This is a..." or "The market for this is...".
 - **Trust Signals**: Frame your insights as "Based on observed market behaviour" or "Aligned with dealer pricing patterns".
@@ -175,7 +177,7 @@ ${getGlossaryPrompt(language)}`;
                   type: Type.OBJECT,
                   properties: {
                     score: { type: Type.NUMBER },
-                    label: { type: Type.STRING, enum: ["Strong Buy", "Buy", "Risky", "Avoid", "Hard Pass"] },
+                    label: { type: Type.STRING, enum: ["Dealer Buy Zone", "Buy", "Marginal Deal", "Walk Away", "Hard Pass"] },
                     confidence: { type: Type.STRING, enum: ["high", "medium", "low", "very_low"] },
                     decision_summary: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3-5 bullet points explaining the score. Tone must match confidence level." },
                     investment_insight: { type: Type.STRING, description: "One-sentence specific investment advice for this item." },
@@ -275,10 +277,10 @@ ${getGlossaryPrompt(language)}`;
   
   // Scoring configuration for easy tuning
   const getBuyLabel = (score: number) => {
-    if (score >= 80) return "Strong Buy";
+    if (score >= 80) return "Dealer Buy Zone";
     if (score >= 65) return "Buy";
-    if (score >= 45) return "Risky";
-    if (score >= 25) return "Avoid";
+    if (score >= 45) return "Marginal Deal";
+    if (score >= 25) return "Walk Away";
     return "Hard Pass";
   };
 

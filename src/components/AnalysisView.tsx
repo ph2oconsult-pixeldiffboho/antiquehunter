@@ -905,6 +905,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <p className="text-xs text-muted leading-relaxed border-t border-border-custom pt-4 italic">
             {currentItem.price_guidance.pricing_reasoning}
           </p>
+          <p className="text-[10px] text-muted/60 mt-4 pt-4 border-t border-border-custom/50 italic">
+            {t('analysis.valuation_trust_line')}
+          </p>
         </section>
       )}
 
@@ -1141,7 +1144,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <div className="space-y-2">
                   <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
                   <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
-                  {currentItem.buy_decision.score < 65 && <p className="text-[11px] text-muted italic mt-2">{t('analysis.risk_increases')}</p>}
+                  <p className="text-[11px] text-muted italic mt-2">
+                    {currentItem.buy_decision.score >= 65 ? t('analysis.buy_strong_desc') : 
+                     currentItem.buy_decision.score >= 45 ? t('analysis.buy_risky_desc') : 
+                     t('analysis.buy_avoid_desc')}
+                  </p>
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">
+                    {t('analysis.dealer_buy_rule')}
+                  </p>
                 </div>
                 <div className="scale-125 origin-right">
                   <BuyGaugeScore 
@@ -1211,7 +1221,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   <TrendingUp className="w-5 h-5 text-gold" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold mb-1">Market Signal</h3>
+                  <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold mb-1">{t('paywall.market_signal')}</h3>
                   <p className="text-sm font-bold text-ink leading-tight">{t('paywall.teaser_insight')}</p>
                 </div>
               </div>
