@@ -27,7 +27,15 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
   const items = Array.isArray(find.analysis) ? find.analysis : [find.analysis];
   const mainItem = items[0];
   const score = mainItem.buy_decision.score;
-  const label = mainItem.buy_decision.label;
+  
+  const getLabel = (s: number) => {
+    if (s >= 80) return t('analysis.buy_strong');
+    if (s >= 65) return t('analysis.buy_normal');
+    if (s >= 45) return t('analysis.buy_risky');
+    if (s >= 25) return t('analysis.buy_avoid');
+    return t('analysis.buy_pass');
+  };
+  const label = getLabel(score);
 
   const getScoreColor = (s: number) => {
     if (s >= 65) return 'bg-decision-green';

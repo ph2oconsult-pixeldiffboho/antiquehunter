@@ -37,7 +37,7 @@ export const Legal: React.FC<LegalProps> = ({ onBack }) => {
         <section className="space-y-2">
           <h2 className="text-xl font-medium">Disclaimer</h2>
           <p className="text-muted text-sm leading-relaxed">
-            Antique Hunter provides AI-generated appraisals based on public data. Actual market value may vary significantly. Always consult with a certified professional for high-value items.
+            Antique Hunter provides expert-led appraisals based on public data. Actual market value may vary significantly. Always consult with a certified professional for high-value items.
           </p>
         </section>
       </div>

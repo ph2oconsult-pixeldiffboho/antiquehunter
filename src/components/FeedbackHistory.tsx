@@ -38,14 +38,15 @@ export const FeedbackHistory: React.FC<FeedbackHistoryProps> = ({ onBack, curren
   const formatPrice = (amount: number, itemCurrency?: string) => {
     const displayCurrency = itemCurrency || currency;
     try {
-      return new Intl.NumberFormat(i18n.language, {
+      const formatted = new Intl.NumberFormat(i18n.language, {
         style: 'currency',
         currency: displayCurrency,
-        maximumFractionDigits: 0
+        currencyDisplay: 'narrowSymbol'
       }).format(amount);
+      return `${displayCurrency} ${formatted}`;
     } catch (e) {
-      const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', JPY: '¥' };
-      return `${symbols[displayCurrency] || '$'}${amount}`;
+      const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', JPY: '¥', CNY: '¥' };
+      return `${displayCurrency} ${symbols[displayCurrency] || '$'}${amount}`;
     }
   };
 

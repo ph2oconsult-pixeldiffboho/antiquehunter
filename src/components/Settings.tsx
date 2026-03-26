@@ -38,9 +38,9 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
     { code: 'GBP', symbol: '£', name: 'British Pound' },
     { code: 'USD', symbol: '$', name: 'US Dollar' },
     { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
-    { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
-    { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
+    { code: 'AUD', symbol: '$', name: 'Australian Dollar' },
+    { code: 'CNY', symbol: '¥', name: '人民币 (CNY)' },
+    { code: 'JPY', symbol: '¥', name: '日本円 (JPY)' }
   ];
 
   const plans = [
@@ -155,6 +155,9 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
               </button>
             ))}
           </div>
+          <p className="text-[10px] text-muted/60 px-4 italic">
+            {t('settings.language_beta')}
+          </p>
         </section>
 
         {/* Currency Selection */}

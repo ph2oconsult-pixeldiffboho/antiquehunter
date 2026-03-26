@@ -31,14 +31,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const formatPrice = (amount: number) => {
     const displayCurrency = currentItem?.price_guidance?.currency || currency;
     try {
-      return new Intl.NumberFormat(i18n.language, {
+      const formatted = new Intl.NumberFormat(i18n.language, {
         style: 'currency',
         currency: displayCurrency,
-        maximumFractionDigits: 0
+        currencyDisplay: 'narrowSymbol'
       }).format(amount);
+      return `${displayCurrency} ${formatted}`;
     } catch (e) {
-      const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', JPY: '¥' };
-      return `${symbols[displayCurrency] || '$'}${amount}`;
+      const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', JPY: '¥', CNY: '¥' };
+      return `${displayCurrency} ${symbols[displayCurrency] || '$'}${amount}`;
     }
   };
 
@@ -64,9 +65,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     }
 
     // Update label based on new score
-    if (score >= 65) label = t('analysis.confidence_high'); // Using high as proxy for Strong Buy if not defined
-    else if (score >= 45) label = t('analysis.confidence_medium'); // Using medium as proxy for Risky Buy
-    else label = t('analysis.confidence_low'); // Using low as proxy for Hard Pass
+    if (score >= 80) label = t('analysis.buy_strong');
+    else if (score >= 65) label = t('analysis.buy_normal');
+    else if (score >= 45) label = t('analysis.buy_risky');
+    else if (score >= 25) label = t('analysis.buy_avoid');
+    else label = t('analysis.buy_pass');
 
     return { ...rawItem, buy_decision: { ...originalDecision, score, label } };
   }, [rawItem, buyingGoal, t]);
@@ -255,39 +258,65 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const getPackPrices = (currencyCode: string) => {
     const prices: Record<string, any> = {
       GBP: { 
-        single: '£4.99', 
-        pack3: '£9.99', 
-        pack10: '£29.99', 
-        singlePer: `£4.99${t('analysis.per_item')}`, 
-        pack3Per: `£3.33${t('analysis.per_item')}`, 
-        pack10Per: `£2.99${t('analysis.per_item')}`,
+        single: 'GBP £4.99', 
+        pack3: 'GBP £9.99', 
+        pack10: 'GBP £29.99', 
+        singlePer: `GBP £4.99${t('analysis.per_item')}`, 
+        pack3Per: `GBP £3.33${t('analysis.per_item')}`, 
+        pack10Per: `GBP £2.99${t('analysis.per_item')}`,
         pack3Label: t('analysis.best_value'),
         pack10Label: t('analysis.regular_buyers')
       },
       USD: { 
-        single: '$6.99', 
-        pack3: '$13.99', 
-        pack10: '$39.99', 
-        singlePer: `$6.99${t('analysis.per_item')}`, 
-        pack3Per: `$4.66${t('analysis.per_item')}`, 
-        pack10Per: `$3.99${t('analysis.per_item')}` 
+        single: 'USD $6.99', 
+        pack3: 'USD $13.99', 
+        pack10: 'USD $39.99', 
+        singlePer: `USD $6.99${t('analysis.per_item')}`, 
+        pack3Per: `USD $4.66${t('analysis.per_item')}`, 
+        pack10Per: `USD $3.99${t('analysis.per_item')}`,
+        pack3Label: t('analysis.best_value'),
+        pack10Label: t('analysis.regular_buyers')
       },
       EUR: { 
-        single: '€5.99', 
-        pack3: '€11.99', 
-        pack10: '€34.99', 
-        singlePer: `€5.99${t('analysis.per_item')}`, 
-        pack3Per: `€3.99${t('analysis.per_item')}`, 
-        pack10Per: `€3.49${t('analysis.per_item')}` 
+        single: 'EUR €5.99', 
+        pack3: 'EUR €11.99', 
+        pack10: 'EUR €34.99', 
+        singlePer: `EUR €5.99${t('analysis.per_item')}`, 
+        pack3Per: `EUR €3.99${t('analysis.per_item')}`, 
+        pack10Per: `EUR €3.49${t('analysis.per_item')}`,
+        pack3Label: t('analysis.best_value'),
+        pack10Label: t('analysis.regular_buyers')
       },
       AUD: { 
-        single: 'A$9.99', 
-        pack3: 'A$19.99', 
-        pack10: 'A$59.99', 
-        singlePer: `A$9.99${t('analysis.per_item')}`, 
-        pack3Per: `A$6.66${t('analysis.per_item')}`, 
-        pack10Per: `A$5.99${t('analysis.per_item')}` 
+        single: 'AUD $9.99', 
+        pack3: 'AUD $19.99', 
+        pack10: 'AUD $59.99', 
+        singlePer: `AUD $9.99${t('analysis.per_item')}`, 
+        pack3Per: `AUD $6.66${t('analysis.per_item')}`, 
+        pack10Per: `AUD $5.99${t('analysis.per_item')}`,
+        pack3Label: t('analysis.best_value'),
+        pack10Label: t('analysis.regular_buyers')
       },
+      CNY: { 
+        single: 'CNY ¥45.00', 
+        pack3: 'CNY ¥88.00', 
+        pack10: 'CNY ¥258.00', 
+        singlePer: `CNY ¥45.00${t('analysis.per_item')}`, 
+        pack3Per: `CNY ¥29.33${t('analysis.per_item')}`, 
+        pack10Per: `CNY ¥25.80${t('analysis.per_item')}`,
+        pack3Label: t('analysis.best_value'),
+        pack10Label: t('analysis.regular_buyers')
+      },
+      JPY: { 
+        single: 'JPY ¥980', 
+        pack3: 'JPY ¥1,980', 
+        pack10: 'JPY ¥5,800', 
+        singlePer: `JPY ¥980${t('analysis.per_item')}`, 
+        pack3Per: `JPY ¥660${t('analysis.per_item')}`, 
+        pack10Per: `JPY ¥580${t('analysis.per_item')}`,
+        pack3Label: t('analysis.best_value'),
+        pack10Label: t('analysis.regular_buyers')
+      }
     };
     return prices[currencyCode] || prices.USD;
   };
@@ -385,9 +414,17 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               {t('paywall.cta_strategy')}
             </span>
           </button>
-          <p className="text-[11px] text-muted font-medium tracking-wide text-center">
-            {t('paywall.cta_footer')}
-          </p>
+          <div className="space-y-1">
+            <p className="text-[11px] text-muted font-medium tracking-wide text-center">
+              {t('paywall.cta_footer')}
+            </p>
+            <p className="text-[9px] text-white/30 font-medium tracking-wide text-center italic">
+              {t('paywall.dealer_logic')}
+            </p>
+            <p className="text-[8px] text-white/20 font-medium tracking-tight text-center pt-1">
+              {t('paywall.founder_note')}
+            </p>
+          </div>
         </div>
       </div>
     </section>
@@ -731,6 +768,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </section>
 
+      {/* Buying Goal Selector - Moved here to clarify it's a setting that affects the analysis */}
+      <section className="px-2">
+        <BuyingGoalSelector />
+      </section>
+
       {/* 4. Data Quality Assessment */}
       <section className={`p-8 bg-white border-2 rounded-[44px] shadow-md space-y-6 transition-all duration-500 ${
         currentItem.item_summary.confidence === 'high' ? 'border-decision-green/20 shadow-decision-green/5' : 
@@ -1031,8 +1073,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 12. Buy Score Card - Moved to bottom for final verdict */}
       <div className="space-y-2">
-        <BuyingGoalSelector />
-
         {/* Value Analysis (Snap Judgement) - Visible even with paywall */}
         <div className="relative z-10 space-y-3 p-4 bg-white/5 border border-white/10 rounded-3xl">
           <div className="flex items-center gap-2 text-white/40">
@@ -1090,20 +1130,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
                   <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
                   {currentItem.buy_decision.score < 65 && <p className="text-[11px] text-muted italic mt-2">{t('analysis.risk_increases')}</p>}
-                  
-                  <div className="flex items-center gap-2 pt-1">
-                    <div className={`w-2 h-2 rounded-full ${decisionStyles.dot}`} />
-                    <div className="flex flex-col">
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-paper/60">
-                        {t(`analysis.confidence_${currentItem.buy_decision.confidence}`)} {t('analysis.confidence_label')}
-                      </span>
-                      <p className="text-[8px] text-paper/40 font-light italic">
-                        {currentItem.buy_decision.confidence === 'high' ? t('analysis.confidence_high_desc') : 
-                         currentItem.buy_decision.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
-                         t('analysis.confidence_low_desc')}
-                      </p>
-                    </div>
-                  </div>
                 </div>
                 <div className="scale-125 origin-right">
                   <BuyGaugeScore 

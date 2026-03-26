@@ -33,10 +33,12 @@ export default function Main() {
       if (locale.includes('gb')) return 'GBP';
       if (locale.includes('us')) return 'USD';
       if (locale.includes('au')) return 'AUD';
+      if (locale.includes('zh') || locale.includes('cn')) return 'CNY';
+      if (locale.includes('ja') || locale.includes('jp')) return 'JPY';
       if (locale.includes('de') || locale.includes('fr') || locale.includes('es') || locale.includes('it')) return 'EUR';
       
       const inferred = new Intl.NumberFormat().resolvedOptions().currency;
-      if (inferred && ['GBP', 'USD', 'EUR', 'AUD'].includes(inferred)) return inferred;
+      if (inferred && ['GBP', 'USD', 'EUR', 'AUD', 'CNY', 'JPY'].includes(inferred)) return inferred;
     } catch (e) {}
     
     return 'USD';
@@ -82,12 +84,12 @@ export default function Main() {
 
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const loadingMessages = [
-    "Checking market value and dealer signals...",
-    "Consulting historical databases...",
-    "Analyzing construction and materials...",
-    "Checking for modern reproductions...",
-    "Calculating investment potential...",
-    "Finalizing expert appraisal..."
+    t('loading_messages.dealer_history', 'Checking dealer price history...'),
+    t('loading_messages.auction_results', 'Scanning auction results...'),
+    t('loading_messages.construction', 'Evaluating materials and construction...'),
+    t('loading_messages.reproduction', 'Identifying reproduction risks...'),
+    t('loading_messages.resale', 'Calculating resale potential...'),
+    t('loading_messages.valuation', 'Finalizing valuation...')
   ];
 
   useEffect(() => {
@@ -482,8 +484,8 @@ export default function Main() {
                 className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl space-y-6"
               >
                 <div className="space-y-2 text-center">
-                  <h3 className="serif text-2xl font-light text-ink">Unsaved Analysis</h3>
-                  <p className="text-sm text-muted">You have an active analysis that hasn't been saved to your collection. Starting a new scan will discard it.</p>
+                  <h3 className="serif text-2xl font-light text-ink">{t('reset_prompt.title', 'Unsaved Valuation')}</h3>
+                  <p className="text-sm text-muted">{t('reset_prompt.desc', 'You have an active valuation that hasn\'t been logged. Starting a new check will discard this data.')}</p>
                 </div>
                 <div className="flex flex-col gap-3">
                   <button 
@@ -493,13 +495,13 @@ export default function Main() {
                     }}
                     className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm shadow-lg shadow-ink/10"
                   >
-                    Go Back to Save
+                    {t('reset_prompt.back', 'Go Back to Save')}
                   </button>
                   <button 
                     onClick={confirmReset}
                     className="w-full py-4 bg-paper text-muted rounded-2xl font-bold text-sm hover:bg-border-custom transition-colors border border-border-custom"
                   >
-                    Discard and Continue
+                    {t('reset_prompt.discard', 'Discard and Continue')}
                   </button>
                 </div>
               </motion.div>
