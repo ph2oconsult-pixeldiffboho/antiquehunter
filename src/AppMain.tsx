@@ -245,7 +245,6 @@ export default function Main() {
     // For demo purposes, we'll simulate a successful purchase
     // and upgrade the user to 'pro' status
     setPlan('pro');
-    alert(`Success! You've unlocked the ${packId === 'single' ? 'Single Analysis' : packId === '3pack' ? '3-Pack' : '10-Pack'}.`);
   };
 
   const renderScreen = () => {
