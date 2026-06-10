@@ -20,7 +20,7 @@ async function startServer() {
     try {
       const { query, geographies, platforms, priceRange, currency, language } = req.body;
       if (!query) {
-        return res.status(400).json({ success: false, error: "Search query is required" });
+        return res.json({ success: false, error: "Search query is required" });
       }
       const results = await huntAntiquesLive({
         query,
@@ -33,7 +33,7 @@ async function startServer() {
       res.json({ success: true, results });
     } catch (error: any) {
       console.error("Error executing hunt:", error);
-      res.status(500).json({ success: false, error: error.message || "Sourcing check failed" });
+      res.json({ success: false, error: error.message || "Sourcing check failed" });
     }
   });
 
@@ -50,9 +50,9 @@ async function startServer() {
         }
       };
       res.json({ success: true, updatedAnalysis });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error rerunning analysis:", error);
-      res.status(500).json({ success: false, error: "Failed to rerun analysis" });
+      res.json({ success: false, error: "Failed to rerun analysis" });
     }
   });
 
