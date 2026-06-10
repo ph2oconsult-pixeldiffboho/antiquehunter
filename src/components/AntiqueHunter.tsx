@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { Search, MapPin, Globe, Sparkles, ExternalLink, Loader2, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Check } from 'lucide-react';
-import { huntAntiquesLive } from '../services/hunting';
 
 interface AntiqueHunterProps {
   onBack: () => void;
@@ -81,54 +80,33 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
     }, 2200);
 
     try {
-      let sourcingResults: SourcingResults | null = null;
-
-      try {
-        const response = await fetch('/api/hunt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query,
-            geographies,
-            platforms,
-            priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
-            currency,
-            language: i18n.language
-          })
-        });
-
-        const textResponse = await response.text();
-        let data: any;
-        try {
-          data = JSON.parse(textResponse);
-        } catch {
-          throw new Error('Endpoint returned a non-JSON index page. Falling back.');
-        }
-
-        if (data.success && data.results) {
-          sourcingResults = data.results;
-        } else {
-          throw new Error(data.error || 'Server reported unsuccessful operation');
-        }
-      } catch (serverError: any) {
-        console.warn('Server API unavailable, applying secure browser-side grounding sourcing fallback...', serverError);
-        // Direct browser fallback utilizing client-side config defining process.env.GEMINI_API_KEY
-        sourcingResults = await huntAntiquesLive({
+      const response = await fetch('/api/hunt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           query,
           geographies,
           platforms,
           priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
           currency,
           language: i18n.language
-        });
+        })
+      });
+
+      const textResponse = await response.text();
+      let data: any;
+      try {
+        data = JSON.parse(textResponse);
+      } catch {
+        throw new Error('Server returned an unexpected response. Please ensure server is running.');
       }
 
       clearInterval(stepInterval);
 
-      if (sourcingResults) {
-        setResults(sourcingResults);
+      if (data.success && data.results) {
+        setResults(data.results);
       } else {
-        throw new Error('Sourcing scan returned empty or invalid results.');
+        throw new Error(data.error || 'Sourcing check failed to find any matches.');
       }
     } catch (err: any) {
       clearInterval(stepInterval);
