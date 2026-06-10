@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Camera, Search, History, Settings, Sparkles, ArrowRight, Upload, Mic, X, BookOpen } from 'lucide-react';
+import { Camera, Search, History, Settings, Sparkles, ArrowRight, Upload, Mic, X, BookOpen, Compass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface HomeProps {
@@ -9,9 +9,10 @@ interface HomeProps {
   onDescribe: (autoListen?: boolean) => void;
   onViewCollection: () => void;
   onViewSettings: () => void;
+  onViewHunt: () => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onViewCollection, onViewSettings }) => {
+export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onViewCollection, onViewSettings, onViewHunt }) => {
   const { t } = useTranslation();
   const [showAllTips, setShowAllTips] = useState(false);
   const [selectedTip, setSelectedTip] = useState<number | null>(null);
@@ -114,6 +115,32 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
               </div>
             </motion.button>
           )}
+
+          {/* Sourcing portal button */}
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={onViewHunt}
+            className="group relative h-28 rounded-[24px] overflow-hidden bg-gradient-to-br from-paper via-white to-gold/5 border border-gold/35 shadow-sm hover:shadow-md transition-all text-left"
+          >
+            <div className="absolute inset-0 flex items-center justify-between px-8">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-gold/10 rounded-2xl group-hover:bg-gold/20 transition-colors">
+                  <Compass className="w-6 h-6 text-gold animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[8px] bg-gold/15 text-gold border border-gold/25 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">
+                    AI Sourcing Portal
+                  </span>
+                  <h3 className="serif text-xl font-light text-ink">Find Me an Antique</h3>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                    Scan Interencheres, Drouot, eBay & more in real-time
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.button>
         </div>
       </section>
 

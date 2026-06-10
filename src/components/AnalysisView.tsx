@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen } from 'lucide-react';
 import { BuyGaugeScore } from './BuyGaugeScore';
 import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
@@ -717,13 +717,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   'bg-decision-red'
                 }`} />
                 <span className="text-[10px] uppercase tracking-widest font-bold text-muted">
-                  {t(`analysis.confidence_${currentItem.item_summary.confidence}`)} {t('analysis.confidence')}
+                  {t(`analysis.confidence_${currentItem.item_summary.confidence}`)}
                 </span>
               </div>
               <p className="text-[8px] text-muted/60 font-medium italic pr-1">
-                {currentItem.item_summary.confidence === 'high' ? t('analysis.confidence_high_desc') : 
-                 currentItem.item_summary.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
-                 t('analysis.confidence_low_desc')}
+                {t(`analysis.confidence_${currentItem.item_summary.confidence}_desc`)}
               </p>
             </div>
           )}
@@ -821,12 +819,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             }`} />
             <div className="flex flex-col">
               <p className="text-xl font-medium text-ink capitalize leading-tight">
-                {t(`analysis.confidence_${currentItem.item_summary.confidence}`)} {t('analysis.confidence')}
+                {t(`analysis.confidence_${currentItem.item_summary.confidence}`)}
               </p>
               <p className="text-xs text-muted font-medium italic mt-2 leading-relaxed">
-                {currentItem.item_summary.confidence === 'high' ? t('analysis.confidence_high_desc') : 
-                 currentItem.item_summary.confidence === 'medium' ? t('analysis.confidence_medium_desc') : 
-                 t('analysis.confidence_low_desc')}
+                {t(`analysis.confidence_${currentItem.item_summary.confidence}_desc`)}
               </p>
             </div>
           </div>
@@ -993,13 +989,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
           <div className="space-y-3">
             <p className="text-sm font-bold text-decision-red">{t('analysis.walk_away_price_label')} {formatPrice(currentItem.negotiation_strategy.walk_away_price)}</p>
-            <p className="text-[10px] font-bold text-decision-red uppercase tracking-widest">{t('analysis.walk_away_desc')}</p>
             <div className="space-y-2">
-              {currentItem.walk_away_if.slice(0, 3).map((condition: string, i: number) => (
-                <p key={i} className="text-sm text-decision-red/80 leading-relaxed flex gap-2">
-                  <span className="text-decision-red font-bold">!</span> {condition}
-                </p>
-              ))}
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.walk_away_desc')}</p>
+              <div className="space-y-2">
+                {(currentItem.walk_away_if?.length > 0 ? currentItem.walk_away_if : t('analysis.walk_away_points').split('\n')).slice(0, 3).map((condition: string, i: number) => (
+                  <p key={i} className="text-sm text-decision-red/80 leading-relaxed flex gap-2">
+                    <span className="text-decision-red font-bold">!</span> {condition.replace('• ', '')}
+                  </p>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -1056,51 +1054,68 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </section>
       )}
 
-      {/* 11. Market Insight Card */}
-      {showProContent && (
-        <section className="p-6 bg-paper rounded-[32px] border border-border-custom space-y-4">
-          <div className="flex items-center gap-2 text-muted">
-            <Info className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.market_insight')}</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.appetite')}</p>
-              <p className="text-sm font-medium text-ink capitalize">{currentItem.market_insight.demand}</p>
+      {/* 11. Market Insight Card - Moved inside the final verdict group */}
+      <div className="space-y-4">
+        {showProContent && (
+          <section className="p-6 bg-paper rounded-[32px] border border-border-custom space-y-4">
+            <div className="flex items-center gap-2 text-muted">
+              <Info className="w-4 h-4" />
+              <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.market_insight')}</h3>
             </div>
-            <div>
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.liquidity')}</p>
-              <p className="text-sm font-medium text-ink capitalize">{currentItem.market_insight.resale_ease.replace('_', ' ')}</p>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.appetite')}</p>
+                <p className="text-sm font-medium text-ink capitalize">{currentItem.market_insight.demand}</p>
+              </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.liquidity')}</p>
+                <p className="text-sm font-medium text-ink capitalize">{currentItem.market_insight.resale_ease.replace('_', ' ')}</p>
+              </div>
             </div>
-          </div>
-          <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.what_sells_this')}</p>
-            <div className="flex flex-wrap gap-2">
-              {currentItem.market_insight.drivers_of_value.map((driver: string, i: number) => (
-                <span key={i} className="px-3 py-1 bg-white border border-border-custom rounded-full text-[10px] text-muted">
-                  {driver}
-                </span>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
-      {/* 12. Buy Score Card - Moved to bottom for final verdict */}
-      <div className="space-y-2">
-        {/* Value Analysis (Snap Judgement) - Visible even with paywall */}
-        <div className="relative z-10 space-y-3 p-4 bg-white/5 border border-white/10 rounded-3xl">
-          <div className="flex items-center gap-2 text-white/40">
-            <Info className="w-4 h-4" />
-            <p className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.snap_judgement')}</p>
-          </div>
-          <p className="serif text-xl font-medium text-white italic leading-snug">
-            "{currentItem.item_summary.snap_judgement}"
-          </p>
-        </div>
+            <div className="space-y-3 pt-4 border-t border-border-custom/30">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.market_insight_desc')}</p>
+              <div className="flex flex-wrap gap-2">
+                {(currentItem.market_insight.drivers_of_value?.length > 0 ? currentItem.market_insight.drivers_of_value : t('analysis.market_insight_points').split('\n')).map((driver: string, i: number) => (
+                  <span key={i} className="px-3 py-1 bg-white border border-border-custom rounded-full text-[10px] text-muted">
+                    {driver.replace('• ', '')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
-        {!showPaywall && (
-          <section className={`p-8 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-8 relative overflow-hidden transition-all duration-500 border border-white/5`}>
+        {/* Market Pulse Indicator - Productive use of space */}
+        {showProContent && (
+          <div className="flex items-center gap-4 px-2 py-1">
+            <div className="h-[1px] flex-1 bg-border-custom/30" />
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-3 h-3 text-gold" />
+              <span className="text-[9px] uppercase tracking-[0.2em] font-bold text-muted">
+                {t('analysis.market_pulse')}: {currentItem.market_insight.demand}
+              </span>
+            </div>
+            <div className="h-[1px] flex-1 bg-border-custom/30" />
+          </div>
+        )}
+
+        {/* 12. Buy Score Card - Moved to bottom for final verdict */}
+        <div className="space-y-4">
+          {/* Value Analysis (Snap Judgement) - Refined as Dealer's Field Note */}
+          <div className="relative z-10 p-6 bg-white border-l-4 border-gold shadow-sm rounded-r-2xl">
+            <div className="flex items-center gap-2 mb-3">
+              <Pen className="w-3 h-3 text-gold" />
+              <span className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('analysis.snap_judgement')}</span>
+            </div>
+            <p className="serif text-xl font-medium text-ink italic leading-snug">
+              "{currentItem.item_summary.snap_judgement}"
+            </p>
+          </div>
+
+          {!showPaywall && (
+            <section className={`p-8 ${decisionStyles.cardBg} text-white rounded-[44px] shadow-2xl shadow-ink/40 space-y-8 relative overflow-hidden transition-all duration-500 border border-white/5`}>
             <div className={`absolute top-0 right-0 w-64 h-64 ${decisionStyles.blur} blur-[100px] rounded-full -mr-32 -mt-32 transition-colors duration-500`} />
             
             {isTierD && isFree && (
@@ -1189,8 +1204,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </section>
         )}
       </div>
+    </div>
 
-      {/* 13. Feedback System */}
+    {/* 13. Feedback System */}
       {!showPaywall && (
         <FeedbackSection currentItem={currentItem} />
       )}
@@ -1215,18 +1231,22 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
           )}
           {showPaywall && (
-            <div className="space-y-6">
-              <div className="p-6 bg-gold/5 border border-gold/20 rounded-[32px] flex items-center gap-4">
-                <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-gold" />
+              <div className="space-y-4">
+                <div className="p-6 bg-paper rounded-[32px] border border-border-custom space-y-2">
+                  <h3 className="text-sm font-bold text-ink">{t('paywall.pre_tension_title')}</h3>
+                  <p className="text-xs text-muted leading-relaxed">{t('paywall.pre_tension_subtitle')}</p>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold mb-1">{t('paywall.market_signal')}</h3>
-                  <p className="text-sm font-bold text-ink leading-tight">{t('paywall.teaser_insight')}</p>
+                <div className="p-6 bg-gold/5 border border-gold/20 rounded-[32px] flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-gold" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold mb-1">{t('paywall.market_signal')}</h3>
+                    <p className="text-sm font-bold text-ink leading-tight">{t('paywall.teaser_insight')}</p>
+                  </div>
                 </div>
+                <PaywallCard />
               </div>
-              <PaywallCard />
-            </div>
           )}
         </section>
       )}
