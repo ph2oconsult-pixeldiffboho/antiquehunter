@@ -1,7 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const API_KEY = process.env.GEMINI_API_KEY || "";
-
 export interface HuntParams {
   query: string;
   geographies: string[];
@@ -12,12 +10,13 @@ export interface HuntParams {
 }
 
 export const huntAntiquesLive = async (params: HuntParams) => {
-  if (!API_KEY) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not defined in the environment.");
   }
 
   const ai = new GoogleGenAI({
-    apiKey: API_KEY,
+    apiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -126,12 +125,22 @@ Return the best matched listings in the database structure below.`;
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (groundingChunks && parsed.matches) {
         parsed.matches = parsed.matches.map((match: any, index: number) => {
+          // Guard match.platform and match.title to ensure safe operations
+          const matchPlatform = String(match.platform || "").toLowerCase();
+          const matchTitle = String(match.title || "").toLowerCase();
+          const matchUrl = String(match.url || "");
+
           // If the model did not output a real URL but wrote a placeholder or empty string, or we have groundings, map them!
-          if ((!match.url || match.url.includes("example") || match.url.length < 10) && groundingChunks.length > 0) {
+          if ((!matchUrl || matchUrl.includes("example") || matchUrl.length < 10) && groundingChunks.length > 0) {
             // Find a grounding chunk that contains or suggests the platform, or fallback to any available
-            const chunk = groundingChunks.find((c: any) => 
-               c.web?.uri && (c.web.uri.toLowerCase().includes(match.platform.toLowerCase()) || c.web.title.toLowerCase().includes(match.title.toLowerCase()))
-            ) || groundingChunks[index % groundingChunks.length];
+            const chunk = groundingChunks.find((c: any) => {
+              const uri = String(c.web?.uri || "").toLowerCase();
+              const title = String(c.web?.title || "").toLowerCase();
+              return uri && (
+                (matchPlatform && uri.includes(matchPlatform)) || 
+                (matchTitle && title.includes(matchTitle))
+              );
+            }) || groundingChunks[index % groundingChunks.length];
             
             if (chunk && chunk.web?.uri) {
               match.url = chunk.web.uri;
