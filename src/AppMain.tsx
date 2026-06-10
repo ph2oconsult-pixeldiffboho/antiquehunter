@@ -13,13 +13,14 @@ import { Legal } from './components/Legal';
 import { Onboarding } from './components/Onboarding';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AntiqueHunter } from './components/AntiqueHunter';
+import { IntroChoice } from './components/IntroChoice';
 import { searchAntiques } from './services/gemini';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Sparkles } from 'lucide-react';
 
-type Screen = 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'legal' | 'upload-choice' | 'profile' | 'hunt';
+type Screen = 'intro-choice' | 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'legal' | 'upload-choice' | 'profile' | 'hunt';
 
 export default function Main() {
   const { t, i18n } = useTranslation();
@@ -53,7 +54,7 @@ export default function Main() {
     return localStorage.getItem('onboarding_complete') !== 'true';
   });
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('intro-choice');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDetailedScan, setIsDetailedScan] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
@@ -252,6 +253,13 @@ export default function Main() {
 
   const renderScreen = () => {
     switch (currentScreen) {
+      case 'intro-choice':
+        return (
+          <IntroChoice 
+            onSelectValue={() => setCurrentScreen('home')}
+            onSelectSource={() => setCurrentScreen('hunt')}
+          />
+        );
       case 'home':
         return (
           <Home 
@@ -459,7 +467,7 @@ export default function Main() {
         <Onboarding onComplete={() => {
           setShowOnboarding(false);
           localStorage.setItem('onboarding_complete', 'true');
-          setCurrentScreen('describe');
+          setCurrentScreen('intro-choice');
         }} />
       )}
       <MainLayout onViewChange={setCurrentScreen}>

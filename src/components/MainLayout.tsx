@@ -13,7 +13,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const menuItems = [
-    { label: t('common.home', 'Home'), view: 'home', icon: Home },
+    { label: t('common.home', 'Home'), view: 'intro-choice', icon: Home },
     { label: t('common.hunt', 'Find Me an Antique'), view: 'hunt', icon: Compass },
     { label: t('common.collection', 'Collection'), view: 'collection', icon: BookOpen },
     { label: t('common.settings', 'Settings'), view: 'settings', icon: Settings },
@@ -52,7 +52,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
 
           <div className="absolute left-1/2 -translate-x-1/2">
             <button 
-              onClick={() => onViewChange?.('home')}
+              onClick={() => onViewChange?.('intro-choice')}
             >
               <Logo variant="centered" className="text-xl" />
             </button>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { Search, MapPin, Globe, Sparkles, ExternalLink, Loader2, ArrowRight, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, MapPin, Globe, Sparkles, ExternalLink, Loader2, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Check } from 'lucide-react';
+import { huntAntiquesLive } from '../services/hunting';
 
 interface AntiqueHunterProps {
   onBack: () => void;
@@ -80,29 +81,58 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
     }, 2200);
 
     try {
-      const response = await fetch('/api/hunt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      let sourcingResults: SourcingResults | null = null;
+
+      try {
+        const response = await fetch('/api/hunt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            geographies,
+            platforms,
+            priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
+            currency,
+            language: i18n.language
+          })
+        });
+
+        const textResponse = await response.text();
+        let data: any;
+        try {
+          data = JSON.parse(textResponse);
+        } catch {
+          throw new Error('Endpoint returned a non-JSON index page. Falling back.');
+        }
+
+        if (data.success && data.results) {
+          sourcingResults = data.results;
+        } else {
+          throw new Error(data.error || 'Server reported unsuccessful operation');
+        }
+      } catch (serverError: any) {
+        console.warn('Server API unavailable, applying secure browser-side grounding sourcing fallback...', serverError);
+        // Direct browser fallback utilizing client-side config defining process.env.GEMINI_API_KEY
+        sourcingResults = await huntAntiquesLive({
           query,
           geographies,
           platforms,
           priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
           currency,
           language: i18n.language
-        })
-      });
+        });
+      }
 
-      const data = await response.json();
       clearInterval(stepInterval);
 
-      if (data.success && data.results) {
-        setResults(data.results);
+      if (sourcingResults) {
+        setResults(sourcingResults);
       } else {
-        throw new Error(data.error || 'Failed to capture live sourcing data.');
+        throw new Error('Sourcing scan returned empty or invalid results.');
       }
     } catch (err: any) {
-      console.error(err);
+      clearInterval(stepInterval);
+      console.error('Sourcing run failure:', err);
       setError(err?.message || 'The sourcing scan encountered a localized timeout. Please try refining your parameters.');
     } finally {
       setIsSourcing(false);
@@ -180,7 +210,7 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
             {/* Geography Settings */}
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wider font-bold text-ink flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" /> Selected Sourcing Geographies
+                <MapPin className="w-3.5 h-3.5 text-gold" /> Selected Sourcing Geographies
               </label>
               <div className="flex flex-wrap gap-2 pt-1">
                 {availableGeographies.map((geo) => {
@@ -190,13 +220,14 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
                       key={geo}
                       type="button"
                       onClick={() => handleGeographyToggle(geo)}
-                      className={`px-4 py-2 text-xs rounded-full border transition-all ${
+                      className={`px-4 py-2 text-xs rounded-full border transition-all flex items-center gap-1.5 cursor-pointer ${
                         selected 
-                          ? 'bg-ink text-paper border-ink font-semibold' 
-                          : 'bg-paper text-muted border-border-custom hover:bg-white'
+                          ? 'bg-decision-green text-white border-decision-green shadow-md scale-[1.03] font-semibold' 
+                          : 'bg-paper text-muted border-border-custom hover:bg-white hover:text-ink'
                       }`}
                     >
-                      {geo}
+                      {selected && <Check className="w-3 h-3 text-white" />}
+                      <span>{geo}</span>
                     </button>
                   );
                 })}
@@ -206,7 +237,7 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
             {/* Platform Priorities */}
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wider font-bold text-ink flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" /> Target Reputable Channels
+                <ShieldCheck className="w-3.5 h-3.5 text-gold" /> Target Reputable Channels
               </label>
               <div className="flex flex-wrap gap-2 pt-1">
                 {availablePlatforms.map((plat) => {
@@ -216,13 +247,14 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
                       key={plat}
                       type="button"
                       onClick={() => handlePlatformToggle(plat)}
-                      className={`px-4 py-2 text-xs rounded-full border transition-all ${
+                      className={`px-4 py-2 text-xs rounded-full border transition-all flex items-center gap-1.5 cursor-pointer ${
                         selected 
-                          ? 'bg-ink text-paper border-ink font-semibold' 
-                          : 'bg-paper text-muted border-border-custom hover:bg-white'
+                          ? 'bg-decision-green text-white border-decision-green shadow-md scale-[1.03] font-semibold' 
+                          : 'bg-paper text-muted border-border-custom hover:bg-white hover:text-ink'
                       }`}
                     >
-                      {plat}
+                      {selected && <Check className="w-3 h-3 text-white" />}
+                      <span>{plat}</span>
                     </button>
                   );
                 })}
