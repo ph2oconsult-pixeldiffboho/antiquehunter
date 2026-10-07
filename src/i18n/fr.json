@@ -378,7 +378,7 @@
     "no_verified": "Aucune annonce en ligne vérifiée – élargissez le budget ou les sources.",
     "verified": "Lien vérifié",
     "unverified": "Non vérifié",
-    "unverified_desc": "Ce site bloque les vérifications automatiques – ouvrez le lien pour confirmer que l'annonce est toujours en ligne.",
+    "unverified_desc": "Ce site bloque les vérifications automatiques : le prix, la date de vente et la disponibilité proviennent des résultats de recherche et ne sont pas confirmés – ouvrez le lien pour vérifier.",
     "checked_summary": "Liens vérifiés : {{verified}} confirmés, {{unverified}} non vérifiés, {{dropped}} écartés (morts, terminés, génériques ou hors filtre)."
   }
 }

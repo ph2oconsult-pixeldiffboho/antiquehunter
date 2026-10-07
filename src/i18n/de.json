@@ -378,7 +378,7 @@
     "no_verified": "Keine verifizierten aktiven Angebote gefunden – Budget oder Quellen erweitern.",
     "verified": "Link geprüft",
     "unverified": "Nicht verifiziert",
-    "unverified_desc": "Diese Seite blockiert automatische Prüfungen – öffnen Sie den Link, um zu bestätigen, dass das Angebot noch aktiv ist.",
+    "unverified_desc": "Diese Seite blockiert automatische Prüfungen: Preis, Auktionsdatum und Verfügbarkeit stammen aus Suchergebnissen und sind nicht bestätigt – öffnen Sie den Link zur Kontrolle.",
     "checked_summary": "Links geprüft: {{verified}} verifiziert, {{unverified}} nicht verifiziert, {{dropped}} entfernt (tot, beendet, generisch oder außerhalb des Filters)."
   }
 }

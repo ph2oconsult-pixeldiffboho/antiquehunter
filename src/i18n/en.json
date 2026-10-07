@@ -378,7 +378,7 @@
     "no_verified": "No verified live listings found – try widening the budget or sources.",
     "verified": "Link checked",
     "unverified": "Not verified",
-    "unverified_desc": "This site blocks automated checks – open the link to confirm the listing is still live.",
+    "unverified_desc": "This site blocks automated checks, so the price, sale date and availability come from search results and are not confirmed – open the link to check.",
     "checked_summary": "Links checked: {{verified}} verified, {{unverified}} unverified, {{dropped}} removed (dead, closed, generic or off-filter)."
   }
 }

@@ -378,7 +378,7 @@
     "no_verified": "No se encontraron anuncios activos verificados – amplíe el presupuesto o las fuentes.",
     "verified": "Enlace comprobado",
     "unverified": "No verificado",
-    "unverified_desc": "Este sitio bloquea las comprobaciones automáticas – abra el enlace para confirmar que el anuncio sigue activo.",
+    "unverified_desc": "Este sitio bloquea las comprobaciones automáticas: el precio, la fecha de venta y la disponibilidad proceden de los resultados de búsqueda y no están confirmados – abra el enlace para comprobarlo.",
     "checked_summary": "Enlaces comprobados: {{verified}} verificados, {{unverified}} sin verificar, {{dropped}} descartados (caídos, cerrados, genéricos o fuera de filtro)."
   }
 }

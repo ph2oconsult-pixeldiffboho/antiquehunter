@@ -378,7 +378,7 @@
     "no_verified": "未找到经过验证的在售商品——请放宽预算或来源。",
     "verified": "链接已验证",
     "unverified": "未验证",
-    "unverified_desc": "该网站阻止自动检查——请打开链接确认商品仍在售。",
+    "unverified_desc": "该网站阻止自动检查，因此价格、拍卖日期和是否在售均来自搜索结果，未经确认——请打开链接核实。",
     "checked_summary": "链接检查：{{verified}} 个已验证，{{unverified}} 个未验证，{{dropped}} 个已移除（失效、已结束、通用页面或不符合筛选）。"
   }
 }

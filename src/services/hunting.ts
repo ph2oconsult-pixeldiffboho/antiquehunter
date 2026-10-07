@@ -234,8 +234,8 @@ export const validateMatch = async (
   // Page could not be read (bot protection, timeout...). Keep only specific listing URLs, flagged.
   if (!isSpecificListingUrl(finalUrl)) return { dropReason: page.status ? `unreadable_generic_${page.status}` : 'unreadable_generic' };
   result.verificationNote = page.status === 403 || page.status === 429
-    ? 'Site blocks automated checks – open the link to confirm it is still live.'
-    : 'Could not load the page in time – open the link to confirm it is still live.';
+    ? 'Site blocks automated checks: price, date and availability come from search results and are not confirmed – open the link to check.'
+    : 'Page did not load in time: price, date and availability come from search results and are not confirmed – open the link to check.';
   return { match: result };
 };
 
