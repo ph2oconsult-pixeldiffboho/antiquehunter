@@ -174,7 +174,7 @@ export const parsePage = (url: string, html: string): PageFacts => {
   const rawTitle = ogTitle || (titleTag ? decodeEntities(titleTag) : undefined);
   const lotNo = rawTitle?.match(/-\s*\d{6,}-(\d+)\s*(\||$)/)?.[1];
   if (rawTitle) {
-    facts.title = cleanText(rawTitle.split(' | ')[0]
+    facts.title = cleanText(rawTitle.split(' | ')[0].replace(/\s+/g, ' ')
       .replace(/\s*[–-]\s*(Interencheres\.com|Drouot\.com|Drouot|Auctionet|Bukowskis|eBay|leboncoin)\s*$/i, '')
       .replace(/\s*-\s*\d{6,}-\d+\s*$/, '')
       .replace(/\s*(\.\.\.|…)\s*$/, '…'));
@@ -183,7 +183,7 @@ export const parsePage = (url: string, html: string): PageFacts => {
   if (rawDesc) {
     let d = rawDesc.replace(/^En détail\s*:\s*/i, '');
     if (lotNo) d = d.replace(new RegExp(`^Lot\\s*${lotNo}`), '');
-    facts.description = cleanText(d).slice(0, 400);
+    facts.description = cleanText(d.replace(/\s+/g, ' ')).slice(0, 400);
   }
   const img = metaContent(html, 'og:image') || metaContent(html, 'twitter:image');
   if (img && /^https?:\/\//i.test(img)) facts.image = img;
@@ -191,10 +191,14 @@ export const parsePage = (url: string, html: string): PageFacts => {
   const text = visibleText(html);
 
   if (hostMatches(host, 'interencheres.com')) {
+    // Timed online sales ("Date de clôture") have an end_at; live sales only a start_at
+    // (sale end and this lot's own closing time); the earliest one is when this lot closes.
+    const ends = Array.from(html.matchAll(/end_at:"(\d{4}-\d{2}-\d{2}T[\d:.]+Z)"/g)).map(m => new Date(m[1]).getTime()).filter(n => !isNaN(n));
     const iso = html.match(/start_at:"(\d{4}-\d{2}-\d{2}T[\d:.]+Z)"/);
-    if (iso) facts.saleDate = new Date(iso[1]);
+    if (ends.length > 0) facts.saleDate = new Date(Math.min(...ends));
+    else if (iso) facts.saleDate = new Date(iso[1]);
     else {
-      const fr = text.match(/Date\s+(\d{2})\/(\d{2})\/(\d{4})(?:\s+à\s+(\d{1,2})h(\d{2}))?/);
+      const fr = text.match(/Date(?: de clôture)?\s+(\d{2})\/(\d{2})\/(\d{4})(?:\s+à\s+(\d{1,2})h(\d{2}))?/);
       if (fr) facts.saleDate = new Date(`${fr[3]}-${fr[2]}-${fr[1]}T${(fr[4] || '23').padStart(2, '0')}:${fr[5] || '59'}:00+02:00`);
     }
     const est = text.match(/Estimation\s+([\d\s\u00a0\u202f.,]+)\s*€\s*-\s*([\d\s\u00a0\u202f.,]+)\s*€/);

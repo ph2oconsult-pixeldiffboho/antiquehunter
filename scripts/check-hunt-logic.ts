@@ -106,6 +106,13 @@ if (pagesDir && existsSync(`${pagesDir}/p8.html`)) {
     assert.ok(f.title?.startsWith("400 Console"));
   });
 }
+if (pagesDir && existsSync(`${pagesDir}/timed_sale.html`)) {
+  check("interencheres timed sale uses the closing date", () => {
+    const f = parsePage("https://www.interencheres.com/art-decoration/greniers-bourguignons-690292/lot-89097887.html", readFileSync(`${pagesDir}/timed_sale.html`, "utf8"));
+    assert.equal(f.saleDate?.toISOString(), "2026-10-14T19:29:00.000Z");
+    assert.ok(!/[\r\n]/.test(f.title || ""));
+  });
+}
 if (process.env.DROUOT_PAGE && existsSync(process.env.DROUOT_PAGE)) {
   check("drouot page parsing", () => {
     const f = parsePage("https://drouot.com/fr/l/35030886", readFileSync(process.env.DROUOT_PAGE!, "utf8"));
