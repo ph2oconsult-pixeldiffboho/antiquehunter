@@ -14,6 +14,7 @@ interface DescriptionInputProps {
   onRemoveImage: (index: number) => void;
   autoStartListening?: boolean;
   currency: string;
+  onCurrencyChange?: (currency: string) => void;
 }
 
 export const DescriptionInput: React.FC<DescriptionInputProps> = ({ 
@@ -25,7 +26,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   onAddImage,
   onRemoveImage,
   autoStartListening = false,
-  currency: globalCurrency
+  currency: globalCurrency,
+  onCurrencyChange
 }) => {
   const { t, i18n } = useTranslation();
   const [showHint, setShowHint] = useState(() => {
@@ -468,12 +470,12 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
               <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <select 
                   value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
+                  onChange={(e) => { setCurrency(e.target.value); onCurrencyChange?.(e.target.value); }}
                   className="bg-transparent text-xs font-bold text-muted focus:outline-none cursor-pointer"
                 >
-                  <option>USD</option>
-                  <option>GBP</option>
                   <option>EUR</option>
+                  <option>GBP</option>
+                  <option>USD</option>
                   <option>AUD</option>
                   <option>CNY</option>
                   <option>JPY</option>

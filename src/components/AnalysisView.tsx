@@ -5,6 +5,7 @@ import { BuyGaugeScore } from './BuyGaugeScore';
 import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { allInCost, clampToBand } from '../services/appraisalMath';
 
 interface AnalysisViewProps {
   result: any; // Can be a single object or an array of objects
@@ -31,13 +32,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   const formatPrice = (amount: number) => {
     const displayCurrency = currentItem?.price_guidance?.currency || currency || 'EUR';
+    // Whole amounts only: €50, not €50.00 (all appraisal figures are rounded to whole units)
     const num = Math.round(Number(amount) || 0);
     try {
       return new Intl.NumberFormat(i18n.language, {
         style: 'currency',
         currency: displayCurrency,
-        maximumFractionDigits: num >= 100 ? 0 : 2,
-        minimumFractionDigits: num >= 100 ? 0 : 2
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0
       }).format(num);
     } catch (e) {
       const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', JPY: '¥', CNY: '¥' };
@@ -58,14 +60,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     let score = originalDecision.score;
     let label = originalDecision.label;
 
-    // Logic to adjust score based on goal
+    // Small goal-based nudge, kept inside the price band computed on the server
+    // (so e.g. a price at or below market low always stays in the 80-95 band)
     if (buyingGoal === 'investment') {
-        score = Math.max(0, score - 10);
+        score = score - 5;
     } else if (buyingGoal === 'must_have') {
-        score = Math.min(100, score + 15);
+        score = score + 5;
     } else if (buyingGoal === 'resale') {
-        score = Math.max(0, score - 5);
+        score = score - 3;
     }
+    score = Math.round(clampToBand(score, originalDecision.score_band));
 
     // Update label based on new score
     if (score >= 80) label = t('analysis.buy_strong');
@@ -76,6 +80,21 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
     return { ...rawItem, buy_decision: { ...originalDecision, score, label } };
   }, [rawItem, buyingGoal, t]);
+
+  // Keep the floating action bar from covering the end of the page (bar height + safe area)
+  const [actionBarHeight, setActionBarHeight] = useState(88);
+  const actionBarObserver = React.useRef<ResizeObserver | null>(null);
+  const actionBarRef = React.useCallback((el: HTMLDivElement | null) => {
+    actionBarObserver.current?.disconnect();
+    actionBarObserver.current = null;
+    if (!el) return;
+    setActionBarHeight(el.offsetHeight);
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => setActionBarHeight(el.offsetHeight));
+      ro.observe(el);
+      actionBarObserver.current = ro;
+    }
+  }, []);
 
   if (!currentItem) return null;
 
@@ -198,6 +217,23 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   };
 
   const decisionStyles = getDecisionStyles(currentItem.buy_decision.score);
+
+  // Category label: use the translated category name when it is a known key, otherwise capitalise ("furniture" -> "Furniture")
+  const rawCategory = String(currentItem.item_summary?.category || '').trim();
+  const categoryKey = rawCategory.toLowerCase().replace(/[\s/&-]+/g, '_');
+  const categoryLabel = i18n.exists(`categories.${categoryKey}`)
+    ? t(`categories.${categoryKey}`)
+    : rawCategory.charAt(0).toLocaleUpperCase(i18n.language) + rawCategory.slice(1);
+
+  // Buyer's premium figures: computed once and reused everywhere so totals always match
+  const isAuctionItem = !!(currentItem.seller_context?.isAuction || currentItem.seller_context?.sellerType?.toLowerCase().includes('auction'));
+  const premiumPct = Number(currentItem.seller_context?.buyerPremiumRate) > 0 ? Number(currentItem.seller_context.buyerPremiumRate) : 25;
+  const marketLow = Math.round(Number(currentItem.price_guidance?.estimated_market_range_low) || 0);
+  const marketHigh = Math.round(Number(currentItem.price_guidance?.estimated_market_range_high) || 0);
+  const walkAway = Math.round(Number(currentItem.negotiation_strategy?.walk_away_price) || 0);
+  const allInLow = allInCost(marketLow, premiumPct, true);
+  const allInHigh = allInCost(marketHigh, premiumPct, true);
+  const walkAwayAllIn = allInCost(walkAway, premiumPct, true);
 
   const getContextualPaywallMessage = () => {
     const category = currentItem.item_summary?.category?.toLowerCase() || '';
@@ -680,7 +716,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8 space-y-4 pb-48">
+    <div
+      className="max-w-2xl mx-auto px-6 py-8 space-y-4"
+      style={{ paddingBottom: `calc(${actionBarHeight + 40}px + env(safe-area-inset-bottom, 0px))` }}
+    >
       {/* 1. Header & Navigation */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -780,7 +819,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         <div className="grid grid-cols-2 gap-y-3 gap-x-4">
           <div>
             <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('describe.category')}</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.category}</p>
+            <p className="text-sm font-medium text-ink">{categoryLabel}</p>
           </div>
           <div>
             <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.origin')}</p>
@@ -927,10 +966,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       )}
 
       {/* 5b. Auction House Buyer's Premium & True Out-of-Pocket Cost */}
-      {!showPaywall && (currentItem.seller_context?.isAuction || currentItem.seller_context?.sellerType?.toLowerCase().includes('auction')) && (() => {
-        const premiumPct = Number(currentItem.seller_context?.buyerPremiumRate) > 0 ? Number(currentItem.seller_context.buyerPremiumRate) : 25;
-        const premiumMultiplier = premiumPct / 100;
-        const totalMultiplier = 1 + premiumMultiplier;
+      {!showPaywall && isAuctionItem && (() => {
+        const totalMultiplier = 1 + premiumPct / 100;
         return (
           <section className="p-6 bg-amber-50/50 border border-amber-200/80 rounded-[32px] space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -953,7 +990,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <div className="bg-white p-3.5 rounded-2xl border border-amber-200/60 shadow-sm space-y-1">
                 <span className="text-[9px] uppercase tracking-wider font-bold text-stone-500 block">Hammer Price Range</span>
                 <p className="font-semibold text-stone-900 text-sm">
-                  {formatPrice(currentItem.price_guidance.estimated_market_range_low)} – {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
+                  {formatPrice(marketLow)} – {formatPrice(marketHigh)}
                 </p>
                 <span className="text-[9px] text-stone-400 block">Winning bid in the room</span>
               </div>
@@ -961,7 +998,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <div className="bg-white p-3.5 rounded-2xl border border-amber-200/60 shadow-sm space-y-1">
                 <span className="text-[9px] uppercase tracking-wider font-bold text-amber-800 block">Buyer's Premium (+{premiumPct}%)</span>
                 <p className="font-semibold text-amber-800 text-sm">
-                  +{formatPrice(Math.round(currentItem.price_guidance.estimated_market_range_low * premiumMultiplier))} – +{formatPrice(Math.round(currentItem.price_guidance.estimated_market_range_high * premiumMultiplier))}
+                  +{formatPrice(allInLow - marketLow)} – +{formatPrice(allInHigh - marketHigh)}
                 </p>
                 <span className="text-[9px] text-amber-600/70 block">Auction fees & VAT</span>
               </div>
@@ -969,16 +1006,21 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <div className="bg-white p-3.5 rounded-2xl border border-amber-300 shadow-sm space-y-1 bg-gradient-to-br from-white to-amber-50">
                 <span className="text-[9px] uppercase tracking-wider font-bold text-stone-800 block">Total Acquisition Cost</span>
                 <p className="font-bold text-stone-900 text-sm">
-                  {formatPrice(Math.round(currentItem.price_guidance.estimated_market_range_low * totalMultiplier))} – {formatPrice(Math.round(currentItem.price_guidance.estimated_market_range_high * totalMultiplier))}
+                  {formatPrice(allInLow)} – {formatPrice(allInHigh)}
                 </p>
                 <span className="text-[9px] text-stone-500 block">True all-in payment (Hammer × {(totalMultiplier).toFixed(2)})</span>
               </div>
             </div>
 
             <div className="p-3 bg-white/80 rounded-xl border border-amber-200/50 flex items-start gap-2.5 text-[11px] text-stone-700">
-              <span className="font-bold text-amber-800 shrink-0">Dealer Paddle Rule:</span>
+              <span className="font-bold text-amber-800 shrink-0">{t('analysis.paddle_rule_label', 'Dealer Paddle Rule:')}</span>
               <span>
-                Your maximum paddle bid on the auction floor should be <strong>Max Budget ÷ {(totalMultiplier).toFixed(2)}</strong>. If you want to pay no more than {formatPrice(currentItem.price_guidance.good_buy_below || 1000)} total, do not bid higher than <strong>{formatPrice(Math.round((currentItem.price_guidance.good_buy_below || 1000) / totalMultiplier))}</strong> hammer price!
+                {t('analysis.paddle_rule', {
+                  hammer: formatPrice(walkAway),
+                  pct: premiumPct,
+                  allIn: formatPrice(walkAwayAllIn),
+                  mult: totalMultiplier.toFixed(2)
+                })}
               </span>
             </div>
           </section>
@@ -1068,10 +1110,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <div className="space-y-3">
             <div className="flex flex-wrap items-baseline gap-2">
               <p className="text-sm font-bold text-decision-red">
-                {t('analysis.walk_away_price_label')} {formatPrice(currentItem.negotiation_strategy.walk_away_price)}
-                {currentItem.seller_context?.isAuction && (
+                {t('analysis.walk_away_price_label')} {formatPrice(walkAway)}
+                {isAuctionItem && (
                   <span className="text-xs font-normal text-decision-red/80 ml-1.5">
-                    (Max Hammer Bid — Total all-in: {formatPrice(Math.round(currentItem.negotiation_strategy.walk_away_price * (1 + (currentItem.seller_context?.buyerPremiumRate || 25) / 100)))})
+                    (Max Hammer Bid — Total all-in: {formatPrice(walkAwayAllIn)})
                   </span>
                 )}
               </p>
@@ -1348,7 +1390,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       </p>
 
       {/* 13. Sleek Floating Action Bar */}
-      <div className="fixed bottom-4 left-4 right-4 max-w-2xl mx-auto p-3 bg-white/95 backdrop-blur-md border border-border-custom rounded-3xl shadow-2xl flex items-center gap-3 z-40">
+      <div
+        ref={actionBarRef}
+        className="fixed left-4 right-4 max-w-2xl mx-auto p-3 bg-white/95 backdrop-blur-md border border-border-custom rounded-3xl shadow-2xl flex items-center gap-3 z-40"
+        style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <button
           onClick={onBack}
           className="flex-1 py-3 px-4 bg-paper text-ink rounded-2xl font-semibold text-xs hover:bg-border-custom transition-colors text-center border border-border-custom"

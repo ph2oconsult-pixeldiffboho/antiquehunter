@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
+import { allInCost, maxHammerForMarketHigh, priceBandScore } from "./appraisalMath";
 
 // Antique assessment service using Gemini 3.1 Flash Lite
 const API_KEY = process.env.GEMINI_API_KEY || "";
@@ -53,10 +54,11 @@ export const searchAntiques = async (
     unknown: `Infer the category first, then apply specialist knowledge. Focus on construction, materials, and signs of authentic age.`
   };
 
-  const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'JPY' ? '¥' : currency === 'AUD' ? 'A$' : '£';
-  const targetCurrency = currency || 'USD';
+  const targetCurrency = currency || 'EUR';
+  const currencySymbol = targetCurrency === 'EUR' ? '€' : targetCurrency === 'USD' ? '$' : targetCurrency === 'JPY' ? '¥' : targetCurrency === 'AUD' ? 'A$' : targetCurrency === 'CNY' ? '¥' : '£';
   const isAuction = (sellerType || '').toLowerCase().includes('auction') || !!(lotUrl && (lotUrl.includes('drouot') || lotUrl.includes('interencheres') || lotUrl.includes('saleroom') || lotUrl.includes('liveauctioneers') || lotUrl.includes('sothebys') || lotUrl.includes('christies') || lotUrl.includes('bonhams')));
   const hasPhotos = !!(imagesBase64 && imagesBase64.length > 0);
+  const premiumPct = isAuction ? (buyerPremiumRate !== undefined && !isNaN(Number(buyerPremiumRate)) ? Number(buyerPremiumRate) : 25) : 0;
 
   const systemInstruction = `You are a seasoned antique dealer, restorer, and auction specialist with decades of experience in the trade. 
 Your role is to provide a professional, commercially-focused assessment of an item to determine its real-world value and buyability.
@@ -92,11 +94,17 @@ ${lotUrl ? `A SPECIFIC LOT / LISTING LINK HAS BEEN PROVIDED: ${lotUrl}
 ### PRICE RELATIONSHIP CONSTRAINTS (MANDATORY MATHEMATICAL RULES)
 All prices MUST be in ${targetCurrency} and respect these strict inequalities:
 1. opening_offer <= target_price_low <= target_price_high <= walk_away_price
-2. walk_away_price <= estimated_market_range_high (never bid/pay above what the item is worth)
+2. walk_away_price <= estimated_market_range_high (never bid/pay above what the item is worth)${isAuction ? `
+   For this auction lot: walk_away_price is the MAXIMUM HAMMER BID and walk_away_price x ${(1 + premiumPct / 100).toFixed(2)} (hammer + ${premiumPct}% buyer's premium) MUST be <= estimated_market_range_high.` : ''}
 3. estimated_market_range_low <= estimated_market_range_high
 4. good_buy_below <= estimated_market_range_low (dealer smart buy threshold)
 5. overpaying_above > estimated_market_range_high (where buying becomes uncommercial)
 6. fair_price_low <= fair_price_high (retail market tier)
+7. fair_price_low >= estimated_market_range_low and fair_price_high >= estimated_market_range_high (retail is never below auction/market level)
+
+### BUY SCORE INPUTS
+The final buy score is calculated by the app from the asking price versus your price ranges, so your price ranges must be honest. Fill scoring_inputs on these scales (do not inflate; most items are not perfect):
+- authenticity 0–25, condition 0–15, rarity_desirability 0–15, market_demand 0–15, price_vs_market 0–20 (20 only if the asking price is well below market low; 0 if above retail), liquidity 0–10, risk_penalty 0 to -40.
 
 ### EVIDENCE & CONFIDENCE RULES (CRITICAL)
 - **NO PHOTOS SUBMITTED (${hasPhotos ? 'Photos provided' : 'TEXT ONLY - NO PHOTOS'}):**
@@ -124,7 +132,8 @@ All qualitative commentary MUST match the exact numerical range in price_guidanc
 ### AUCTION SELLER & BUYER'S PREMIUM LOGIC
 ${isAuction ? `- AUCTION LOT DETECTED: In antique auctions, buyers pay a mandatory Buyer's Premium (frais d'adjudication) of typically 20% to 30% (average ~25% incl. VAT) plus online bidding platform fees (~1.5–3%).
 - estimated_market_range must reflect the anticipated HAMMER PRICE (marteau).
-- In pricing_reasoning, dealer_take, and negotiation_strategy, explicitly highlight the 20%–30% Buyer's Premium surcharge and warn that maximum paddle bids must be calculated as: Maximum Hammer Bid = Total Budget ÷ 1.25. Walk-away price MUST be framed as the maximum hammer bid.` : ''}
+- The buyer's premium for this lot is ${premiumPct}%.
+- In pricing_reasoning, dealer_take, and negotiation_strategy, explicitly highlight the Buyer's Premium surcharge and warn that maximum paddle bids must be calculated as: Maximum Hammer Bid = Total Budget ÷ ${(1 + premiumPct / 100).toFixed(2)}. Walk-away price MUST be framed as the maximum hammer bid.` : ''}
 
 ### PRICING LOGIC & CURRENCY
 All monetary numbers in price_guidance, dealer_take, and negotiation_strategy MUST be denominated in ${targetCurrency} (${currencySymbol}).
@@ -406,11 +415,13 @@ ${getGlossaryPrompt(language)}`;
 
     // Retail bounds: fair_price_low <= fair_price_high
     pg.fair_price_low = Math.max(pg.estimated_market_range_low, Number(pg.fair_price_low) || Math.round(pg.estimated_market_range_low * 1.5));
-    pg.fair_price_high = Math.max(pg.fair_price_low, Number(pg.fair_price_high) || Math.round(pg.estimated_market_range_high * 2));
+    pg.fair_price_high = Math.max(pg.fair_price_low, pg.estimated_market_range_high, Number(pg.fair_price_high) || Math.round(pg.estimated_market_range_high * 2));
 
     // Negotiation Strategy: first_offer <= walk_in_low <= walk_in_high <= walk_away <= estimated_market_range_high
     if (ns) {
-      ns.walk_away_price = Math.min(pg.estimated_market_range_high, Number(ns.walk_away_price) || pg.estimated_market_range_high);
+      // Auctions: walk-away is the max hammer bid, and hammer + buyer's premium must stay <= market high
+      const walkAwayCap = isAuction ? maxHammerForMarketHigh(pg.estimated_market_range_high, premiumPct) : pg.estimated_market_range_high;
+      ns.walk_away_price = Math.round(Math.min(walkAwayCap, Number(ns.walk_away_price) || walkAwayCap));
       ns.target_price_high = Math.min(ns.walk_away_price, Number(ns.target_price_high) || Math.round(ns.walk_away_price * 0.9));
       ns.target_price_low = Math.min(ns.target_price_high, Number(ns.target_price_low) || Math.round(ns.target_price_high * 0.85));
       ns.opening_offer = Math.min(ns.target_price_low, Number(ns.opening_offer) || Math.round(ns.target_price_low * 0.8));
@@ -436,19 +447,35 @@ ${getGlossaryPrompt(language)}`;
       (s.price_vs_market || 0) +
       (s.liquidity || 0) +
       (s.risk_penalty || 0);
-    
-    // Apply additional penalty for clearly overpriced items if not already reflected
-    let finalBaseScore = calculatedScore;
+
+    // Buy score is driven by the price actually paid (incl. buyer's premium) vs the ranges,
+    // not by the model's self-scored inputs (which tended to sum to 100 -> a constant 90 in the UI).
     const askingPriceNum = Number(askingPrice);
-    if (askingPriceNum && item.price_guidance.overpaying_above && askingPriceNum > item.price_guidance.overpaying_above) {
-      // Ensure a strong penalty for overpaying
-      finalBaseScore = Math.min(finalBaseScore, 40); 
+    const allIn = askingPriceNum > 0 ? allInCost(askingPriceNum, premiumPct, isAuction) : 0;
+    const priceScore = allIn > 0
+      ? priceBandScore(allIn, pg.estimated_market_range_low, pg.estimated_market_range_high, pg.fair_price_high)
+      : null;
+
+    let finalScore: number;
+    let scoreBand: { min: number; max: number } | null = null;
+    if (priceScore) {
+      finalScore = priceScore.score;
+      scoreBand = priceScore.band;
+      // Severe authenticity risk (reproduction, marriage, major damage) caps the score whatever the price
+      if ((Number(s.risk_penalty) || 0) <= -25) {
+        finalScore = Math.min(finalScore, 40);
+        scoreBand = { min: Math.min(scoreBand.min, finalScore), max: Math.min(scoreBand.max, 40) };
+      }
+    } else {
+      // No price given: we cannot judge the deal, so the score reflects the item only and stays below "Buy"
+      finalScore = Math.max(1, Math.min(60, Math.round(calculatedScore)));
+      scoreBand = { min: 1, max: 60 };
     }
     
-    const finalScore = Math.max(1, Math.min(100, Math.round(finalBaseScore)));
-    
     // Tier D Cap: Utility items should not have high scores
-    const cappedScore = item.item_summary.value_tier === 'D' ? Math.min(finalScore, 30) : finalScore;
+    let cappedScore = item.item_summary.value_tier === 'D' ? Math.min(finalScore, 30) : finalScore;
+    if (item.item_summary.value_tier === 'D' && scoreBand) scoreBand = { min: Math.min(scoreBand.min, cappedScore), max: Math.min(scoreBand.max, 30) };
+    cappedScore = Math.max(1, Math.min(100, Math.round(cappedScore)));
     
     return {
       ...item,
@@ -456,7 +483,8 @@ ${getGlossaryPrompt(language)}`;
         sellerType: sellerType || 'Market/Fair',
         isAuction,
         lotUrl: lotUrl || null,
-        buyerPremiumRate: buyerPremiumRate !== undefined ? buyerPremiumRate : (isAuction ? 25 : 0)
+        buyerPremiumRate: premiumPct,
+        allInPrice: allIn || null
       },
       item_summary: {
         ...item.item_summary,
@@ -466,6 +494,8 @@ ${getGlossaryPrompt(language)}`;
       buy_decision: {
         ...item.buy_decision,
         score: cappedScore,
+        score_band: scoreBand,
+        price_basis: priceScore ? priceScore.basis : 'no_price',
         label: getBuyLabel(cappedScore),
         confidence: confLabel
       }
