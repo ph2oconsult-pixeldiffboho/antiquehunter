@@ -3,5 +3,8 @@
     "api/hunt.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "regions": [
+    "cdg1"
+  ]
 }

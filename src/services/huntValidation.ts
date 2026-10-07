@@ -81,7 +81,7 @@ const SPECIFIC_PATTERNS: Array<[string, RegExp]> = [
   ['christies.com', /(\/lot\/|\/lot-\d+|^\/s\/[^/]+\/[^/]+\/\d+)/],
   ['sothebys.com', /\/buy\/auction\/\d{4}\/[^/]+\/[^/?#]+/],
   ['auctionet.com', /^\/(en|sv|de|fr|es|fi|da|nb)\/\d+-/],
-  ['bukowskis.com', /\/lots\/\d+/],
+  ['bukowskis.com', /(\/lots\/\d+|\/auctions\/\d+\/\d+-)/],
 ];
 
 export const isSpecificListingUrl = (url: string): boolean => {
@@ -131,7 +131,7 @@ const NON_PERIOD_PATTERNS: RegExp[] = [
   /\bcopie\b/i,
   /\bd['’]apr[eè]s\b/i,
   /\bstil\b/i,           // Swedish: "gustaviansk stil"
-  /\b19[0-9]0-tal(et)?\b/i, // Swedish: "1900-tal", "1920-tal"
+  /\b19\d0-tal\w*/i,       // Swedish: "1900-tal", "1900-talets mitt"
 ];
 
 export const failsPeriodRule = (...texts: Array<string | undefined | null>): string | null => {
@@ -212,10 +212,23 @@ export const parsePage = (url: string, html: string): PageFacts => {
     if (cur) facts.estimateCurrency = cur[1];
     const res = block.match(/[,{]result:(\d+(?:\.\d+)?)/);
     if (res && Number(res[1]) > 0) facts.soldOrEnded = true;
+  } else if (hostMatches(host, 'auctionet.com')) {
+    const itemId = url.match(/\/(\d+)-/)?.[1];
+    const at = itemId ? html.indexOf(`"id":${itemId},"auction_id"`) : -1;
+    const seg = at >= 0 ? html.slice(at, at + 1500) : '';
+    const state = seg.match(/"state":"([a-z_]+)"/)?.[1];
+    if (state && /^(sold|unsold|ended|closed|withdrawn|cancelled|canceled)$/.test(state)) facts.soldOrEnded = true;
+    const ends = seg.match(/"ends_at":(\d{9,11})/);
+    if (ends) facts.saleDate = new Date(Number(ends[1]) * 1000);
+    const est = seg.match(/"estimate":(\d+)/);
+    const upper = seg.match(/"upper_estimate":(\d+)/);
+    const cur = seg.match(/"currency":"([A-Z]{3})"/);
+    if (est) { facts.estimateLow = Number(est[1]); facts.estimateHigh = upper ? Number(upper[1]) : undefined; facts.estimateCurrency = cur?.[1] || 'SEK'; }
+    if (/This auction is closed|Auktionen är avslutad|Auktionen avslutad/i.test(text)) facts.soldOrEnded = true;
   } else {
     // Generic signals of a closed/sold listing
     if (/"availability"\s*:\s*"(https?:\/\/schema\.org\/)?(OutOfStock|SoldOut|Discontinued)"/i.test(html)) facts.soldOrEnded = true;
-    if (/\b(This listing (has ended|was ended)|Cette annonce est terminée|Price realised|Prix réalisé|Lot closed|Sold for [£$€]|Auktionen avslutad|Avslutad)\b/i.test(text)) facts.soldOrEnded = true;
+    if (/\b(This listing (has ended|was ended)|Cette annonce est terminée|Price realised|Prix réalisé|Lot closed|Sold for [£$€]|Auktionen avslutad|Avslutad|Klubbat pris|Hammer price|Auction ended|This auction is closed)\b/i.test(text)) facts.soldOrEnded = true;
     const endIso = html.match(/"(?:endDate|end_date|ends_at|endTime)"\s*:\s*"(\d{4}-\d{2}-\d{2}T[^"]+)"/);
     if (endIso) facts.saleDate = new Date(endIso[1]);
   }

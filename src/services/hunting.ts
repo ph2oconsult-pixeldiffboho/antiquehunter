@@ -38,6 +38,7 @@ export interface HuntMatch {
   imageUrl?: string;
   verification: Verification;
   verificationNote?: string;
+  checkStatus?: number; // HTTP status seen when checking the page (0 = timeout/network error)
 }
 
 export interface HuntResults {
@@ -203,6 +204,7 @@ export const validateMatch = async (
     description: description || undefined,
     dealerAnalysis: cleanText(match.dealerAnalysis),
     verification: 'unverified',
+    checkStatus: page.status,
   };
 
   if (page.status >= 200 && page.status < 300 && page.html) {

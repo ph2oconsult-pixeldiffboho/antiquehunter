@@ -31,6 +31,7 @@ check("specific listing urls are recognised", () => {
     "https://www.ebay.fr/itm/123456789012",
     "https://auctionet.com/en/4123456-a-gustavian-commode",
     "https://www.bukowskis.com/en/lots/1234567-byra",
+    "https://www.bukowskis.com/sv/auctions/583/1347-byra-gustavianskt-stockholmsarbete-1700-talets-slut",
     "https://onlineonly.christies.com/s/irene-roosevelt-aitken-love-18th-century/george-i-oak-console-table-641/286363",
   ]) assert.equal(isSpecificListingUrl(u), true, u);
   assert.equal(isSpecificListingUrl("https://www.interencheres.com/art-decoration/belle-vente-mobiliere-685868"), false);
@@ -54,6 +55,8 @@ check("period rule", () => {
   assert.ok(failsPeriodRule("Reproduction of a Louis XVI commode"));
   assert.ok(failsPeriodRule("Commode d'après Riesener"));
   assert.ok(failsPeriodRule("BYRÅ, gustaviansk stil, 1900-tal"));
+  assert.ok(failsPeriodRule("Byrå, 1900-talets mitt"));
+  assert.equal(failsPeriodRule("BYRÅ. Gustavianskt stockholmsarbete, 1700-talets slut."), null);
   assert.equal(failsPeriodRule("Commode d'époque Louis XV mouvementée sur trois faces"), null);
   assert.equal(failsPeriodRule("Buffet XIXème 2 corps en noyer"), null);
   assert.equal(failsPeriodRule("Commode gustavienne, vers 1790"), null);
@@ -110,6 +113,14 @@ if (process.env.DROUOT_PAGE && existsSync(process.env.DROUOT_PAGE)) {
     assert.equal(f.estimateHigh, 900);
     assert.ok(f.saleDate && f.saleDate.getUTCFullYear() === 2026);
     assert.ok(f.image?.startsWith("https://cdn.drouot.com/"));
+  });
+}
+
+if (process.env.AUCTIONET_PAGE && existsSync(process.env.AUCTIONET_PAGE)) {
+  check("auctionet closed lot is detected", () => {
+    const f = parsePage("https://auctionet.com/en/5391667-chest-of-drawers-gustavian-18th-century", readFileSync(process.env.AUCTIONET_PAGE!, "utf8"));
+    assert.equal(f.soldOrEnded, true);
+    assert.equal(f.saleDate?.toISOString(), "2026-10-03T18:21:00.000Z");
   });
 }
 
