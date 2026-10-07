@@ -39,6 +39,7 @@ export interface HuntMatch {
   verification: Verification;
   verificationNote?: string;
   checkStatus?: number; // HTTP status seen when checking the page (0 = timeout/network error)
+  checkedVia?: 'direct' | 'google';
 }
 
 export interface HuntResults {
@@ -226,6 +227,7 @@ export const validateMatch = async (
     else if (['interencheres.com', 'drouot.com'].some(d => hostMatches(hostOf(finalUrl), d))) result.price = 'No estimate published';
     if (facts.image) result.imageUrl = facts.image;
     result.verification = 'verified';
+    result.checkedVia = 'direct';
     return { match: result };
   }
 
@@ -235,6 +237,106 @@ export const validateMatch = async (
     ? 'Site blocks automated checks – open the link to confirm it is still live.'
     : 'Could not load the page in time – open the link to confirm it is still live.';
   return { match: result };
+};
+
+const URL_CHECK_MIN_MS = 12_000;
+const URL_CHECK_MAX_MS = 20_000;
+
+const urlCheckSchema = {
+  type: Type.OBJECT,
+  properties: {
+    pages: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          url: { type: Type.STRING },
+          loaded: { type: Type.BOOLEAN, description: "true only if you could read this exact page and it shows one specific lot or ad" },
+          title: { type: Type.STRING, description: "Lot / ad title exactly as on the page" },
+          sale_date_iso: { type: Type.STRING, description: "Sale or closing date-time as ISO 8601 with offset, copied from the page; empty if none" },
+          estimate_low: { type: Type.NUMBER, description: "Low estimate or asking price as printed, 0 if none" },
+          estimate_high: { type: Type.NUMBER, description: "High estimate as printed, 0 if none" },
+          currency: { type: Type.STRING },
+          sold_or_closed: { type: Type.BOOLEAN, description: "true if the page says sold, adjugé, closed, ended, withdrawn or the sale date has passed" }
+        },
+        required: ["url", "loaded", "sold_or_closed"]
+      }
+    }
+  },
+  required: ["pages"]
+};
+
+const normUrl = (u: string) => String(u || '').trim().replace(/[?#].*$/, '').replace(/\/$/, '').toLowerCase();
+
+/**
+ * Some sites (e.g. Interencheres, Bukowskis, eBay) block requests from cloud servers.
+ * For those listings we ask Gemini's URL-context tool (fetched by Google) to read the page.
+ * Only facts read from the page are used; if Google cannot read it either, the listing stays 'unverified'.
+ */
+const confirmViaUrlContext = async (
+  ai: GoogleGenAI,
+  candidates: HuntMatch[],
+  params: HuntParams,
+  deadline: number,
+  dropReasons: Record<string, number>
+): Promise<HuntMatch[]> => {
+  const remaining = deadline - Date.now();
+  if (candidates.length === 0 || remaining < URL_CHECK_MIN_MS) return candidates;
+  const budget = Math.min(URL_CHECK_MAX_MS, remaining - 2_000);
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new Error('url_check_timeout')); }, budget);
+    });
+    const today = new Date().toISOString();
+    const response: any = await Promise.race([
+      ai.models.generateContent({
+        model: MODEL,
+        contents: `Now is ${today}. Read each of these pages with the URL context tool and report only what the page itself says. Never guess: if you cannot read a page, set loaded=false.\n${candidates.map(c => c.url).join('\n')}`,
+        config: {
+          tools: [{ urlContext: {} }],
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          responseMimeType: "application/json",
+          responseSchema: urlCheckSchema,
+          abortSignal: controller.signal,
+        }
+      }),
+      timeout,
+    ]);
+    const parsed = JSON.parse(String(response?.text || '{}'));
+    const retrieval: Record<string, string> = {};
+    for (const m of response?.candidates?.[0]?.urlContextMetadata?.urlMetadata || []) {
+      if (m?.retrievedUrl) retrieval[normUrl(m.retrievedUrl)] = String(m.urlRetrievalStatus || '');
+    }
+    const byUrl = new Map<string, any>();
+    for (const p of parsed?.pages || []) byUrl.set(normUrl(p.url), p);
+
+    const out: HuntMatch[] = [];
+    for (const c of candidates) {
+      const page = byUrl.get(normUrl(c.url));
+      const status = retrieval[normUrl(c.url)];
+      const googleRead = status === 'URL_RETRIEVAL_STATUS_SUCCESS' && page?.loaded === true;
+      if (!googleRead) { out.push(c); continue; }
+      const saleDate = page.sale_date_iso ? new Date(page.sale_date_iso) : undefined;
+      const title = cleanText(page.title);
+      if (page.sold_or_closed) { dropReasons.sold_or_ended = (dropReasons.sold_or_ended || 0) + 1; continue; }
+      if (saleDate && !isNaN(saleDate.getTime()) && saleDate.getTime() < Date.now()) { dropReasons.past_sale = (dropReasons.past_sale || 0) + 1; continue; }
+      if (params.periodOnly !== false && failsPeriodRule(title)) { dropReasons.not_period = (dropReasons.not_period || 0) + 1; continue; }
+      const confirmed: HuntMatch = { ...c, verification: 'verified', checkedVia: 'google', verificationNote: undefined };
+      if (title) confirmed.title = title;
+      if (saleDate && !isNaN(saleDate.getTime())) confirmed.date = formatSaleDate(saleDate);
+      const est = formatEstimate(Number(page.estimate_low) || undefined, Number(page.estimate_high) || undefined, /^[A-Z]{3}$/.test(page.currency || '') ? page.currency : 'EUR');
+      if (est) confirmed.price = est;
+      out.push(confirmed);
+    }
+    return out;
+  } catch (err: any) {
+    console.warn('URL-context check skipped:', err?.message || err);
+    return candidates;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 };
 
 export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults> => {
@@ -306,6 +408,19 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
       dropReasons[reason] = (dropReasons[reason] || 0) + 1;
     }
   }
+  // Second opinion for pages our server could not read (bot protection / timeouts)
+  const unreadable = matches.filter(m => m.verification === 'unverified');
+  if (unreadable.length > 0) {
+    const confirmed = await confirmViaUrlContext(ai, unreadable, params, deadline, dropReasons);
+    const keep = new Set(confirmed.map(m => m.url));
+    const replaced = new Map(confirmed.map(m => [m.url, m]));
+    for (let i = matches.length - 1; i >= 0; i--) {
+      if (matches[i].verification !== 'unverified') continue;
+      if (!keep.has(matches[i].url)) matches.splice(i, 1);
+      else matches[i] = replaced.get(matches[i].url)!;
+    }
+  }
+
   // Verified listings first
   matches.sort((a, b) => (a.verification === b.verification ? 0 : a.verification === 'verified' ? -1 : 1));
   const finalMatches = matches.slice(0, MAX_RESULTS);
