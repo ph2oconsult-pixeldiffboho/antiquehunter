@@ -4,7 +4,7 @@
     "scan": "購入前にチェック",
     "upload": "写真をアップロード",
     "describe": "詳細を追加（任意）",
-    "hunt": "お宝を探す（自動買い付けソーシング）",
+    "hunt": "探す",
     "history": "履歴",
     "settings": "設定",
     "back": "戻る",
@@ -20,7 +20,10 @@
     "status_bought": "購入済み",
     "status_passed": "見送り",
     "status_sold": "売却済み",
-    "score": "スコア"
+    "score": "スコア",
+    "home": "ホーム",
+    "collection": "コレクション",
+    "profile": "プロフィール"
   },
   "home": {
     "hero_badge": "プロフェッショナル現場ツール",
@@ -96,7 +99,7 @@
     "walk_away_price_label": "撤退価格：",
     "walk_away_desc": "このレベルを超えると、ディーラーは手を引きます。",
     "walk_away_points": "• 活動中のキクイムシ — 構造的リスク\n• 目に見える修理は再販価値を下げる\n• 価格がすでにディーラーの購入範囲を超えている",
-    "appetite": "需要",
+    "appetite": "市場需要",
     "liquidity": "換金性",
     "what_sells_this": "売れるポイント",
     "risk_increases": "このレベルでは、利益は状態と購入価格に依存します。",
@@ -120,7 +123,31 @@
     "buy_pass_desc": "価格はすでに小売レベルかそれ以上です — ディーラーの利益はありません。",
     "dealer_buy_rule": "ディーラーは通常、小売価格より30〜60%安く購入します。",
     "valuation_trust_line": "本当の価値は状態と本物かどうかに大きく依存します — 必ず実地で確認してください。",
-    "disclaimer": "観察された市場行動に基づく分析。賢いディーラーは、資金を投じる前に必ず実地で確認します。"
+    "disclaimer": "観察された市場行動に基づく分析。賢いディーラーは、資金を投じる前に必ず実地で確認します。",
+    "price_guidance": "価格ガイダンス",
+    "price_guidance_desc": "このような価格は通常、小売店の価格を反映しています。実際の取引はそれ以下で行われます。",
+    "dealer_perspective": "ディーラーの視点",
+    "dealer_perspective_desc": "商業ディーラーが利幅とリスクを評価する方法",
+    "negotiation_strategy": "価格交渉戦略",
+    "negotiation_strategy_desc": "ディーラーの交渉戦術と交渉ポイント",
+    "when_to_walk_away": "購入を見送るべきタイミング",
+    "when_to_walk_away_desc": "再販価値を損なう決定的な警告サイン",
+    "auction_premium_title": "オークション手数料とバイヤーズプレミアム",
+    "auction_premium_desc": "オークションでは落札価格に20〜30%の手数料が加算されます。上限入札額の計算に反映させてください。",
+    "new_appraisal": "新しい鑑定",
+    "unlock": "{{title}} をアンロック",
+    "per_item": "/個",
+    "best_value": "ベストバリュー",
+    "regular_buyers": "定期購入者向け",
+    "copied": "コピーしました！",
+    "share_hard_pass": "ディーラー警告：見送り推奨 (スコア: {{score}})",
+    "share_tier_d": "アラート：この {{title}} は実用向け（Tier D）です。",
+    "share_title": "Antique Hunter 鑑定レポート",
+    "buy_score": "購入スコア",
+    "rating": "評価",
+    "investment_insight_fallback": "大幅な値引きがある場合のみ購入価値があります。",
+    "must_have_insight_fallback": "個人で楽しむための購入に適しています。",
+    "resale_insight_fallback": "利益はディーラー価格以下で購入できるかにかかっています。"
   },
   "results": {
     "title": "ディーラーの所見",
@@ -186,7 +213,9 @@
     "most_popular": "一番人気",
     "dealer_logic": "実際のディーラーの価格設定行動に基づいています",
     "founder_note": "AIだけでなく、現役の買い手によって構築されました。",
-    "market_signal": "マーケットシグナル"
+    "market_signal": "市場シグナル",
+    "description": "完全なディーラー評価と入札戦略をアンロック。",
+    "dealer_buy_signal": "ディーラーは通常 {{price}} 以下で購入します。"
   },
   "collection": {
     "title": "ディーラーのハンティングログ",
@@ -228,7 +257,8 @@
     "got_it": "了解",
     "try_item": "アイテムを試してみる — 近くにあるものでも構いません",
     "upload_photo_hint": "写真は出発点です。詳細が価格を鋭くします。",
-    "simple_start_hint": "「まずは簡単なものから始めてみましょう。グラスや小さなアイテムでも構いません」"
+    "simple_start_hint": "「まずは簡単なものから始めてみましょう。グラスや小さなアイテムでも構いません」",
+    "lot_url_label": "オークションまたは出品リンクを貼り付け"
   },
   "categories": {
     "furniture": "家具",
@@ -310,5 +340,25 @@
     "desc": "保存されていないアクティブな鑑定があります。新しいチェックを開始すると、このデータは破棄されます。",
     "back": "戻って保存",
     "discard": "破棄して続行"
+  },
+  "intro": {
+    "welcome_badge": "プロ鑑定＆調達エンジン",
+    "welcome_title": "今日のアンティーク探求は何ですか？",
+    "welcome_desc": "専門知識を活用して始めるルートを選択してください。",
+    "path_value_title": "アンティークを鑑定する",
+    "path_value_desc": "相場価格を判定し、複製品のリスクを診断します。",
+    "path_value_action": "鑑定を開始",
+    "path_hunt_title": "アンティークを探す",
+    "path_hunt_desc": "ヨーロッパのオークション会場やオンラインをリアルタイム検索。",
+    "path_hunt_action": "探索を開始",
+    "footer_assurance": "コレクターとディーラーのための信頼できる市場分析。"
+  },
+  "profile": {
+    "title": "プロフィール",
+    "subscription": "サブスクリプション",
+    "current_plan": "現在のプラン"
+  },
+  "legal": {
+    "title": "利用規約・法的表記"
   }
 }

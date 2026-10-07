@@ -19,7 +19,11 @@
     "status_bought": "Gekauft",
     "status_passed": "Abgelehnt",
     "status_sold": "Verkauft",
-    "score": "Score"
+    "score": "Score",
+    "home": "Startseite",
+    "hunt": "Suchen",
+    "collection": "Sammlung",
+    "profile": "Profil"
   },
   "home": {
     "hero_badge": "Profi-Feldwerkzeug",
@@ -61,17 +65,17 @@
     "red_flags": "Warnsignale",
     "market_insight": "Werttreiber",
     "price_guidance": "Preisberatung",
-    "buy_score": "Kaufbewertung",
+    "buy_score": "Kauf-Score",
     "value_range": "Händlerspanne",
     "resale_potential": "Liquidität",
     "price_assessment": "Preiseinschätzung",
-    "dealer_perspective": "Die Händler-Sicht",
-    "negotiation_strategy": "Kaufstrategie",
-    "when_to_walk_away": "Abbruchpreis",
+    "dealer_perspective": "Händlerperspektive",
+    "negotiation_strategy": "Verhandlungsstrategie",
+    "when_to_walk_away": "Wann Sie aussteigen sollten",
     "price_guidance_desc": "Solche Preise spiegeln meist Einzelhandelsangebote wider — der echte Kauf findet darunter statt.",
-    "dealer_perspective_desc": "Händler kaufen das nur, wenn der Preis Raum für den Wiederverkauf lässt — sonst bleibt es stehen.",
-    "negotiation_strategy_desc": "Genaue Angebotsspanne und Strategie",
-    "when_to_walk_away_desc": "Darüber hinaus: Gehen Sie weg.",
+    "dealer_perspective_desc": "Wie Händler Margen und Risiken kalkulieren",
+    "negotiation_strategy_desc": "Händlertaktiken und Verhandlungshebel",
+    "when_to_walk_away_desc": "Warnsignale, die den Wiederverkaufswert zerstören",
     "market_insight_desc": "Nachfrage und Werttreiber",
     "confidence_high_desc": "Starke Übereinstimmung in Form, Material und Markt",
     "confidence_medium_desc": "Gute Übereinstimmung — wichtige Details fehlen",
@@ -101,7 +105,7 @@
     "leverage_points": "Nutzen Sie dies zum Verhandeln:",
     "walk_away_price_label": "Abbruchpreis:",
     "walk_away_desc": "Darüber hinaus: Sie bezahlen zu viel.",
-    "appetite": "Nachfrage",
+    "appetite": "Marktnachfrage",
     "liquidity": "Liquidität",
     "what_sells_this": "Was dies verkauft",
     "risk_increases": "Auf diesem Niveau hängt der Gewinn von Zustand und Einkaufspreis ab.",
@@ -125,7 +129,25 @@
     "buy_pass_desc": "Der Preis liegt bereits auf oder über dem Einzelhandelsniveau — keine Händlermarge.",
     "dealer_buy_rule": "Händler kaufen normalerweise 30–60 % unter dem Einzelhandelspreis.",
     "valuation_trust_line": "Der wahre Wert hängt stark von Zustand und Echtheit ab — immer persönlich prüfen.",
-    "disclaimer": "Basierend auf beobachtetem Marktverhalten. Ein kluger Händler prüft immer persönlich, bevor er Kapital einsetzt."
+    "disclaimer": "Basierend auf beobachtetem Marktverhalten. Ein kluger Händler prüft immer persönlich, bevor er Kapital einsetzt.",
+    "auction_premium_title": "Auktionsaufgeld & Nebenkosten",
+    "auction_premium_desc": "Auktionshäuser erheben 20–30 % Aufgeld auf den Zuschlagspreis. Berücksichtigen Sie dies bei Ihrem Höchstgebot.",
+    "new_appraisal": "Neue Bewertung",
+    "unlock": "{{title}} freischalten",
+    "per_item": "/Stk.",
+    "best_value": "Bester Wert",
+    "regular_buyers": "Ideal für Stammkäufer",
+    "copied": "Kopiert!",
+    "share_hard_pass": "Händler-Warnung: Dieses Objekt ist ein Fehlkauf (Score: {{score}}). {{judgement}}",
+    "share_tier_d": "Warnung: Dieses Objekt {{title}} ist ein Tier-D Gebrauchsgegenstand.",
+    "share_title": "Antique Hunter Gutachten",
+    "rating": "Bewertung",
+    "investment_insight_fallback": "Lohnt sich nur mit hohem Rabatt.",
+    "must_have_insight_fallback": "Schöner Kauf für den persönlichen Gebrauch.",
+    "resale_insight_fallback": "Gewinn hängt vom Einkauf unter Händlerniveau ab.",
+    "walk_away_points": "• Aktiver Holzwurm — strukturelles Risiko\n• Sichtbare Reparaturen mindern den Wert\n• Preis liegt bereits über dem Händlerniveau",
+    "market_insight_points": "• Schärfe der Schnitzereien\n• Originale Patina vs. restauriert\n• Zeitgenössisch vs. spätere Reproduktion",
+    "market_pulse": "Marktpuls"
   },
   "results": {
     "title": "Händler-Funde",
@@ -189,7 +211,11 @@
     "most_popular": "AM BELIEBTESTEN",
     "dealer_logic": "Basierend auf realem Preisverhalten von Händlern",
     "founder_note": "Erstellt von einem aktiven Käufer – nicht nur von KI.",
-    "market_signal": "Marktsignal"
+    "market_signal": "Marktsignal",
+    "description": "Schalten Sie die vollständige Händlerbewertung und Auktionsstrategie frei.",
+    "dealer_buy_signal": "Händler würden typischerweise unter {{price}} kaufen.",
+    "pre_tension_title": "In dieser Preisklasse sind kleine Fehler teuer.",
+    "pre_tension_subtitle": "Die meisten Käufer zahlen hier zu viel — weil die Risiken nicht offensichtlich sind."
   },
   "collection": {
     "title": "Händler-Jagdprotokoll",
@@ -231,7 +257,8 @@
     "got_it": "Verstanden",
     "try_item": "Probieren Sie einen Gegenstand aus — sogar etwas in der Nähe",
     "upload_photo_hint": "Ein Foto ist der Ausgangspunkt. Details schärfen den Preis.",
-    "simple_start_hint": "„Fangen Sie mit etwas Einfachem an — sogar ein Glas oder ein kleiner Gegenstand“"
+    "simple_start_hint": "„Fangen Sie mit etwas Einfachem an — sogar ein Glas oder ein kleiner Gegenstand“",
+    "lot_url_label": "Auktions- oder Angebotslink einfügen"
   },
   "categories": {
     "furniture": "Möbel",
@@ -313,5 +340,25 @@
     "desc": "Sie haben eine aktive Bewertung, die nicht gespeichert wurde. Das Starten einer neuen Prüfung verwirft diese Details.",
     "back": "Zurück zum Speichern",
     "discard": "Verwerfen und fortfahren"
+  },
+  "intro": {
+    "welcome_badge": "Professioneller Gutachter & Sourcing-Motor",
+    "welcome_title": "Was ist Ihre heutige Antiquitätensuche?",
+    "welcome_desc": "Wählen Sie Ihren Pfad, um mit Fachwissen zu beginnen.",
+    "path_value_title": "Antiquität bewerten",
+    "path_value_desc": "Ermitteln Sie Marktwerte und Reproduktionsrisiken per Kamera oder Text.",
+    "path_value_action": "Bewertung starten",
+    "path_hunt_title": "Antiquität finden",
+    "path_hunt_desc": "Durchsuchen Sie Auktionshäuser und Marktplätze in Europa.",
+    "path_hunt_action": "Suche starten",
+    "footer_assurance": "Zuverlässige Marktintelligenz für Sammler und Händler."
+  },
+  "profile": {
+    "title": "Profil",
+    "subscription": "Abonnement",
+    "current_plan": "Aktueller Tarif"
+  },
+  "legal": {
+    "title": "Rechtliches"
   }
 }

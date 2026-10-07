@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag, Mic, MicOff, Sparkles } from 'lucide-react';
+import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag, Mic, MicOff, Sparkles, Link as LinkIcon, Info, ChevronDown, ChevronUp, Gavel, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AntiqueCategory } from '../services/gemini';
 
@@ -31,14 +31,15 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const [showHint, setShowHint] = useState(() => {
     return localStorage.getItem('input_hint_shown') !== 'true';
   });
-  const [showGuide, setShowGuide] = useState(() => {
-    return localStorage.getItem('guide_shown') !== 'true';
-  });
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [description, setDescription] = useState('');
+  const [lotUrl, setLotUrl] = useState('');
+  const [detectedPlatform, setDetectedPlatform] = useState<string | null>(null);
   const [price, setPrice] = useState('');
   const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
   const [currency, setCurrency] = useState(globalCurrency);
   const [sellerType, setSellerType] = useState('Market/Fair');
+  const [buyersPremium, setBuyersPremium] = useState('25');
   const [category, setCategory] = useState<AntiqueCategory>('unknown');
   const [location, setLocation] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -49,22 +50,47 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   }, [globalCurrency]);
   const isSpeechSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
+  // Auto-detect listing/auction links from either the dedicated lot URL input or the description
+  useEffect(() => {
+    const textToCheck = `${lotUrl} ${description}`;
+    const urlMatch = textToCheck.match(/(https?:\/\/[^\s]+)/i);
+    if (urlMatch) {
+      const url = urlMatch[0].toLowerCase();
+      let platformName = 'Online Listing';
+      let isAuctionSite = false;
+
+      if (url.includes('drouot')) { platformName = 'Drouot Paris'; isAuctionSite = true; }
+      else if (url.includes('interencheres')) { platformName = 'Interencheres'; isAuctionSite = true; }
+      else if (url.includes('saleroom')) { platformName = 'The Saleroom'; isAuctionSite = true; }
+      else if (url.includes('liveauctioneers')) { platformName = 'LiveAuctioneers'; isAuctionSite = true; }
+      else if (url.includes('sothebys')) { platformName = "Sotheby's"; isAuctionSite = true; }
+      else if (url.includes('christies')) { platformName = "Christie's"; isAuctionSite = true; }
+      else if (url.includes('bonhams')) { platformName = 'Bonhams'; isAuctionSite = true; }
+      else if (url.includes('catawiki')) { platformName = 'Catawiki'; isAuctionSite = true; }
+      else if (url.includes('ebay')) { platformName = 'eBay'; }
+      else if (url.includes('leboncoin')) { platformName = 'LeBonCoin'; }
+      else if (url.includes('1stdibs')) { platformName = '1stDibs'; }
+      else if (url.includes('vinterior')) { platformName = 'Vinterior'; }
+
+      setDetectedPlatform(platformName);
+      if (isAuctionSite && sellerType !== 'Auction') {
+        setSellerType('Auction');
+      }
+    } else {
+      setDetectedPlatform(null);
+    }
+  }, [lotUrl, description]);
+
   const toggleListening = () => {
     if (isListening) {
-      // In a real implementation with a persistent recognition object, we'd stop it here.
-      // For this simple implementation, we'll let it stop naturally or handle it via state.
       setIsListening(false);
       return;
     }
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      return;
-    }
+    if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
-    
-    // Map i18n language to BCP 47 tags
     const langMap: Record<string, string> = {
       'en': 'en-US',
       'fr': 'fr-FR',
@@ -72,32 +98,20 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       'de': 'de-DE'
     };
     recognition.lang = langMap[i18n.language] || i18n.language || 'en-US';
-    
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
+    recognition.onstart = () => setIsListening(true);
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       setDescription(prev => prev ? `${prev} ${transcript}` : transcript);
     };
-
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
 
     try {
       recognition.start();
     } catch (e) {
-      console.error('Failed to start recognition:', e);
       setIsListening(false);
     }
   };
@@ -111,12 +125,15 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim()) return;
+    if (!description.trim() && !lotUrl.trim()) return;
     
     if (showHint) {
       setShowHint(false);
       localStorage.setItem('input_hint_shown', 'true');
     }
+
+    // Determine final lotUrl either from field or description
+    const effectiveLotUrl = lotUrl.trim() || (description.match(/(https?:\/\/[^\s]+)/i)?.[0] || '');
 
     onAnalyze(description, { 
       askingPrice: price ? parseFloat(price) : undefined, 
@@ -124,7 +141,9 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       currency, 
       sellerType,
       category,
-      location
+      location,
+      lotUrl: effectiveLotUrl,
+      buyerPremiumRate: sellerType === 'Auction' && buyersPremium ? parseFloat(buyersPremium) : undefined
     });
   };
 
@@ -150,40 +169,66 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       <button 
         onClick={onBack}
         className="flex items-center gap-2 text-muted hover:text-ink transition-colors mb-8"
+        aria-label="Go back to previous screen"
       >
         <ArrowLeft className="w-4 h-4" />
         <span className="text-sm font-medium">{t('common.back')}</span>
       </button>
 
       <div className="mb-8">
-        {showGuide && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
-              <h2 className="serif text-2xl mb-4">{t('describe.hint_title')}</h2>
-              <ol className="list-decimal list-inside space-y-2 text-sm text-muted mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-gold/10 text-gold rounded-full border border-gold/20">
+            <Sparkles className="w-3 h-3" />
+            <span className="text-[9px] uppercase tracking-widest font-bold">{t('describe.try_item')}</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsGuideOpen(!isGuideOpen);
+              localStorage.setItem('guide_shown', 'true');
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border border-border-custom bg-paper hover:bg-stone-100 text-stone-700 transition-colors"
+            aria-label="Toggle appraisal best practices guide"
+          >
+            <Info className="w-3.5 h-3.5 text-gold" />
+            <span>{t('describe.hint_title', 'Appraisal Best Practices')}</span>
+            {isGuideOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        </div>
+
+        {/* Non-intrusive Collapsible Guide */}
+        <AnimatePresence>
+          {isGuideOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden mb-6 bg-paper border border-gold/30 rounded-2xl p-5 shadow-sm space-y-3"
+            >
+              <h3 className="serif text-lg font-medium text-ink">{t('describe.hint_title')}</h3>
+              <ol className="list-decimal list-inside space-y-1.5 text-xs text-muted">
                 <li>{t('describe.hint_step1')}</li>
                 <li>{t('describe.hint_step2')}</li>
                 <li>{t('describe.hint_step3')}</li>
               </ol>
-              <p className="text-sm text-ink font-medium mb-6">
+              <p className="text-xs text-ink font-medium pt-1">
                 {t('describe.hint_footer')}
               </p>
               <button
+                type="button"
                 onClick={() => {
-                  setShowGuide(false);
+                  setIsGuideOpen(false);
                   localStorage.setItem('guide_shown', 'true');
                 }}
-                className="w-full py-3 bg-ink text-paper rounded-xl font-bold text-sm hover:opacity-90"
+                className="py-1.5 px-4 bg-ink text-paper rounded-xl text-xs font-bold hover:opacity-90 transition-opacity"
               >
-                {t('describe.got_it')}
+                {t('describe.got_it', 'Got it')}
               </button>
-            </div>
-          </div>
-        )}
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-gold/10 text-gold rounded-full border border-gold/20 mb-4">
-          <Sparkles className="w-3 h-3" />
-          <span className="text-[9px] uppercase tracking-widest font-bold">{t('describe.try_item')}</span>
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <h1 className="serif text-4xl mb-1 tracking-tight text-ink">{t('describe.title')}</h1>
         <p className="text-[10px] text-muted uppercase tracking-widest font-bold mb-4">{t('describe.upload_photo_hint')}</p>
         <p className="text-muted text-sm leading-relaxed">{t('home.describe_subtitle')}</p>
@@ -206,6 +251,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                   localStorage.setItem('input_hint_shown', 'true');
                 }}
                 className="ml-auto text-muted hover:text-ink"
+                aria-label="Dismiss quick hint"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -218,18 +264,22 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
         <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('describe.images')}</label>
         <div className="flex flex-wrap gap-3">
           <button 
+            type="button"
             onClick={onAddImage}
             className="w-24 h-24 rounded-2xl border-2 border-dashed border-border-custom flex flex-col items-center justify-center gap-2 text-muted hover:border-gold hover:text-gold transition-all bg-paper/50"
+            aria-label="Upload item photos"
           >
             <Camera className="w-6 h-6" />
             <span className="text-[9px] font-bold uppercase tracking-widest">{t('common.upload')}</span>
           </button>
           {images.map((img, index) => (
             <div key={index} className="relative w-24 h-24 rounded-2xl overflow-hidden group border border-border-custom shadow-sm">
-              <img src={img} alt="" className="w-full h-full object-cover" />
+              <img src={img} alt="Uploaded item" className="w-full h-full object-cover" />
               <button 
+                type="button"
                 onClick={() => onRemoveImage(index)}
                 className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label={`Remove photo ${index + 1}`}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -260,7 +310,44 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Dedicated Auction or Listing Link Input */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted flex items-center gap-1.5">
+              <LinkIcon className="w-3.5 h-3.5 text-gold" />
+              <span>{t('describe.lot_url_label', 'Paste Auction or Listing Link (Lot Link)')}</span>
+            </label>
+            {detectedPlatform && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gold/15 text-gold text-[10px] font-bold rounded-full border border-gold/30">
+                <Gavel className="w-3 h-3" />
+                {detectedPlatform}
+              </span>
+            )}
+          </div>
+          <div className="relative">
+            <input
+              type="url"
+              value={lotUrl}
+              onChange={(e) => setLotUrl(e.target.value)}
+              placeholder="https://www.drouot.com/l/... or Interencheres, Sotheby's, eBay, LeBonCoin, 1stDibs..."
+              className="w-full p-4 pl-11 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-xs text-ink placeholder:text-muted/40 font-mono shadow-sm"
+              aria-label="Paste auction or listing link"
+            />
+            <LinkIcon className="w-4 h-4 text-muted absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+          <p className="text-[11px] text-muted flex items-center gap-1.5">
+            <Info className="w-3 h-3 text-gold shrink-0" />
+            <span>Paste a lot or listing link — the appraisal will prioritize fetching official estimates, lot dimensions, and catalog descriptions as the primary anchor.</span>
+          </p>
+          {sellerType === 'Auction' && (
+            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2 flex items-center gap-2 font-medium">
+              <Gavel className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+              <span>Auction Lot Mode: Appraisal factors in 20%–30% buyer's premium (frais de vente) and paddle ceiling rules.</span>
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-widest font-bold text-muted flex items-center gap-2">
@@ -309,6 +396,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                       ? 'bg-decision-red/10 text-decision-red border-decision-red/20 animate-pulse' 
                       : 'bg-paper text-muted border-border-custom hover:border-gold hover:text-gold'
                   }`}
+                  aria-label={isListening ? "Stop voice listening" : "Start voice appraisal input"}
                 >
                   {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                   <span className="text-[10px] font-bold uppercase tracking-widest">
@@ -323,10 +411,10 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={isListening ? t('describe.listening_placeholder') : t('describe.placeholder')}
-              className={`w-full h-40 p-4 bg-paper border rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all resize-none text-sm leading-relaxed text-ink placeholder:text-muted/40 ${
+              className={`w-full h-36 p-4 bg-paper border rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all resize-none text-sm leading-relaxed text-ink placeholder:text-muted/40 ${
                 isListening ? 'border-gold ring-2 ring-gold/10' : 'border-border-custom'
               }`}
-              required
+              required={!lotUrl.trim()}
             />
             {isListening && (
               <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] rounded-2xl flex items-center justify-center pointer-events-none">
@@ -407,6 +495,34 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
             </select>
           </div>
         </div>
+
+        {sellerType === 'Auction' && (
+          <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-amber-900 flex items-center gap-1.5">
+                <Gavel className="w-3.5 h-3.5 text-amber-700" />
+                <span>Buyer's Premium % (Frais de Vente)</span>
+              </label>
+              <span className="text-[10px] font-semibold text-amber-800">Standard: 25% (France/UK)</span>
+            </div>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                max="50"
+                step="0.5"
+                value={buyersPremium}
+                onChange={(e) => setBuyersPremium(e.target.value)}
+                placeholder="25"
+                className="w-full p-3.5 pr-8 bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm font-semibold text-stone-900"
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-sm">%</span>
+            </div>
+            <p className="text-[11px] text-amber-800/80 leading-tight">
+              Includes auction house surcharge + VAT. Total out-of-pocket cost = Hammer Price × (1 + {parseFloat(buyersPremium || '25') / 100}).
+            </p>
+          </div>
+        )}
 
         <button
           type="submit"

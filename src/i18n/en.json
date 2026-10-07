@@ -20,7 +20,10 @@
     "status_bought": "Bought",
     "status_passed": "Passed",
     "status_sold": "Sold",
-    "score": "Score"
+    "score": "Score",
+    "home": "Home",
+    "collection": "Collection",
+    "profile": "Profile"
   },
   "home": {
     "hero_badge": "Professional Field Tool",
@@ -119,7 +122,32 @@
     "buy_pass_desc": "Price is already at or above retail — no dealer margin.",
     "dealer_buy_rule": "Dealers typically buy 30–60% below retail.",
     "valuation_trust_line": "Real value depends heavily on condition and authenticity — always inspect in person.",
-    "disclaimer": "Based on observed market behaviour. A smart dealer always verifies in person before committing capital."
+    "disclaimer": "Based on observed market behaviour. A smart dealer always verifies in person before committing capital.",
+    "price_guidance": "Price Guidance",
+    "price_guidance_desc": "Prices like this usually reflect retail listings — real acquisitions happen below.",
+    "dealer_perspective": "Dealer Perspective",
+    "dealer_perspective_desc": "How commercial dealers appraise margin and risk",
+    "negotiation_strategy": "Negotiation Strategy",
+    "negotiation_strategy_desc": "Dealer tactics and leverage points",
+    "when_to_walk_away": "When to Walk Away",
+    "when_to_walk_away_desc": "Critical warning signs that destroy resale value",
+    "auction_premium_title": "Auction House Fees & Buyer's Premium (Frais de Vente)",
+    "auction_premium_desc": "Auction houses charge a mandatory 20%–30% buyer's premium on top of the winning hammer price, plus potential online bidding fees (1.5%–3% on Drouot Digital, Saleroom, LiveAuctioneers). Factor this into your maximum paddle bid.",
+    "new_appraisal": "New Appraisal",
+    "unlock": "Unlock {{title}}",
+    "per_item": "/ea",
+    "best_value": "Best value",
+    "regular_buyers": "Best for regular buyers",
+    "copied": "Copied!",
+    "share_hard_pass": "Dealer Warning: This item is a Hard Pass (Score: {{score}}). {{judgement}}",
+    "share_tier_d": "Antique Hunter Alert: This {{title}} is a Tier D utility item. {{judgement}}",
+    "share_title": "Antique Hunter Assessment",
+    "buy_score": "Buy Score",
+    "appetite": "Market Appetite",
+    "rating": "Rating",
+    "investment_insight_fallback": "Only worth buying at a discount — this is not a hold piece. Profit depends entirely on buying below dealer level.",
+    "must_have_insight_fallback": "A great purchase for personal enjoyment. The condition is secondary to your aesthetic preference, but do budget for restoration.",
+    "resale_insight_fallback": "Profit depends entirely on buying below dealer level. High restoration costs severely limit your margin."
   },
   "results": {
     "title": "Dealer's Findings",
@@ -185,7 +213,9 @@
     "most_popular": "MOST POPULAR",
     "dealer_logic": "Based on real dealer pricing behaviour",
     "founder_note": "Built by an active buyer — not just AI.",
-    "market_signal": "Market Signal"
+    "market_signal": "Market Signal",
+    "description": "Unlock full dealer pricing breakdowns, bidding strategies, and private market comparables.",
+    "dealer_buy_signal": "Dealers would typically buy below {{price}}. Above this, margin disappears."
   },
   "collection": {
     "title": "Dealer's Hunting Log",
@@ -227,7 +257,8 @@
     "got_it": "Got it",
     "try_item": "Try an item — even something nearby",
     "upload_photo_hint": "A photo is the starting point. Details sharpen the price.",
-    "simple_start_hint": "“Start with something simple — even a glass or small item”"
+    "simple_start_hint": "“Start with something simple — even a glass or small item”",
+    "lot_url_label": "Paste Auction or Listing Link (Lot Link)"
   },
   "categories": {
     "furniture": "Furniture",
@@ -309,5 +340,25 @@
     "desc": "You have an active valuation that hasn't been logged. Starting a new check will discard these details.",
     "back": "Go Back to Save",
     "discard": "Discard and Continue"
+  },
+  "intro": {
+    "welcome_badge": "Professional Appraiser & Sourcing Engine",
+    "welcome_title": "What is your antique quest today?",
+    "welcome_desc": "Choose your path to begin with specialist field intelligence.",
+    "path_value_title": "Appraise an Antique",
+    "path_value_desc": "Determine real-world market values, check reproduction hazards, run safety audits, and generate instant valuation reports using smart camera or detailed descriptions.",
+    "path_value_action": "Launch Appraisal",
+    "path_hunt_title": "Find Me an Antique",
+    "path_hunt_desc": "Search live auction rooms, flea markets, and curated catalogues across France, the UK, Europe, and online platforms using live web grounding.",
+    "path_hunt_action": "Launch Hunter",
+    "footer_assurance": "Trusted field intelligence for collectors, auction bidders, and dealers."
+  },
+  "profile": {
+    "title": "Profile",
+    "subscription": "Subscription",
+    "current_plan": "Current Plan"
+  },
+  "legal": {
+    "title": "Terms & Legal"
   }
 }

@@ -54,7 +54,9 @@ export default function Main() {
     return localStorage.getItem('onboarding_complete') !== 'true';
   });
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<Screen>('intro-choice');
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    return localStorage.getItem('onboarding_complete') === 'true' ? 'home' : 'intro-choice';
+  });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDetailedScan, setIsDetailedScan] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
@@ -135,7 +137,9 @@ export default function Main() {
         i18n.language,
         details.priceType,
         details.category,
-        details.location
+        details.location,
+        details.lotUrl,
+        details.buyerPremiumRate
       );
       
       if (result) {
@@ -394,6 +398,11 @@ export default function Main() {
                 images={capturedImages}
                 onSave={handleSaveFind}
                 onBack={() => setCurrentScreen('home')}
+                onNewAppraisal={() => {
+                  setAnalysisResult(null);
+                  setCapturedImages([]);
+                  setCurrentScreen('describe');
+                }}
                 onUpgrade={handleCheckout}
                 plan={plan}
                 currency={currency}

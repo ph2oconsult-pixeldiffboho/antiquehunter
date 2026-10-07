@@ -24,6 +24,16 @@ i18n
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false
+    },
+    parseMissingKeyHandler: (key: string) => {
+      // Never render raw dotted or capitalized key strings
+      const parts = key.split('.');
+      const lastPart = parts[parts.length - 1] || key;
+      return lastPart
+        .replace(/_/g, ' ')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .toLowerCase()
+        .replace(/^\w/, (c) => c.toUpperCase());
     }
   });
 

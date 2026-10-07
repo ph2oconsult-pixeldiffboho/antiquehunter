@@ -4,7 +4,7 @@
     "scan": "购买前检查",
     "upload": "上传照片",
     "describe": "添加细节（可选）",
-    "hunt": "帮我寻找古董",
+    "hunt": "寻宝",
     "history": "历史",
     "settings": "设置",
     "back": "返回",
@@ -20,7 +20,10 @@
     "status_bought": "已购买",
     "status_passed": "已放弃",
     "status_sold": "已售出",
-    "score": "评分"
+    "score": "评分",
+    "home": "首页",
+    "collection": "收藏记录",
+    "profile": "个人中心"
   },
   "home": {
     "hero_badge": "专业现场工具",
@@ -96,7 +99,7 @@
     "walk_away_price_label": "撤退价格：",
     "walk_away_desc": "超过此水平，经销商将放弃购买。",
     "walk_away_points": "• 活跃木蛀虫 — 结构性风险\n• 明显修复降低转售价值\n• 价格已超出经销商收购范围",
-    "appetite": "需求",
+    "appetite": "市场热度",
     "liquidity": "变现能力",
     "what_sells_this": "核心卖点",
     "risk_increases": "在这一水平上，利润取决于品相和买入价格。",
@@ -120,7 +123,31 @@
     "buy_pass_desc": "价格已达到或超过零售水平 — 无经销商利润空间。",
     "dealer_buy_rule": "经销商通常以低于零售价 30–60% 的价格收购。",
     "valuation_trust_line": "真实价值高度依赖于品相和真实性 — 请务必亲自检查。",
-    "disclaimer": "基于观察到的市场行为。聪明的经销商在投入资金前总是会亲自核实。"
+    "disclaimer": "基于观察到的市场行为。聪明的经销商在投入资金前总是会亲自核实。",
+    "price_guidance": "价格指南",
+    "price_guidance_desc": "此类价格通常反映零售标价——真正的交易往往低于此价格。",
+    "dealer_perspective": "古董商视角",
+    "dealer_perspective_desc": "专业古董商如何评估利润空间与风险",
+    "negotiation_strategy": "议价谈判策略",
+    "negotiation_strategy_desc": "古董商议价技巧与谈判筹码",
+    "when_to_walk_away": "何时果断放弃",
+    "when_to_walk_away_desc": "严重影响转售价值的关键隐患",
+    "auction_premium_title": "拍卖行佣金与买家溢价 (Buyer's Premium)",
+    "auction_premium_desc": "拍卖行通常在落槌价基础上加收20%–30%的买家佣金。设定最高出价时须计入该成本。",
+    "new_appraisal": "开始新估价",
+    "unlock": "解锁 {{title}}",
+    "per_item": "/件",
+    "best_value": "高性价比",
+    "regular_buyers": "适合定期购买者",
+    "copied": "已复制！",
+    "share_hard_pass": "古董商警告：建议放弃 (评分: {{score}})",
+    "share_tier_d": "提醒：该 {{title}} 为日常实用级（D级）。",
+    "share_title": "Antique Hunter 鉴定评估报告",
+    "buy_score": "购买决策评分",
+    "rating": "评级",
+    "investment_insight_fallback": "仅在大幅折扣下值得购买，并非长期投资级藏品。",
+    "must_have_insight_fallback": "适合个人欣赏与收藏，请预留修复预算。",
+    "resale_insight_fallback": "转售利润完全取决于能否以低于同行进货价买入。"
   },
   "results": {
     "title": "经销商发现",
@@ -186,7 +213,9 @@
     "most_popular": "最受欢迎",
     "dealer_logic": "基于真实的经销商定价行为",
     "founder_note": "由活跃买家构建 — 而不仅仅是 AI。",
-    "market_signal": "市场信号"
+    "market_signal": "市场信号",
+    "description": "解锁完整古董商估价分析与竞拍策略。",
+    "dealer_buy_signal": "古董商通常会在 {{price}} 以下收购。"
   },
   "collection": {
     "title": "经销商狩猎日志",
@@ -228,7 +257,8 @@
     "got_it": "知道了",
     "try_item": "尝试一件物品 — 甚至是身边的东西",
     "upload_photo_hint": "照片是起点。细节决定价格。",
-    "simple_start_hint": "“从简单的东西开始 — 甚至是一个玻璃杯或小物品”"
+    "simple_start_hint": "“从简单的东西开始 — 甚至是一个玻璃杯或小物品”",
+    "lot_url_label": "粘贴拍卖或商品详情链接 (Lot Link)"
   },
   "categories": {
     "furniture": "家具",
@@ -310,5 +340,25 @@
     "desc": "您有一项尚未保存的活动评估。开始新的检查将放弃这些数据。",
     "back": "返回保存",
     "discard": "放弃并继续"
+  },
+  "intro": {
+    "welcome_badge": "专业古董估价与寻宝引擎",
+    "welcome_title": "您今天想探索什么？",
+    "welcome_desc": "选择您的探索路径，获取专家级市场情报。",
+    "path_value_title": "古董估价鉴定",
+    "path_value_desc": "评估真实市场行情，排查仿品风险，出具专业评估报告。",
+    "path_value_action": "开始鉴定",
+    "path_hunt_title": "寻找心仪古董",
+    "path_hunt_desc": "实时检索欧洲各大拍卖行与专业线上市场。",
+    "path_hunt_action": "开始寻宝",
+    "footer_assurance": "为藏家与古董商提供值得信赖的市场情报。"
+  },
+  "profile": {
+    "title": "个人资料",
+    "subscription": "订阅状态",
+    "current_plan": "当前方案"
+  },
+  "legal": {
+    "title": "法律条款与声明"
   }
 }

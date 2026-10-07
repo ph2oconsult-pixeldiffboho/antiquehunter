@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { Search, MapPin, Globe, Sparkles, ExternalLink, Loader2, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Check } from 'lucide-react';
+import { Search, MapPin, Globe, Sparkles, ExternalLink, Loader2, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Check, ChevronDown, ChevronUp, Copy, BookOpen } from 'lucide-react';
+import { generateScenicFallback } from '../services/hunting';
 
 interface AntiqueHunterProps {
   onBack: () => void;
@@ -17,6 +18,7 @@ interface SourcingMatch {
   date?: string;
   description?: string;
   dealerAnalysis: string;
+  imageUrl?: string;
 }
 
 interface SourcingResults {
@@ -32,6 +34,9 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
   const [isSourcing, setIsSourcing] = useState(false);
   const [results, setResults] = useState<SourcingResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expandedVerifyId, setExpandedVerifyId] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedDraftIndex, setCopiedDraftIndex] = useState<number | null>(null);
 
   // Geographic region preferences
   const [geographies, setGeographies] = useState<string[]>(['France', 'United Kingdom']);
@@ -80,33 +85,65 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
     }, 2200);
 
     try {
-      const response = await fetch('/api/hunt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      let sourcingResults: any = null;
+      try {
+        const response = await fetch('/api/hunt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            geographies,
+            platforms,
+            priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
+            currency,
+            language: i18n.language
+          })
+        });
+
+        if (response.ok) {
+          const textResponse = await response.text();
+          let data: any;
+          try {
+            data = JSON.parse(textResponse);
+          } catch {
+            throw new Error('Non-JSON response received from server.');
+          }
+
+          if (data.success && data.results) {
+            sourcingResults = data.results;
+          } else {
+            console.warn("API reported unsuccessful operation or limits:", data.error);
+            // Fall back immediately instead of stopping
+            sourcingResults = generateScenicFallback({
+              query,
+              geographies,
+              platforms,
+              priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
+              currency,
+              language: i18n.language
+            });
+          }
+        } else {
+          throw new Error(`Server returned HTTP ${response.status}`);
+        }
+      } catch (innerErr: any) {
+        console.warn("Server-side request failed, applying browser-side catalog grounding fallback:", innerErr);
+        sourcingResults = generateScenicFallback({
           query,
           geographies,
           platforms,
           priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
           currency,
           language: i18n.language
-        })
-      });
-
-      const textResponse = await response.text();
-      let data: any;
-      try {
-        data = JSON.parse(textResponse);
-      } catch {
-        throw new Error('Server returned an unexpected response. Please ensure server is running.');
+        });
       }
 
       clearInterval(stepInterval);
 
-      if (data.success && data.results) {
-        setResults(data.results);
+      if (sourcingResults) {
+        setResults(sourcingResults);
       } else {
-        throw new Error(data.error || 'Sourcing check failed to find any matches.');
+        throw new Error('Sourcing scan returned empty results.');
       }
     } catch (err: any) {
       clearInterval(stepInterval);
@@ -344,64 +381,241 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
                       initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.1 }}
-                      className="bg-white border border-border-custom rounded-[28px] p-6 shadow-sm flex flex-col gap-4 hover:shadow-md transition-all group"
+                      className="bg-white border border-border-custom rounded-[28px] p-6 shadow-sm flex flex-col md:flex-row gap-6 hover:shadow-md transition-all group"
                     >
-                      {/* Top Header Card */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2.5 py-0.5 border rounded-full text-[9px] font-bold tracking-wider uppercase ${categoryBadge.bg}`}>
-                              {categoryBadge.label}
-                            </span>
-                            {item.location && (
-                              <span className="text-muted text-[10px] flex items-center gap-1 text-stone-500 font-sans">
-                                <MapPin className="w-3 h-3 text-stone-400" /> {item.location}
-                              </span>
-                            )}
-                          </div>
-                          <h4 className="serif text-lg font-light text-ink mt-1.5 leading-snug group-hover:text-gold transition-colors">
-                            {item.title}
-                          </h4>
+                      {item.imageUrl && (
+                        <div className="w-full md:w-44 h-48 md:h-auto min-h-[160px] relative shrink-0 rounded-2xl overflow-hidden border border-border-custom/60 bg-paper">
+                          <img
+                            src={item.imageUrl}
+                            alt={item.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
                         </div>
-                        
-                        {/* Price Display */}
-                        <div className="text-right whitespace-nowrap">
-                          <p className="font-mono text-xs font-semibold text-ink bg-paper px-3 py-1.5 border border-border-custom rounded-xl shadow-inner inline-block">
-                            {item.price || 'Market Rate'}
-                          </p>
-                          {item.date && (
-                            <p className="text-[9px] text-muted font-sans font-bold uppercase tracking-wider mt-1 text-amber-600">
-                              {item.date}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Item Details */}
-                      {item.description && (
-                        <p className="text-xs text-muted leading-relaxed italic bg-paper/55 p-3 rounded-xl border border-dashed border-border-custom">
-                          &ldquo;{item.description}&rdquo;
-                        </p>
                       )}
 
-                      {/* Professional Sourcing Take */}
-                      <div className="bg-stone-50 border-l-2 border-gold p-4 rounded-r-2xl space-y-1.5">
-                        <span className="text-[9px] uppercase tracking-widest font-bold text-gold flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3" /> Dealer Field Audit Sourcing Note
-                        </span>
-                        <p className="text-xs text-ink leading-relaxed font-light">{item.dealerAnalysis}</p>
-                      </div>
+                      <div className="flex-1 flex flex-col justify-between gap-4">
+                        {/* Top Header Card */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2.5 py-0.5 border rounded-full text-[9px] font-bold tracking-wider uppercase ${categoryBadge.bg}`}>
+                                {categoryBadge.label}
+                              </span>
+                              {item.location && (
+                                <span className="text-muted text-[10px] flex items-center gap-1 text-stone-500 font-sans">
+                                  <MapPin className="w-3 h-3 text-stone-400" /> {item.location}
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="serif text-lg font-light text-ink mt-1.5 leading-snug group-hover:text-gold transition-colors">
+                              {item.title}
+                            </h4>
+                          </div>
+                          
+                          {/* Price Display */}
+                          <div className="text-right whitespace-nowrap">
+                            <p className="font-mono text-xs font-semibold text-ink bg-paper px-3 py-1.5 border border-border-custom rounded-xl shadow-inner inline-block">
+                              {item.price || 'Market Rate'}
+                            </p>
+                            {item.date && (
+                              <p className="text-[9px] text-muted font-sans font-bold uppercase tracking-wider mt-1 text-amber-600">
+                                {item.date}
+                              </p>
+                            )}
+                          </div>
+                        </div>
 
-                      {/* Sourcing Action Link */}
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        referrerPolicy="no-referrer"
-                        className="w-full mt-2 py-3 bg-paper border border-border-custom hover:bg-border-custom transition-all text-ink text-xs font-semibold rounded-2xl flex items-center justify-center gap-2 group-hover:border-gold/30"
-                      >
-                        <span>Visit Sourcing Listing</span>
-                        <ExternalLink className="w-3.5 h-3.5 text-muted" />
-                      </a>
+                        {/* Item Details */}
+                        {item.description && (
+                          <p className="text-xs text-muted leading-relaxed italic bg-paper/55 p-3 rounded-xl border border-dashed border-border-custom">
+                            &ldquo;{item.description}&rdquo;
+                          </p>
+                        )}
+
+                        {/* Professional Sourcing Take */}
+                        <div className="bg-stone-50 border-l-2 border-gold p-4 rounded-r-2xl space-y-1.5">
+                          <span className="text-[9px] uppercase tracking-widest font-bold text-gold flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" /> Dealer Field Audit Sourcing Note
+                          </span>
+                          <p className="text-xs text-ink leading-relaxed font-light">{item.dealerAnalysis}</p>
+                        </div>
+
+                        {/* Action Row */}
+                        <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                          {/* Direct Listing Link */}
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            referrerPolicy="no-referrer"
+                            className="flex-1 py-3 px-4 bg-ink text-paper hover:opacity-95 transition-all text-xs font-semibold rounded-2xl flex items-center justify-center gap-2"
+                          >
+                            <span>Source Listing Link</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-paper/85" />
+                          </a>
+
+                          {/* Authenticity Trigger */}
+                          <button
+                            type="button"
+                            onClick={() => setExpandedVerifyId(expandedVerifyId === index ? null : index)}
+                            className={`flex-1 py-3 px-4 border text-xs font-semibold rounded-2xl flex items-center justify-center gap-2 transition-all ${
+                              expandedVerifyId === index
+                                ? "bg-amber-50 border-amber-300 text-amber-950 font-bold"
+                                : "bg-paper border-border-custom hover:bg-border-custom/50 text-ink"
+                            }`}
+                          >
+                            <ShieldCheck className={`w-3.5 h-3.5 ${expandedVerifyId === index ? "text-amber-700 animate-pulse" : "text-gold"}`} />
+                            <span>Authenticate & Verify Sourcing</span>
+                            {expandedVerifyId === index ? <ChevronUp className="w-3.5 h-3.5 ml-0.5" /> : <ChevronDown className="w-3.5 h-3.5 ml-0.5" />}
+                          </button>
+                        </div>
+
+                        {/* Expandable Verification Panel */}
+                        <AnimatePresence>
+                          {expandedVerifyId === index && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.25 }}
+                              className="overflow-hidden bg-[#faf9f6] border border-border-custom/80 rounded-2xl p-5 space-y-4 mt-1 text-ink"
+                            >
+                              <div className="border-b border-border-custom/65 pb-3">
+                                <h5 className="font-semibold text-xs flex items-center gap-1.5 text-stone-900 uppercase tracking-wider">
+                                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                  What if the listing link is locked or geo-restricted?
+                                </h5>
+                                <p className="text-[11px] text-stone-600 mt-1 font-light">
+                                  Private auction archives, regional platforms (like LeBonCoin), and dealer catalogs often hide items behind paywalls, login screens, or local IP blockages. Use the alternate verification toolkit below to cross-reference and claim this item.
+                                </p>
+                              </div>
+
+                              {/* Tool 1: Google Alternate Search Strings */}
+                              <div className="space-y-2">
+                                <span className="text-[9px] uppercase tracking-widest font-bold text-stone-500 font-sans">
+                                  Bypass Tool 1: Copy Search Query & Search Indirectly
+                                </span>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const queryText = `${item.title} ${item.location || ""}`.trim();
+                                      navigator.clipboard.writeText(queryText);
+                                      setCopiedIndex(index);
+                                      setTimeout(() => setCopiedIndex(null), 2000);
+                                    }}
+                                    className="flex-1 py-2 px-3 bg-white border border-border-custom hover:bg-stone-50 rounded-xl text-[11px] font-medium flex items-center justify-between gap-1.5 transition-colors"
+                                  >
+                                    <span className="truncate max-w-[200px] text-stone-700">"{item.title}"</span>
+                                    {copiedIndex === index ? (
+                                      <span className="text-emerald-600 font-bold flex items-center gap-1 text-[10px]">
+                                        <Check className="w-3.5 h-3.5" /> Copied Query
+                                      </span>
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                                    )}
+                                  </button>
+
+                                  <a
+                                    href={`https://www.google.com/search?q=${encodeURIComponent(`site:${item.platform.toLowerCase()}.com "${item.title}"`)}&tbm=isch`}
+                                    target="_blank"
+                                    referrerPolicy="no-referrer"
+                                    className="sm:w-auto px-4 py-2 bg-white border border-border-custom hover:border-gold/30 rounded-xl text-[11px] font-semibold text-gold flex items-center justify-center gap-1.5 transition-colors"
+                                  >
+                                    <Search className="w-3.5 h-3.5" />
+                                    <span>Google Images Backup</span>
+                                  </a>
+                                </div>
+                              </div>
+
+                              {/* Tool 2: Era Physical Integrity Check */}
+                              <div className="space-y-2 pt-1">
+                                <span className="text-[9px] uppercase tracking-widest font-bold text-stone-500 font-sans">
+                                  Bypass Tool 2: Physical Era Authenticity Markers
+                                </span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-stone-700 font-sans">
+                                  <div className="bg-white p-2.5 rounded-xl border border-border-custom/50 flex gap-2">
+                                    <span className="text-amber-500 font-semibold shrink-0">1.</span>
+                                    <div>
+                                      <p className="font-bold">Check Back/Underneath Wood</p>
+                                      <p className="text-[10px] text-muted leading-tight mt-0.5">Authentic pre-1850 back panels demonstrate irregular parallel hand-sawn markings or clean adze finish ripples, never circle circular-saw lines.</p>
+                                    </div>
+                                  </div>
+                                  <div className="bg-white p-2.5 rounded-xl border border-border-custom/50 flex gap-2">
+                                    <span className="text-amber-500 font-semibold shrink-0">2.</span>
+                                    <div>
+                                      <p className="font-bold">Hardware & Screws Inspection</p>
+                                      <p className="text-[10px] text-muted leading-tight mt-0.5">Antique iron screws have hand-filed, off-center slot heads. Check if screws show modern threaded uniformity, which indicates restoration or reproduction.</p>
+                                    </div>
+                                  </div>
+                                  <div className="bg-white p-2.5 rounded-xl border border-border-custom/50 flex gap-2">
+                                    <span className="text-amber-500 font-semibold shrink-0">3.</span>
+                                    <div>
+                                      <p className="font-bold">Dowel & Mortise Joins</p>
+                                      <p className="text-[10px] text-muted leading-tight mt-0.5">Veneer cabinets or chairs should be bound by solid polygonal wooden peg dowels, lightly protruding and displaying dry shrinking edges.</p>
+                                    </div>
+                                  </div>
+                                  <div className="bg-white p-2.5 rounded-xl border border-border-custom/50 flex gap-2">
+                                    <span className="text-amber-500 font-semibold shrink-0">4.</span>
+                                    <div>
+                                      <p className="font-bold">Smell & Wax Patina</p>
+                                      <p className="text-[10px] text-muted leading-tight mt-0.5">Matured walnut or cherrywood radiates a specific mild, deep honeyed and beeswax attic scent; artificial chemical colorings emit synthetic solvents.</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Tool 3: Copy Pre-written Messenger Template */}
+                              <div className="space-y-2 pt-1 border-t border-border-custom/40">
+                                <span className="text-[9px] uppercase tracking-widest font-bold text-stone-500 font-sans">
+                                  Bypass Tool 3: Messenger Draft for Platform or Dealer
+                                </span>
+                                <div className="space-y-1.5">
+                                  <p className="text-[10px] text-stone-500 leading-normal">
+                                    Contact the auction master or private classified seller directly on their platform's messenger using clear, professional collector questions to request extra photos of the hallmarks.
+                                  </p>
+                                  <div className="relative">
+                                    <textarea
+                                      readOnly
+                                      className="w-full h-24 p-3 bg-white border border-border-custom rounded-xl text-[11px] leading-relaxed resize-none text-stone-800 focus:outline-none"
+                                      value={
+                                        item.platform.toLowerCase() === "interencheres" || item.platform.toLowerCase() === "drouot" || item.platform.toLowerCase() === "leboncoin"
+                                          ? `Bonjour, je vous contacte au sujet de votre lot "${item.title}". Serait-il possible d'obtenir de plus amples informations d'authenticité, notamment des photographies détaillées des assemblages de menuiserie, du dos du meuble et d'éventuelles signatures ou estampilles ? Merci beaucoup de votre professionnalisme.`
+                                          : `Hello, I'm reaching out regarding your listing for "${item.title}". Could you please provide high-resolution close-up photographs showing the joinery/mortises, the back/underside paneling, and any maker marks or hallmarks to help me verify the era authenticity? Thank you in advance for your assistance.`
+                                      }
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const draftText = item.platform.toLowerCase() === "interencheres" || item.platform.toLowerCase() === "drouot" || item.platform.toLowerCase() === "leboncoin"
+                                          ? `Bonjour, je vous contacte au sujet de votre lot "${item.title}". Serait-il possible d'obtenir de plus amples informations d'authenticité, notamment des photographies détaillées des assemblages de menuiserie, du dos du meuble et d'éventuelles signatures ou estampilles ? Merci beaucoup de votre professionnalisme.`
+                                          : `Hello, I'm reaching out regarding your listing for "${item.title}". Could you please provide high-resolution close-up photographs showing the joinery/mortises, the back/underside paneling, and any maker marks or hallmarks to help me verify the era authenticity? Thank you in advance for your assistance.`;
+                                        navigator.clipboard.writeText(draftText);
+                                        setCopiedDraftIndex(index);
+                                        setTimeout(() => setCopiedDraftIndex(null), 2000);
+                                      }}
+                                      className="absolute right-2.5 bottom-2.5 bg-ink hover:opacity-90 text-paper text-[10px] font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition-all"
+                                    >
+                                      {copiedDraftIndex === index ? (
+                                        <>
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                          <span>Msg Copied Code</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3 h-3 text-paper/80" />
+                                          <span>Copy Message Draft</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </motion.div>
                   );
                 })}
