@@ -47,7 +47,7 @@ export interface HuntResults {
   matches: HuntMatch[];
   dealerClosingTip: string;
   message?: string;
-  stats: { returned: number; verified: number; unverified: number; dropped: number; dropReasons: Record<string, number> };
+  stats: { returned: number; verified: number; unverified: number; dropped: number; dropReasons: Record<string, number>; secondCheck?: string };
 }
 
 export const NO_VERIFIED_MESSAGE = "No verified live listings found – try widening the budget or sources";
@@ -278,10 +278,12 @@ const confirmViaUrlContext = async (
   candidates: HuntMatch[],
   params: HuntParams,
   deadline: number,
-  dropReasons: Record<string, number>
+  dropReasons: Record<string, number>,
+  report: (note: string) => void
 ): Promise<HuntMatch[]> => {
   const remaining = deadline - Date.now();
-  if (candidates.length === 0 || remaining < URL_CHECK_MIN_MS) return candidates;
+  if (candidates.length === 0) return candidates;
+  if (remaining < URL_CHECK_MIN_MS) { report(`skipped: only ${Math.round(remaining / 1000)}s left`); return candidates; }
   const budget = Math.min(URL_CHECK_MAX_MS, remaining - 2_000);
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -312,6 +314,7 @@ const confirmViaUrlContext = async (
     const byUrl = new Map<string, any>();
     for (const p of parsed?.pages || []) byUrl.set(normUrl(p.url), p);
 
+    report(`google read: ${candidates.map(c => `${retrieval[normUrl(c.url)] || 'no_status'}/${byUrl.get(normUrl(c.url))?.loaded ?? 'n/a'}`).join(', ')}`);
     const out: HuntMatch[] = [];
     for (const c of candidates) {
       const page = byUrl.get(normUrl(c.url));
@@ -333,6 +336,7 @@ const confirmViaUrlContext = async (
     return out;
   } catch (err: any) {
     console.warn('URL-context check skipped:', err?.message || err);
+    report(`error: ${String(err?.message || err).slice(0, 160)}`);
     return candidates;
   } finally {
     if (timer) clearTimeout(timer);
@@ -410,8 +414,9 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
   }
   // Second opinion for pages our server could not read (bot protection / timeouts)
   const unreadable = matches.filter(m => m.verification === 'unverified');
+  let secondCheck: string | undefined;
   if (unreadable.length > 0) {
-    const confirmed = await confirmViaUrlContext(ai, unreadable, params, deadline, dropReasons);
+    const confirmed = await confirmViaUrlContext(ai, unreadable, params, deadline, dropReasons, (note) => { secondCheck = note; });
     const keep = new Set(confirmed.map(m => m.url));
     const replaced = new Map(confirmed.map(m => [m.url, m]));
     for (let i = matches.length - 1; i >= 0; i--) {
@@ -435,6 +440,7 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
       unverified: finalMatches.filter(m => m.verification === 'unverified').length,
       dropped: rawMatches.length - finalMatches.length,
       dropReasons,
+      secondCheck,
     },
   };
   if (finalMatches.length === 0) results.message = NO_VERIFIED_MESSAGE;
