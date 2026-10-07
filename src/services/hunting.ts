@@ -1,4 +1,20 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import {
+  allowedDomainsFor,
+  cleanText,
+  failsPeriodRule,
+  formatEstimate,
+  formatSaleDate,
+  hostMatches,
+  hostOf,
+  isAllowedHost,
+  isGenericUrl,
+  isGroundingRedirect,
+  isSpecificListingUrl,
+  parsePage,
+  platformLabelForUrl,
+  type Verification,
+} from "./huntValidation.js";
 
 export interface HuntParams {
   query: string;
@@ -7,394 +23,303 @@ export interface HuntParams {
   priceRange?: string;
   currency?: string;
   language?: string;
+  periodOnly?: boolean;
 }
 
-const extractOgImage = async (url: string): Promise<string | null> => {
-  if (!url || !url.startsWith("http")) return null;
+export interface HuntMatch {
+  title: string;
+  url: string;
+  platform: string;
+  price: string;
+  location: string;
+  date?: string;
+  description?: string;
+  dealerAnalysis: string;
+  imageUrl?: string;
+  verification: Verification;
+  verificationNote?: string;
+}
+
+export interface HuntResults {
+  marketBrief: string;
+  matches: HuntMatch[];
+  dealerClosingTip: string;
+  message?: string;
+  stats: { returned: number; verified: number; unverified: number; dropped: number; dropReasons: Record<string, number> };
+}
+
+export const NO_VERIFIED_MESSAGE = "No verified live listings found – try widening the budget or sources";
+
+const MODEL = "gemini-3.5-flash";
+const GEMINI_TIMEOUT_MS = 45_000;
+const FUNCTION_BUDGET_MS = 56_000; // Vercel maxDuration is 60s
+const FETCH_TIMEOUT_MS = 5_000;
+const REDIRECT_TIMEOUT_MS = 3_000;
+const MAX_RESULTS = 4;
+
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+};
+
+export class HuntTimeoutError extends Error {
+  constructor() {
+    super("The live search took too long (over 45 seconds). Please try again or narrow the search.");
+    this.name = "HuntTimeoutError";
+  }
+}
+
+const withDeadline = async <T>(ms: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1, ms));
   try {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 3500); // 3.5s timeout for fast loads
-    
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
-      },
-      signal: controller.signal
-    });
-    
-    clearTimeout(id);
-    
-    if (!res.ok) return null;
-    const html = await res.text();
-    
-    // Look for tags containing property="og:image"
-    const ogImageRegex = /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i;
-    const ogImageRegexAlt = /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i;
-    
-    let match = html.match(ogImageRegex) || html.match(ogImageRegexAlt);
-    if (match && match[1]) {
-      let imageUrl = match[1];
-      imageUrl = imageUrl.replace(/&amp;/g, '&');
-      return imageUrl;
-    }
-    
-    // Look for twitter:image
-    const twitterImageRegex = /<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i;
-    match = html.match(twitterImageRegex);
-    if (match && match[1]) {
-      return match[1].replace(/&amp;/g, '&');
-    }
-    
-    // Fallback eBay specific scraping
-    if (url.includes("ebay")) {
-      const ebayImgRegex = /(https:\/\/i\.ebayimg\.com\/images\/g\/[^"']+\.jpg)/i;
-      const ebayMatch = html.match(ebayImgRegex);
-      if (ebayMatch && ebayMatch[1]) {
-        return ebayMatch[1];
-      }
-    }
-    
-    return null;
-  } catch (err) {
-    console.warn(`Failed to extract og:image from ${url}:`, err);
-    return null;
+    return await run(controller.signal);
+  } finally {
+    clearTimeout(timer);
   }
 };
 
-export const huntAntiquesLive = async (params: HuntParams) => {
+const resolveRedirect = async (url: string, budgetMs: number): Promise<string> => {
+  if (!isGroundingRedirect(url)) return url;
+  try {
+    return await withDeadline(Math.min(REDIRECT_TIMEOUT_MS, budgetMs), async (signal) => {
+      const res = await fetch(url, { method: 'GET', redirect: 'manual', headers: BROWSER_HEADERS, signal });
+      const loc = res.headers.get('location');
+      return loc ? new URL(loc, url).toString() : url;
+    });
+  } catch {
+    return url;
+  }
+};
+
+interface FetchOutcome { status: number; finalUrl: string; html?: string; error?: string }
+
+const fetchPage = async (url: string, budgetMs: number): Promise<FetchOutcome> => {
+  try {
+    return await withDeadline(Math.min(FETCH_TIMEOUT_MS, budgetMs), async (signal) => {
+      const res = await fetch(url, { method: 'GET', redirect: 'follow', headers: BROWSER_HEADERS, signal });
+      const finalUrl = res.url || url;
+      if (!res.ok) return { status: res.status, finalUrl };
+      const html = (await res.text()).slice(0, 1_500_000);
+      return { status: res.status, finalUrl, html };
+    });
+  } catch (err: any) {
+    return { status: 0, finalUrl: url, error: err?.name === 'AbortError' ? 'timeout' : String(err?.message || err) };
+  }
+};
+
+const buildPrompts = (params: HuntParams, allowedDomains: string[]) => {
+  const { query, geographies, platforms, priceRange, currency = "EUR", language = "en", periodOnly = true } = params;
+  const geographyText = geographies.length > 0 ? geographies.join(", ") : "Europe";
+  const platformText = platforms.length > 0 ? platforms.join(", ") : "Interencheres, Drouot, LeBonCoin, Christie's, Sotheby's, eBay";
+  const today = new Date().toISOString().slice(0, 10);
+
+  const systemInstruction = `You are a premium antique finder and professional dealer.
+Your goal is to search the live web for the user's requested antique and return REAL, currently buyable listings.
+
+IMPORTANT RULES:
+1. Today's date is ${today}. Use the googleSearch tool. Only return auction lots whose sale date is AFTER today, or classified ads that are still active. Never return past or closed sales.
+2. Only return listings hosted on these sites: ${allowedDomains.join(", ")} (platforms: ${platformText}). Never return any other website.
+3. Every url MUST be the page of ONE specific lot or ad (e.g. interencheres.com/.../lot-123.html, drouot.com/l/123, leboncoin.fr/ad/..., ebay.../itm/...). NEVER return search results pages, category pages, sale catalogue pages or keyword landing pages (leboncoin /ck/ or /recherche, ebay /b/ or /sch/).
+4. Copy the url exactly as it appears in the search grounding results. Never invent or guess a url, title, price or date. If you cannot find a real matching listing, return fewer matches (an empty list is acceptable).
+5. Return at most ${MAX_RESULTS} matches.
+${periodOnly ? `6. PERIOD PIECES ONLY: the user wants authentic period pieces. Exclude anything described as "style", "de style", "XXe", "20e siècle", "20th century", reproduction, copy, "copie" or "d'après".` : ''}
+7. All text content must be in the user's selected language: '${language}'.
+8. Return structured JSON only.`;
+
+  const promptText = `Find real, live or upcoming antique listings matching:
+Query: ${query}
+Geographies: ${geographyText}
+Platforms: ${platformText}
+Budget: ${priceRange || "No budget given"}
+Currency: ${currency}
+${periodOnly ? 'Period pieces only: yes' : 'Period pieces only: no'}
+
+Return at most ${MAX_RESULTS} specific listings in the structure below.`;
+
+  return { systemInstruction, promptText };
+};
+
+const responseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    marketBrief: { type: Type.STRING, description: "A 2-3 sentence dealer brief on availability, typical rates and sourcing difficulty for this piece in these areas." },
+    matches: {
+      type: Type.ARRAY,
+      description: `At most ${MAX_RESULTS} real listings found during live web search.`,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: "Title of the listing as shown on the page." },
+          url: { type: Type.STRING, description: "Exact url of ONE specific lot or ad page, copied from the grounding results." },
+          platform: { type: Type.STRING, description: "Platform name (e.g. 'Interencheres', 'Drouot', 'LeBonCoin', 'eBay', 'Auctionet')." },
+          price: { type: Type.STRING, description: "Price or estimate exactly as listed, with currency symbol." },
+          location: { type: Type.STRING },
+          date: { type: Type.STRING, description: "Auction sale date or 'Active classified'." },
+          description: { type: Type.STRING, description: "Brief summary of condition, era and design as listed." },
+          dealerAnalysis: { type: Type.STRING, description: "Sharp field-note evaluation: price reasonability, authenticity checks needed, buy or walk away." }
+        },
+        required: ["title", "url", "platform", "price", "location", "dealerAnalysis"]
+      }
+    },
+    dealerClosingTip: { type: Type.STRING, description: "One sourcing insider tip for negotiating or auditing this type of antique." }
+  },
+  required: ["marketBrief", "matches", "dealerClosingTip"]
+};
+
+// Validate one AI result against the live web. Returns null (+reason) if it must be dropped.
+export const validateMatch = async (
+  match: any,
+  params: HuntParams,
+  allowedDomains: string[],
+  deadline: number
+): Promise<{ match?: HuntMatch; dropReason?: string }> => {
+  const remaining = () => deadline - Date.now();
+  const rawUrl = String(match?.url || '').trim();
+  if (!/^https?:\/\//i.test(rawUrl)) return { dropReason: 'no_url' };
+
+  const url = await resolveRedirect(rawUrl, remaining());
+  if (isGroundingRedirect(url)) return { dropReason: 'unresolved_redirect' };
+  if (isGenericUrl(url)) return { dropReason: 'generic_page' };
+  if (!isAllowedHost(url, allowedDomains)) return { dropReason: 'platform_not_selected' };
+
+  const title = cleanText(match.title);
+  const description = cleanText(match.description);
+  if (params.periodOnly !== false && failsPeriodRule(title, description)) return { dropReason: 'not_period' };
+
+  const page = remaining() > 500 ? await fetchPage(url, remaining()) : { status: 0, finalUrl: url, error: 'no_time' } as FetchOutcome;
+  const finalUrl = page.finalUrl || url;
+  if (page.status === 404 || page.status === 410) return { dropReason: 'dead_link' };
+  if (finalUrl !== url && (isGenericUrl(finalUrl) || !isAllowedHost(finalUrl, allowedDomains))) return { dropReason: 'redirected_to_generic' };
+
+  const result: HuntMatch = {
+    title,
+    url: finalUrl,
+    platform: platformLabelForUrl(finalUrl) || cleanText(match.platform),
+    price: cleanText(match.price),
+    location: cleanText(match.location),
+    date: cleanText(match.date) || undefined,
+    description: description || undefined,
+    dealerAnalysis: cleanText(match.dealerAnalysis),
+    verification: 'unverified',
+  };
+
+  if (page.status >= 200 && page.status < 300 && page.html) {
+    if (!isSpecificListingUrl(finalUrl)) return { dropReason: 'not_a_listing' };
+    const facts = parsePage(finalUrl, page.html);
+    if (facts.soldOrEnded) return { dropReason: 'sold_or_ended' };
+    if (facts.saleDate && facts.saleDate.getTime() < Date.now()) return { dropReason: 'past_sale' };
+    if (params.periodOnly !== false && failsPeriodRule(facts.title, facts.description)) return { dropReason: 'not_period' };
+    if (facts.title) {
+      // Catalogue titles are often cut ("…"): fall back to the start of the real catalogue description
+      result.title = facts.title.endsWith('…') && facts.description
+        ? facts.description.slice(0, 120).replace(/\s+\S*$/, '') + '…'
+        : facts.title;
+    }
+    if (facts.description) result.description = facts.description;
+    if (facts.saleDate) result.date = formatSaleDate(facts.saleDate);
+    const est = formatEstimate(facts.estimateLow, facts.estimateHigh, facts.estimateCurrency || 'EUR');
+    if (est) result.price = est;
+    else if (['interencheres.com', 'drouot.com'].some(d => hostMatches(hostOf(finalUrl), d))) result.price = 'No estimate published';
+    if (facts.image) result.imageUrl = facts.image;
+    result.verification = 'verified';
+    return { match: result };
+  }
+
+  // Page could not be read (bot protection, timeout...). Keep only specific listing URLs, flagged.
+  if (!isSpecificListingUrl(finalUrl)) return { dropReason: page.status ? `unreadable_generic_${page.status}` : 'unreadable_generic' };
+  result.verificationNote = page.status === 403 || page.status === 429
+    ? 'Site blocks automated checks – open the link to confirm it is still live.'
+    : 'Could not load the page in time – open the link to confirm it is still live.';
+  return { match: result };
+};
+
+export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults> => {
+  const startedAt = Date.now();
+  const deadline = startedAt + FUNCTION_BUDGET_MS;
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not defined in the environment.");
   }
 
-  const ai = new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      }
-    }
+  const ai = new GoogleGenAI({ apiKey });
+  const allowedDomains = allowedDomainsFor(params.platforms || []);
+  const { systemInstruction, promptText } = buildPrompts(params, allowedDomains);
+
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new HuntTimeoutError());
+    }, GEMINI_TIMEOUT_MS);
   });
 
-  const { query, geographies, platforms, priceRange, currency = "USD", language = "en" } = params;
-
-  const geographyText = geographies.length > 0 ? geographies.join(", ") : "Global markets";
-  const platformText = platforms.length > 0 ? platforms.join(", ") : "recognized antique platforms (Interencheres, Drouot, LeBonCoin, Christie's, Sotheby's, eBay)";
-
-  const systemInstruction = `You are a premium antique finder, sourcing specialist, and professional dealer. 
-Your goal is to search the live web for the user's requested antique item and return high-quality matching search results. 
-Adopt an authoritative, sharp, and commercially realistic tone. You avoid retail traps and analyze listings to verify if they are good deals for the buyer.
-
-IMPORTANT RULES:
-1. Use the googleSearch tool to browse the live web. Focus on active or upcoming auctions, estate sales, and classified listings in ${geographyText}.
-2. Target platforms MUST include or heavily prioritize: ${platformText}.
-3. Look for authentic pieces, and provide a dealer's sharp assessment on the matches found.
-4. If you find live URL links in the grounding results, include them EXACTLY in your 'url' string parameter.
-5. All text content must be returned in the user's selected language: '${language}'.
-6. Return structured JSON only. No extra markdown tags or wrapper text outside the JSON structure.`;
-
-  const promptText = `Find actual live or upcoming antique listings matching the following criteria:
-Query: ${query}
-Geographies/Selected Areas: ${geographyText}
-Target Platforms and Sites: ${platformText}
-Target Price/Budget: ${priceRange || "Competitive market rates"}
-Currency: ${currency}
-
-Scour the specified geographies and recognized websites for active pieces or active auction listings. 
-Return the best matched listings in the database structure below.`;
-
+  let response: any;
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: promptText,
-      config: {
-        systemInstruction,
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            marketBrief: {
-              type: Type.STRING,
-              description: "A 2-3 sentence dealer state-of-the-market brief regarding availability, typical rates, and sourcing difficulty for this specific piece in these areas."
-            },
-            matches: {
-              type: Type.ARRAY,
-              description: "A list of realistic matches or active listings found during live web sourcing.",
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: {
-                    type: Type.STRING,
-                    description: "Title or designation of the antique found (e.g., '19th Century French Walnut Commodes')."
-                  },
-                  url: {
-                    type: Type.STRING,
-                    description: "Direct real website URL to the listing (Interencheres, Drouot, LeBonCoin, Christie's, or eBay) - must match live URL or google search grounding link."
-                  },
-                  platform: {
-                    type: Type.STRING,
-                    description: "Single-word or official brand name of the source (e.g. 'Interencheres', 'Drouot', 'LeBonCoin', 'eBay', 'Christie's')."
-                  },
-                  price: {
-                    type: Type.STRING,
-                    description: "The price, reserve, or starting estimate (e.g. 'Asking €850', 'Estimate €1,200 - €1,800'). Use correct currency symbol."
-                  },
-                  location: {
-                    type: Type.STRING,
-                    description: "Location of the seller, auction house, or piece (e.g., 'Paris, France', 'London, UK')."
-                  },
-                  date: {
-                    type: Type.STRING,
-                    description: "Listing date, auction closing date, or status (e.g. 'Auction: June 15, 2026', 'Active Classified')."
-                  },
-                  description: {
-                    type: Type.STRING,
-                    description: "A brief summary of the item condition, era, and design details as listed."
-                  },
-                  dealerAnalysis: {
-                    type: Type.STRING,
-                    description: "Your sharp field-note evaluation of this listing. Mention price reasonability, authenticity checks needed (flaws, handles, wood joints), and whether a dealer would jump on it or walk away."
-                  }
-                },
-                required: ["title", "url", "platform", "price", "location", "dealerAnalysis"]
-              }
-            },
-            dealerClosingTip: {
-              type: Type.STRING,
-              description: "One ultimate sourcing insider tip for negotiating or auditing this specific model of antique."
-            }
-          },
-          required: ["marketBrief", "matches", "dealerClosingTip"]
+    response = await Promise.race([
+      ai.models.generateContent({
+        model: MODEL,
+        contents: promptText,
+        config: {
+          systemInstruction,
+          tools: [{ googleSearch: {} }],
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          responseMimeType: "application/json",
+          responseSchema,
+          abortSignal: controller.signal,
         }
-      }
-    });
+      }),
+      timeout,
+    ]);
+  } catch (err: any) {
+    if (err instanceof HuntTimeoutError || controller.signal.aborted) throw new HuntTimeoutError();
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 
-    if (response.text) {
-      const parsed = JSON.parse(response.text.trim());
-      
-      // Enhance urls with search grounding where they might be missing or generic
-      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      if (parsed.matches && parsed.matches.length > 0) {
-        // First resolve actual landing URLs for all listing matches
-        parsed.matches = parsed.matches.map((match: any, index: number) => {
-          const matchPlatform = String(match.platform || "").toLowerCase();
-          const matchTitle = String(match.title || "").toLowerCase();
-          let matchUrl = String(match.url || "");
+  const text = response?.text;
+  if (!text) throw new Error("The search engine returned an empty response.");
+  let parsed: any;
+  try {
+    parsed = JSON.parse(String(text).trim());
+  } catch {
+    throw new Error("The search engine returned an unreadable response.");
+  }
 
-          if ((!matchUrl || matchUrl.includes("example") || matchUrl.length < 10) && groundingChunks && groundingChunks.length > 0) {
-            const chunk = groundingChunks.find((c: any) => {
-              const uri = String(c.web?.uri || "").toLowerCase();
-              const title = String(c.web?.title || "").toLowerCase();
-              return uri && (
-                (matchPlatform && uri.includes(matchPlatform)) || 
-                (matchTitle && title.includes(matchTitle))
-              );
-            }) || groundingChunks[index % groundingChunks.length];
-            
-            if (chunk && chunk.web?.uri) {
-              matchUrl = chunk.web.uri;
-            }
-          }
-          match.url = matchUrl;
-          
-          // Set dynamic aesthetic image URL directly and skip slow, error-prone HTML crawling
-          match.imageUrl = getAntiqueImageUrl(query, match.title || "", index);
-          
-          return match;
-        });
-      }
+  const rawMatches: any[] = Array.isArray(parsed.matches) ? parsed.matches.slice(0, MAX_RESULTS + 2) : [];
+  const outcomes = await Promise.all(rawMatches.map(m => validateMatch(m, params, allowedDomains, deadline)));
 
-      return parsed;
+  const seen = new Set<string>();
+  const matches: HuntMatch[] = [];
+  const dropReasons: Record<string, number> = {};
+  for (const o of outcomes) {
+    if (o.match && !seen.has(o.match.url)) {
+      seen.add(o.match.url);
+      matches.push(o.match);
+    } else {
+      const reason = o.dropReason || 'duplicate';
+      dropReasons[reason] = (dropReasons[reason] || 0) + 1;
     }
+  }
+  // Verified listings first
+  matches.sort((a, b) => (a.verification === b.verification ? 0 : a.verification === 'verified' ? -1 : 1));
+  const finalMatches = matches.slice(0, MAX_RESULTS);
 
-    throw new Error("Empty response from AI sourcing engine.");
-  } catch (error: any) {
-    console.warn("Live hunt service encountered API exception, launching graceful contextual fallback engine:", error.message || error);
-    return generateScenicFallback(params, error.message || String(error));
-  }
-};
-
-export const getAntiqueImageUrl = (query: string, title: string, index: number): string => {
-  const combined = `${query.toLowerCase()} ${title.toLowerCase()}`;
-  
-  // High-quality curations
-  const commodeImages = [
-    "https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1532372320978-9b4d8a3a0245?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1601887389937-0b028fdb44c7?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const chairImages = [
-    "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1506898667547-4502fe854c8e?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const vaseImages = [
-    "https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1614102073832-030967418971?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const mirrorImages = [
-    "https://images.unsplash.com/photo-1618220179428-22790b461013?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const clockImages = [
-    "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const tableImages = [
-    "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1499933374294-4584851497cc?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const paintingImages = [
-    "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1580136579312-94651dfd596d?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const bookImages = [
-    "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const silverImages = [
-    "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&q=80&w=650"
-  ];
-  
-  const generalImages = [
-    "https://images.unsplash.com/photo-1554188248-986adfe73b4b?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&q=80&w=650",
-    "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=650"
-  ];
-
-  if (combined.includes("commode") || combined.includes("chest") || combined.includes("drawer") || combined.includes("armoire") || combined.includes("dresser") || combined.includes("buffet") || combined.includes("meuble")) {
-    return commodeImages[index % commodeImages.length];
-  }
-  if (combined.includes("chair") || combined.includes("fauteuil") || combined.includes("sofa") || combined.includes("siege") || combined.includes("bench") || combined.includes("stool") || combined.includes("seating")) {
-    return chairImages[index % chairImages.length];
-  }
-  if (combined.includes("vase") || combined.includes("porcelain") || combined.includes("sevrès") || combined.includes("ceramic") || combined.includes("pottery") || combined.includes("faience") || combined.includes("cup") || combined.includes("plate") || combined.includes("dish")) {
-    return vaseImages[index % vaseImages.length];
-  }
-  if (combined.includes("mirror") || combined.includes("glace") || combined.includes("trumeau") || combined.includes("miroir") || combined.includes("frame")) {
-    return mirrorImages[index % mirrorImages.length];
-  }
-  if (combined.includes("clock") || combined.includes("pendule") || combined.includes("cartel") || combined.includes("horloge") || combined.includes("watch") || combined.includes("time") || combined.includes("chrono")) {
-    return clockImages[index % clockImages.length];
-  }
-  if (combined.includes("table") || combined.includes("bureau") || combined.includes("desk") || combined.includes("secretaire") || combined.includes("console") || combined.includes("buffet")) {
-    return tableImages[index % tableImages.length];
-  }
-  if (combined.includes("painting") || combined.includes("tableau") || combined.includes("art") || combined.includes("dessin") || combined.includes("oil") || combined.includes("canvas") || combined.includes("print")) {
-    return paintingImages[index % paintingImages.length];
-  }
-  if (combined.includes("book") || combined.includes("manuscript") || combined.includes("paper") || combined.includes("ephemera") || combined.includes("letter") || combined.includes("tome")) {
-    return bookImages[index % bookImages.length];
-  }
-  if (combined.includes("silver") || combined.includes("gold") || combined.includes("jewel") || combined.includes("ring") || combined.includes("pendant") || combined.includes("brooch") || combined.includes("tea set") || combined.includes("plate")) {
-    return silverImages[index % silverImages.length];
-  }
-  
-  return generalImages[index % generalImages.length];
-};
-
-export const generateScenicFallback = (params: HuntParams, originalError?: string): any => {
-  const { query, geographies, platforms, priceRange, currency = "EUR" } = params;
-  
-  const selectedGeos = geographies.length > 0 ? geographies : ["France", "United Kingdom"];
-  const selectedPlats = platforms.length > 0 ? platforms : ["Interencheres", "Drouot", "LeBonCoin"];
-  
-  // Parse query keywords to create realistic-looking listings
-  const normalizedQuery = query.toLowerCase();
-  
-  let itemCategory = "Antique Collectible";
-  let era = "19th Century (Napoleon III)";
-  let material = "mahogany or walnut";
-  
-  if (normalizedQuery.includes("commode") || normalizedQuery.includes("chest") || normalizedQuery.includes("drawer") || normalizedQuery.includes("meuble")) {
-    itemCategory = "Commode / Bureau Chest of Drawers";
-    era = "Louis XV period (circa 1750)";
-    material = "polished cherrywood with hand-cast bronze escutcheons";
-  } else if (normalizedQuery.includes("chair") || normalizedQuery.includes("fauteuil") || normalizedQuery.includes("sofa") || normalizedQuery.includes("siege")) {
-    itemCategory = "Fauteuil Salon Armchair";
-    era = "Louis XVI transitional style (late 18th century)";
-    material = "carved solid beechwood frame with historic floral tapestry fabric";
-  } else if (normalizedQuery.includes("vase") || normalizedQuery.includes("porcelain") || normalizedQuery.includes("sevrès") || normalizedQuery.includes("ceramic") || normalizedQuery.includes("faience")) {
-    itemCategory = "Sèvres-Style Cobalt Blue Porcelain Vase";
-    era = "Late 19th Century Belle Époque";
-    material = "glazed porcelain with gilt bronze handles and hand-painted cartouches";
-  } else if (normalizedQuery.includes("mirror") || normalizedQuery.includes("glace") || normalizedQuery.includes("trumeau") || normalizedQuery.includes("miroir")) {
-    itemCategory = "Gilded Provincial Salon Mirror";
-    era = "French Provincial 19th Century";
-    material = "hand-carved giltwood with authentic mercury glass pane mirroring";
-  } else if (normalizedQuery.includes("clock") || normalizedQuery.includes("pendule") || normalizedQuery.includes("cartel") || normalizedQuery.includes("horloge")) {
-    itemCategory = "Ormolu Mantel Cartel Clock";
-    era = "French Empire style (circa 1810)";
-    material = "chased fire-gilded bronze (ormolu) base with white enamel dial";
-  } else if (normalizedQuery.includes("table") || normalizedQuery.includes("bureau") || normalizedQuery.includes("desk") || normalizedQuery.includes("secretaire")) {
-    itemCategory = "Writing Desk (Bureau Plat)";
-    era = "Directoire Period (late 18th century)";
-    material = "golden solid walnut planks with custom mortise-and-tenon joints";
-  } else if (normalizedQuery.includes("painting") || normalizedQuery.includes("tableau") || normalizedQuery.includes("art") || normalizedQuery.includes("dessin")) {
-    itemCategory = "Original Oil on Canvas Painting";
-    era = "Mid-19th Century French Barbizon School";
-    material = "fine oil pigments on linen canvas, housed in a sculpted plaster frame";
-  }
-
-  // Create 3 realistic historical auction/listing matches
-  const matches = [
-    {
-      title: `Charming ${era} ${itemCategory}`,
-      url: `https://www.interencheres.com/meubles-objets-art?search=${encodeURIComponent(query)}`,
-      platform: selectedPlats[0] || "Interencheres",
-      price: priceRange ? `Estimate: ${priceRange}` : `Estim. €600 - €900`,
-      location: selectedGeos[0] === "United Kingdom" ? "London, UK" : "Paris, France",
-      date: "Auction: June 24, 2026",
-      description: `Pristine provenance. Built with authentic ${material} showing gorgeous figuring and hand-filed joints. Direct from family estate collection in exemplary conservation state.`,
-      dealerAnalysis: `Dealer Field Audit: Rear backing is solid and shows genuine pre-industrial parallel hand-saw striations. The ${material} is in exceptional shape. Low reproduction hazard — a superb acquisition target.`,
-      imageUrl: getAntiqueImageUrl(query, `Charming ${era} ${itemCategory}`, 0)
-    },
-    {
-      title: `Rare Provincial ${itemCategory} of ${material}`,
-      url: `https://www.drouot.com/en/search?query=${encodeURIComponent(query)}`,
-      platform: selectedPlats[1] || "Drouot",
-      price: priceRange ? `Estimated: ${priceRange}` : `Estim. €1,200 - €1,800`,
-      location: selectedGeos[1] || "Lyon, France",
-      date: "Catalogued Auction Sale",
-      description: `Exceptional proportions, masterfully crafted from selected ${material}. Featuring original iron locks, custom brass keyplates, and authentic ancient beeswax luster.`,
-      dealerAnalysis: `Dealer Field Audit: High collectible value. Commendable wood stability with minor historic insect borer holes on the bottom panels (long inactive, chemically guarded). Highly reasonable bidding start.`,
-      imageUrl: getAntiqueImageUrl(query, `Rare Provincial ${itemCategory} of ${material}`, 1)
-    },
-    {
-      title: `Elegantly Maintained Vintage ${itemCategory}`,
-      url: `https://www.leboncoin.fr/recherche?text=${encodeURIComponent(query)}`,
-      platform: selectedPlats[2] || "LeBonCoin",
-      price: priceRange ? `Asking: ${priceRange}` : `Asking €350`,
-      location: "Bordeaux, France",
-      date: "Active Sourced Listing",
-      description: `Offered from ancestral home storage. Fully functional, sturdy and ready for immediate exhibition. Needs very minor wax polishing to elevate veneer highlight.`,
-      dealerAnalysis: `Dealer Field Audit: Extremely undervalued provincial posting. Private seller listing has not listed the correct historical era tag, making this a brilliant arbitrage choice for collectors.`,
-      imageUrl: getAntiqueImageUrl(query, `Elegantly Maintained Vintage ${itemCategory}`, 2)
-    }
-  ];
-
-  // Limit matches based on selected platforms to respect filter, ensuring at least 1 match
-  const filteredMatches = matches.filter(m => selectedPlats.some(p => m.platform.toLowerCase().includes(p.toLowerCase())));
-  const finalMatches = filteredMatches.length > 0 ? filteredMatches : matches.slice(0, 2);
-
-  return {
-    marketBrief: `⚠️ [High Performance Offline Backup Mode Active] Due to high seasonal API load, showing expert-curated listing directory results. Sourcing records check for "${query}" displays a solid, steady price floor. Excellent ${era} pieces of ${material} are heavily sought after with minimal current market dilution from modern replicas.`,
+  const results: HuntResults = {
+    marketBrief: cleanText(parsed.marketBrief),
     matches: finalMatches,
-    dealerClosingTip: `When assessing this ${itemCategory}, pay close attention to the structural joinery. Pre-1850 pieces utilize hand-cut dowels and hand-filed iron screws which stand out as irregular, whereas later reproductions feature perfect round holes and modern machining.`
+    dealerClosingTip: cleanText(parsed.dealerClosingTip),
+    stats: {
+      returned: rawMatches.length,
+      verified: finalMatches.filter(m => m.verification === 'verified').length,
+      unverified: finalMatches.filter(m => m.verification === 'unverified').length,
+      dropped: rawMatches.length - finalMatches.length,
+      dropReasons,
+    },
   };
+  if (finalMatches.length === 0) results.message = NO_VERIFIED_MESSAGE;
+  return results;
 };
-

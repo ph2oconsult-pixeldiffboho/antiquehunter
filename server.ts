@@ -5,7 +5,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import { huntAntiquesLive } from "./src/services/hunting.ts";
+import { handleHuntRequest } from "./src/services/huntHandler.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,24 +17,8 @@ async function startServer() {
 
   // API routes FIRST
   app.post("/api/hunt", async (req, res) => {
-    try {
-      const { query, geographies, platforms, priceRange, currency, language } = req.body;
-      if (!query) {
-        return res.json({ success: false, error: "Search query is required" });
-      }
-      const results = await huntAntiquesLive({
-        query,
-        geographies: geographies || [],
-        platforms: platforms || [],
-        priceRange,
-        currency,
-        language: language || "en"
-      });
-      res.json({ success: true, results });
-    } catch (error: any) {
-      console.error("Error executing hunt:", error);
-      res.json({ success: false, error: error.message || "Sourcing check failed" });
-    }
+    const { status, body } = await handleHuntRequest(req.body);
+    res.status(status).json(body);
   });
 
   app.post("/api/rerun-analysis", async (req, res) => {
