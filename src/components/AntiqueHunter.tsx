@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+import ReactMarkdown from 'react-markdown';
 import { Search, MapPin, Globe, Sparkles, ExternalLink, Loader2, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Check, ChevronDown, ChevronUp, Copy, BookOpen } from 'lucide-react';
-import { generateScenicFallback } from '../services/hunting';
 
 interface AntiqueHunterProps {
   onBack: () => void;
@@ -19,13 +19,31 @@ interface SourcingMatch {
   description?: string;
   dealerAnalysis: string;
   imageUrl?: string;
+  verification?: 'verified' | 'unverified';
+  verificationNote?: string;
 }
 
 interface SourcingResults {
   marketBrief: string;
   matches: SourcingMatch[];
   dealerClosingTip: string;
+  message?: string;
+  stats?: { returned: number; verified: number; unverified: number; dropped: number };
 }
+
+interface HuntRequest {
+  query: string;
+  geographies: string[];
+  platforms: string[];
+  priceRange?: string;
+  currency: string;
+  language: string;
+  periodOnly: boolean;
+}
+
+const HUNT_CURRENCIES = ['EUR', 'GBP', 'USD', 'SEK'];
+const SWEDISH_PLATFORMS = ['Auctionet', 'Bukowskis'];
+const CLIENT_TIMEOUT_MS = 70_000;
 
 export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }) => {
   const { t, i18n } = useTranslation();
@@ -34,17 +52,24 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
   const [isSourcing, setIsSourcing] = useState(false);
   const [results, setResults] = useState<SourcingResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastRequest, setLastRequest] = useState<HuntRequest | null>(null);
+  const [huntCurrency, setHuntCurrency] = useState<string>(() => {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('hunt_currency') : null;
+    if (saved && HUNT_CURRENCIES.includes(saved)) return saved;
+    return HUNT_CURRENCIES.includes(currency) ? currency : 'EUR';
+  });
+  const [periodOnly, setPeriodOnly] = useState(true);
   const [expandedVerifyId, setExpandedVerifyId] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedDraftIndex, setCopiedDraftIndex] = useState<number | null>(null);
 
   // Geographic region preferences
   const [geographies, setGeographies] = useState<string[]>(['France', 'United Kingdom']);
-  const availableGeographies = ['France', 'United Kingdom', 'United States', 'Europe', 'Global/Rest of World'];
+  const availableGeographies = ['France', 'United Kingdom', 'Sweden', 'United States', 'Europe', 'Global/Rest of World'];
 
   // Platform preferences
   const [platforms, setPlatforms] = useState<string[]>(['Interencheres', 'Drouot', 'LeBonCoin', 'Christie\'s']);
-  const availablePlatforms = ['Interencheres', 'Drouot', 'LeBonCoin', 'Christie\'s', 'Sotheby\'s', 'eBay'];
+  const availablePlatforms = ['Interencheres', 'Drouot', 'LeBonCoin', 'Christie\'s', 'Sotheby\'s', 'eBay', ...SWEDISH_PLATFORMS];
 
   // Sourcing loading message cycle
   const [sourcingStep, setSourcingStep] = useState(0);
@@ -59,9 +84,19 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
   ];
 
   const handleGeographyToggle = (geo: string) => {
+    const turningOn = !geographies.includes(geo);
     setGeographies(prev =>
       prev.includes(geo) ? prev.filter(g => g !== geo) : [...prev, geo]
     );
+    // Swedish auction sources are added automatically when Sweden or Europe is selected
+    if (turningOn && (geo === 'Sweden' || geo === 'Europe')) {
+      setPlatforms(prev => Array.from(new Set([...prev, ...SWEDISH_PLATFORMS])));
+    }
+  };
+
+  const handleCurrencyChange = (value: string) => {
+    setHuntCurrency(value);
+    try { localStorage.setItem('hunt_currency', value); } catch { /* ignore */ }
   };
 
   const handlePlatformToggle = (plat: string) => {
@@ -70,88 +105,75 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
     );
   };
 
-  const executeSourcing = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
+  const runSearch = async (request: HuntRequest) => {
     setIsSourcing(true);
     setResults(null);
     setError(null);
     setSourcingStep(0);
+    setLastRequest(request);
 
     // Dynamic rotation of loading steps
     const stepInterval = setInterval(() => {
       setSourcingStep(prev => (prev + 1) % sourcingMessages.length);
     }, 2200);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
 
     try {
-      let sourcingResults: any = null;
+      let response: Response;
       try {
-        const response = await fetch('/api/hunt', {
+        response = await fetch('/api/hunt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query,
-            geographies,
-            platforms,
-            priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
-            currency,
-            language: i18n.language
-          })
+          body: JSON.stringify(request),
+          signal: controller.signal
         });
-
-        if (response.ok) {
-          const textResponse = await response.text();
-          let data: any;
-          try {
-            data = JSON.parse(textResponse);
-          } catch {
-            throw new Error('Non-JSON response received from server.');
-          }
-
-          if (data.success && data.results) {
-            sourcingResults = data.results;
-          } else {
-            console.warn("API reported unsuccessful operation or limits:", data.error);
-            // Fall back immediately instead of stopping
-            sourcingResults = generateScenicFallback({
-              query,
-              geographies,
-              platforms,
-              priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
-              currency,
-              language: i18n.language
-            });
-          }
-        } else {
-          throw new Error(`Server returned HTTP ${response.status}`);
-        }
-      } catch (innerErr: any) {
-        console.warn("Server-side request failed, applying browser-side catalog grounding fallback:", innerErr);
-        sourcingResults = generateScenicFallback({
-          query,
-          geographies,
-          platforms,
-          priceRange: targetBudget ? `${targetBudget} ${currency}` : undefined,
-          currency,
-          language: i18n.language
-        });
+      } catch (networkErr: any) {
+        throw new Error(networkErr?.name === 'AbortError'
+          ? t('hunter.error_timeout')
+          : t('hunter.error_network'));
       }
 
-      clearInterval(stepInterval);
-
-      if (sourcingResults) {
-        setResults(sourcingResults);
-      } else {
-        throw new Error('Sourcing scan returned empty results.');
+      const textResponse = await response.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(textResponse);
+      } catch {
+        data = null;
       }
+
+      if (!data) {
+        // Vercel timeouts (504) and other gateway errors return HTML/plain text, never fake data
+        throw new Error(response.status === 504 || response.status === 408
+          ? t('hunter.error_timeout')
+          : t('hunter.error_generic'));
+      }
+      if (!data.success || !data.results) {
+        throw new Error(data.code === 'timeout' ? t('hunter.error_timeout') : t('hunter.error_generic'));
+      }
+      setResults(data.results as SourcingResults);
     } catch (err: any) {
-      clearInterval(stepInterval);
       console.error('Sourcing run failure:', err);
-      setError(err?.message || 'The sourcing scan encountered a localized timeout. Please try refining your parameters.');
+      setError(err?.message || t('hunter.error_generic'));
     } finally {
+      clearTimeout(timeoutId);
+      clearInterval(stepInterval);
       setIsSourcing(false);
     }
+  };
+
+  const executeSourcing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    await runSearch({
+      query,
+      geographies,
+      platforms,
+      priceRange: targetBudget.trim() ? `${targetBudget.trim()} ${huntCurrency}` : undefined,
+      currency: huntCurrency,
+      language: i18n.language,
+      periodOnly
+    });
   };
 
   const getPlatformColors = (platformName: string) => {
@@ -162,6 +184,8 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
     if (name.includes('christie')) return { bg: 'bg-red-50 border-red-200 text-red-800', label: "Christie's Premium" };
     if (name.includes('sotheby')) return { bg: 'bg-purple-50 border-purple-200 text-purple-800', label: "Sotheby's Premium" };
     if (name.includes('ebay')) return { bg: 'bg-slate-50 border-slate-200 text-slate-800', label: 'eBay Secondary' };
+    if (name.includes('auctionet')) return { bg: 'bg-sky-50 border-sky-200 text-sky-800', label: 'Auctionet' };
+    if (name.includes('bukowski')) return { bg: 'bg-indigo-50 border-indigo-200 text-indigo-800', label: 'Bukowskis' };
     return { bg: 'bg-stone-50 border-stone-200 text-stone-700', label: platformName };
   };
 
@@ -182,13 +206,13 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
           </div>
         </div>
         <h1 className="serif text-4xl font-light tracking-tight leading-tight text-ink">Find Me an Antique</h1>
-        <p className="text-muted leading-relaxed">
-          Instruct our global dealer sourcing engine. We will comb through renowned databases including **Interencheres**, **Drouot**, **LeBonCoin**, and elite international houses in real-time.
-        </p>
+        <div className="text-muted leading-relaxed [&_strong]:text-ink [&_strong]:font-semibold">
+          <ReactMarkdown>{t('hunter.intro')}</ReactMarkdown>
+        </div>
       </section>
 
       {/* Sourcing Input Card */}
-      {!isSourcing && !results && (
+      {!isSourcing && !results && !error && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -213,14 +237,45 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
 
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wider font-bold text-ink">Target Budget & Price Range (Optional)</label>
-              <input
-                type="text"
-                placeholder={`e.g. Under €1,500, or £500 - £2,000`}
-                value={targetBudget}
-                onChange={(e) => setTargetBudget(e.target.value)}
-                className="w-full px-4 py-4 bg-paper border border-border-custom rounded-2xl text-ink focus:outline-none focus:border-gold transition-colors text-sm"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={t('hunter.budget_placeholder')}
+                  value={targetBudget}
+                  onChange={(e) => setTargetBudget(e.target.value)}
+                  className="flex-1 min-w-0 px-4 py-4 bg-paper border border-border-custom rounded-2xl text-ink focus:outline-none focus:border-gold transition-colors text-sm"
+                />
+                <select
+                  value={huntCurrency}
+                  onChange={(e) => handleCurrencyChange(e.target.value)}
+                  aria-label={t('hunter.currency')}
+                  className="w-24 px-3 py-4 bg-paper border border-border-custom rounded-2xl text-ink text-sm font-bold focus:outline-none focus:border-gold cursor-pointer"
+                >
+                  {HUNT_CURRENCIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            {/* Period pieces only */}
+            <label className="flex items-start justify-between gap-4 p-4 bg-paper border border-border-custom rounded-2xl cursor-pointer">
+              <span className="space-y-1">
+                <span className="block text-xs uppercase tracking-wider font-bold text-ink">{t('hunter.period_only')}</span>
+                <span className="block text-[11px] text-muted leading-snug">{t('hunter.period_only_desc')}</span>
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={periodOnly}
+                aria-label={t('hunter.period_only')}
+                onClick={() => setPeriodOnly(v => !v)}
+                className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${periodOnly ? 'bg-decision-green' : 'bg-border-custom'}`}
+              >
+                <span className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${periodOnly ? 'translate-x-5' : ''}`} />
+              </button>
+            </label>
 
             {/* Geography Settings */}
             <div className="space-y-2">
@@ -331,15 +386,25 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-3xl p-6 flex flex-col gap-4 text-center">
           <div className="flex items-center justify-center gap-2 text-red-800 font-bold text-sm">
-            <AlertCircle className="w-5 h-5" /> Sourcing Interrupted
+            <AlertCircle className="w-5 h-5" /> {t('hunter.error_title')}
           </div>
           <p className="text-xs text-red-700 leading-relaxed">{error}</p>
-          <button
-            onClick={() => { setError(null); setResults(null); }}
-            className="px-6 py-3 bg-red-850 hover:bg-red-800 text-white rounded-full text-xs font-semibold self-center"
-          >
-            Try Sourcing Again
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 self-center">
+            {lastRequest && (
+              <button
+                onClick={() => runSearch(lastRequest)}
+                className="px-6 py-3 bg-red-700 hover:bg-red-800 text-white rounded-full text-xs font-semibold inline-flex items-center justify-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> {t('hunter.retry')}
+              </button>
+            )}
+            <button
+              onClick={() => { setError(null); setResults(null); }}
+              className="px-6 py-3 bg-white border border-red-200 hover:bg-red-100 text-red-800 rounded-full text-xs font-semibold"
+            >
+              {t('hunter.edit_search')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -370,6 +435,12 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
                 <RefreshCw className="w-3 h-3" /> New Search
               </button>
             </h3>
+
+            {results.stats && (
+              <p className="text-[10px] text-muted pl-2 -mt-3">
+                {t('hunter.checked_summary', { verified: results.stats.verified, unverified: results.stats.unverified, dropped: results.stats.dropped })}
+              </p>
+            )}
 
             {results.matches && results.matches.length > 0 ? (
               <div className="space-y-6">
@@ -403,6 +474,16 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
                               <span className={`px-2.5 py-0.5 border rounded-full text-[9px] font-bold tracking-wider uppercase ${categoryBadge.bg}`}>
                                 {categoryBadge.label}
                               </span>
+                              {item.verification === 'verified' && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                                  <Check className="w-3 h-3" /> {t('hunter.verified')}
+                                </span>
+                              )}
+                              {item.verification === 'unverified' && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200" title={t('hunter.unverified_desc')}>
+                                  {t('hunter.unverified')}
+                                </span>
+                              )}
                               {item.location && (
                                 <span className="text-muted text-[10px] flex items-center gap-1 text-stone-500 font-sans">
                                   <MapPin className="w-3 h-3 text-stone-400" /> {item.location}
@@ -426,6 +507,12 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
                             )}
                           </div>
                         </div>
+
+                        {item.verification === 'unverified' && (
+                          <p className="text-[10px] text-amber-700 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 shrink-0" /> {t('hunter.unverified_desc')}
+                          </p>
+                        )}
 
                         {/* Item Details */}
                         {item.description && (
@@ -622,7 +709,7 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
               </div>
             ) : (
               <div className="bg-paper border border-border-custom rounded-3xl p-8 text-center text-muted text-xs">
-                No active listings matched the sourcing filter exactly. Try expanding search keywords.
+                {t('hunter.no_verified')}
               </div>
             )}
           </div>

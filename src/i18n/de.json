@@ -147,7 +147,9 @@
     "resale_insight_fallback": "Gewinn hängt vom Einkauf unter Händlerniveau ab.",
     "walk_away_points": "• Aktiver Holzwurm — strukturelles Risiko\n• Sichtbare Reparaturen mindern den Wert\n• Preis liegt bereits über dem Händlerniveau",
     "market_insight_points": "• Schärfe der Schnitzereien\n• Originale Patina vs. restauriert\n• Zeitgenössisch vs. spätere Reproduktion",
-    "market_pulse": "Marktpuls"
+    "market_pulse": "Marktpuls",
+    "paddle_rule_label": "Bieterregel des Händlers:",
+    "paddle_rule": "Ihr maximales Zuschlagsgebot (Schmerzgrenze) liegt bei {{hammer}}. Mit {{pct}} % Aufgeld sind das {{allIn}} insgesamt. Faustregel: maximales Gebot = Gesamtbudget ÷ {{mult}}."
   },
   "results": {
     "title": "Händler-Funde",
@@ -360,5 +362,23 @@
   },
   "legal": {
     "title": "Rechtliches"
+  },
+  "hunter": {
+    "intro": "Sagen Sie unserer Händler-Suchmaschine, was Sie suchen. Wir durchsuchen **Interencheres**, **Drouot**, **LeBonCoin**, **Auctionet**, **Bukowskis** und führende internationale Häuser in Echtzeit und prüfen jeden Link, bevor wir ihn anzeigen.",
+    "budget_placeholder": "z. B. 1500 oder 500 – 2000",
+    "currency": "Währung",
+    "period_only": "Nur Originale aus der Epoche",
+    "period_only_desc": "Stilmöbel, Kopien, Reproduktionen und Stücke aus dem 20. Jahrhundert ausblenden.",
+    "error_title": "Suche unterbrochen",
+    "error_timeout": "Die Live-Suche hat zu lange gedauert und wurde abgebrochen. Wir zeigen niemals erfundene Angebote, daher wird nichts angezeigt. Bitte erneut versuchen oder die Suche eingrenzen.",
+    "error_generic": "Die Live-Suche konnte nicht abgeschlossen werden. Es wurden keine Angebote erfunden. Bitte gleich erneut versuchen.",
+    "error_network": "Der Suchdienst ist nicht erreichbar. Bitte Verbindung prüfen und erneut versuchen.",
+    "retry": "Suche wiederholen",
+    "edit_search": "Suche bearbeiten",
+    "no_verified": "Keine verifizierten aktiven Angebote gefunden – Budget oder Quellen erweitern.",
+    "verified": "Link geprüft",
+    "unverified": "Nicht verifiziert",
+    "unverified_desc": "Diese Seite blockiert automatische Prüfungen – öffnen Sie den Link, um zu bestätigen, dass das Angebot noch aktiv ist.",
+    "checked_summary": "Links geprüft: {{verified}} verifiziert, {{unverified}} nicht verifiziert, {{dropped}} entfernt (tot, beendet, generisch oder außerhalb des Filters)."
   }
 }

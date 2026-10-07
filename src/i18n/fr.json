@@ -147,7 +147,9 @@
     "resale_insight_fallback": "La marge dépend totalement d'un achat très en-dessous du cours marchand.",
     "walk_away_points": "• Ver à bois actif — risque structurel\n• Réparations visibles réduisant la cote\n• Prix dépassant déjà le cours marchand",
     "market_insight_points": "• Qualité des sculptures et assemblages\n• Surface d'origine vs décapée\n• Époque authentique vs réédition",
-    "market_pulse": "Tendance du Marché"
+    "market_pulse": "Tendance du Marché",
+    "paddle_rule_label": "Règle d'enchère du marchand :",
+    "paddle_rule": "Votre enchère maximale au marteau (prix plafond) est de {{hammer}}. Avec {{pct}} % de frais acheteur, cela fait {{allIn}} frais compris. Règle simple : enchère maximale = budget total ÷ {{mult}}."
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",
@@ -360,5 +362,23 @@
   },
   "legal": {
     "title": "Mentions Légales"
+  },
+  "hunter": {
+    "intro": "Dites à notre moteur de recherche de marchand ce que vous cherchez. Nous parcourons **Interencheres**, **Drouot**, **LeBonCoin**, **Auctionet**, **Bukowskis** et les grandes maisons internationales en temps réel, et nous vérifions chaque lien avant de l'afficher.",
+    "budget_placeholder": "ex. 1500, ou 500 – 2000",
+    "currency": "Devise",
+    "period_only": "Pièces d'époque uniquement",
+    "period_only_desc": "Masquer les pièces « de style », copies, reproductions et objets du XXe siècle.",
+    "error_title": "Recherche interrompue",
+    "error_timeout": "La recherche en direct a pris trop de temps et a été arrêtée. Nous n'affichons jamais d'annonces inventées, donc rien n'est affiché. Réessayez ou affinez la recherche.",
+    "error_generic": "La recherche en direct n'a pas pu aboutir. Aucune annonce n'a été inventée. Réessayez dans un instant.",
+    "error_network": "Impossible de joindre le service de recherche. Vérifiez votre connexion et réessayez.",
+    "retry": "Relancer la recherche",
+    "edit_search": "Modifier la recherche",
+    "no_verified": "Aucune annonce en ligne vérifiée – élargissez le budget ou les sources.",
+    "verified": "Lien vérifié",
+    "unverified": "Non vérifié",
+    "unverified_desc": "Ce site bloque les vérifications automatiques – ouvrez le lien pour confirmer que l'annonce est toujours en ligne.",
+    "checked_summary": "Liens vérifiés : {{verified}} confirmés, {{unverified}} non vérifiés, {{dropped}} écartés (morts, terminés, génériques ou hors filtre)."
   }
 }

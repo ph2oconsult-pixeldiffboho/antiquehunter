@@ -147,7 +147,9 @@
     "rating": "評価",
     "investment_insight_fallback": "大幅な値引きがある場合のみ購入価値があります。",
     "must_have_insight_fallback": "個人で楽しむための購入に適しています。",
-    "resale_insight_fallback": "利益はディーラー価格以下で購入できるかにかかっています。"
+    "resale_insight_fallback": "利益はディーラー価格以下で購入できるかにかかっています。",
+    "paddle_rule_label": "ディーラーの入札ルール：",
+    "paddle_rule": "最高落札入札額（撤退価格）は {{hammer}} です。{{pct}}% の買い手手数料を含めると総額 {{allIn}} になります。目安：最高入札額 = 総予算 ÷ {{mult}}。"
   },
   "results": {
     "title": "ディーラーの所見",
@@ -360,5 +362,23 @@
   },
   "legal": {
     "title": "利用規約・法的表記"
+  },
+  "hunter": {
+    "intro": "ディーラー向けソーシングエンジンに探している品を伝えてください。**Interencheres**、**Drouot**、**LeBonCoin**、**Auctionet**、**Bukowskis** や海外の主要オークションハウスをリアルタイムで検索し、表示前にすべてのリンクを確認します。",
+    "budget_placeholder": "例：1500、または 500 – 2000",
+    "currency": "通貨",
+    "period_only": "当時物のみ",
+    "period_only_desc": "「スタイル」品、コピー、複製品、20世紀の品を除外します。",
+    "error_title": "検索が中断されました",
+    "error_timeout": "ライブ検索に時間がかかりすぎたため停止しました。作り上げた出品は決して表示しないため、何も表示されません。再試行するか、検索条件を絞ってください。",
+    "error_generic": "ライブ検索を完了できませんでした。出品が作り上げられることはありません。しばらくしてから再試行してください。",
+    "error_network": "検索サービスに接続できません。接続を確認して再試行してください。",
+    "retry": "再検索",
+    "edit_search": "検索を編集",
+    "no_verified": "確認済みの出品は見つかりませんでした – 予算や検索先を広げてください。",
+    "verified": "リンク確認済み",
+    "unverified": "未確認",
+    "unverified_desc": "このサイトは自動確認をブロックしています – リンクを開いて出品が有効か確認してください。",
+    "checked_summary": "リンク確認：確認済み {{verified}} 件、未確認 {{unverified}} 件、除外 {{dropped}} 件（無効・終了・一般ページ・条件外）。"
   }
 }

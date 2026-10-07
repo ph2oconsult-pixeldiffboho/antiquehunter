@@ -147,7 +147,9 @@
     "rating": "Rating",
     "investment_insight_fallback": "Only worth buying at a discount — this is not a hold piece. Profit depends entirely on buying below dealer level.",
     "must_have_insight_fallback": "A great purchase for personal enjoyment. The condition is secondary to your aesthetic preference, but do budget for restoration.",
-    "resale_insight_fallback": "Profit depends entirely on buying below dealer level. High restoration costs severely limit your margin."
+    "resale_insight_fallback": "Profit depends entirely on buying below dealer level. High restoration costs severely limit your margin.",
+    "paddle_rule_label": "Dealer Paddle Rule:",
+    "paddle_rule": "Your maximum hammer bid (walk-away) is {{hammer}}. With the {{pct}}% buyer's premium that comes to {{allIn}} all-in. Rule of thumb: maximum hammer bid = your total budget ÷ {{mult}}."
   },
   "results": {
     "title": "Dealer's Findings",
@@ -360,5 +362,23 @@
   },
   "legal": {
     "title": "Terms & Legal"
+  },
+  "hunter": {
+    "intro": "Tell our dealer sourcing engine what you want. We search **Interencheres**, **Drouot**, **LeBonCoin**, **Auctionet**, **Bukowskis** and leading international houses in real time, and check every link before showing it.",
+    "budget_placeholder": "e.g. 1500, or 500 – 2000",
+    "currency": "Currency",
+    "period_only": "Period pieces only",
+    "period_only_desc": "Hide 'style' pieces, copies, reproductions and 20th-century items.",
+    "error_title": "Sourcing Interrupted",
+    "error_timeout": "The live search took too long and was stopped. We never show made-up listings, so nothing is displayed. Please retry, or narrow the search.",
+    "error_generic": "The live search could not be completed. No listings were invented. Please retry in a moment.",
+    "error_network": "Could not reach the search service. Check your connection and retry.",
+    "retry": "Retry search",
+    "edit_search": "Edit search",
+    "no_verified": "No verified live listings found – try widening the budget or sources.",
+    "verified": "Link checked",
+    "unverified": "Not verified",
+    "unverified_desc": "This site blocks automated checks – open the link to confirm the listing is still live.",
+    "checked_summary": "Links checked: {{verified}} verified, {{unverified}} unverified, {{dropped}} removed (dead, closed, generic or off-filter)."
   }
 }

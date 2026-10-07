@@ -147,7 +147,9 @@
     "resale_insight_fallback": "El margen depende de comprar por debajo del nivel comercial.",
     "walk_away_points": "• Carcoma activa — riesgo estructural\n• Reparaciones visibles que reducen el valor\n• Precio por encima del nivel de anticuario",
     "market_insight_points": "• Nitidez de tallas y ensambles\n• Superficie original vs restaurada\n• Época auténtica vs reproducción posterior",
-    "market_pulse": "Pulso del Mercado"
+    "market_pulse": "Pulso del Mercado",
+    "paddle_rule_label": "Regla de puja del anticuario:",
+    "paddle_rule": "Su puja máxima a martillo (precio límite) es {{hammer}}. Con la prima del comprador del {{pct}} % son {{allIn}} en total. Regla práctica: puja máxima = presupuesto total ÷ {{mult}}."
   },
   "results": {
     "title": "Hallazgos del anticuario",
@@ -360,5 +362,23 @@
   },
   "legal": {
     "title": "Aviso Legal"
+  },
+  "hunter": {
+    "intro": "Dígale a nuestro motor de búsqueda de anticuario lo que quiere. Buscamos en **Interencheres**, **Drouot**, **LeBonCoin**, **Auctionet**, **Bukowskis** y grandes casas internacionales en tiempo real, y comprobamos cada enlace antes de mostrarlo.",
+    "budget_placeholder": "p. ej. 1500, o 500 – 2000",
+    "currency": "Moneda",
+    "period_only": "Solo piezas de época",
+    "period_only_desc": "Ocultar piezas «de estilo», copias, reproducciones y objetos del siglo XX.",
+    "error_title": "Búsqueda interrumpida",
+    "error_timeout": "La búsqueda en vivo tardó demasiado y se detuvo. Nunca mostramos anuncios inventados, así que no se muestra nada. Vuelva a intentarlo o acote la búsqueda.",
+    "error_generic": "No se pudo completar la búsqueda en vivo. No se ha inventado ningún anuncio. Vuelva a intentarlo en un momento.",
+    "error_network": "No se pudo contactar con el servicio de búsqueda. Compruebe su conexión y vuelva a intentarlo.",
+    "retry": "Reintentar búsqueda",
+    "edit_search": "Editar búsqueda",
+    "no_verified": "No se encontraron anuncios activos verificados – amplíe el presupuesto o las fuentes.",
+    "verified": "Enlace comprobado",
+    "unverified": "No verificado",
+    "unverified_desc": "Este sitio bloquea las comprobaciones automáticas – abra el enlace para confirmar que el anuncio sigue activo.",
+    "checked_summary": "Enlaces comprobados: {{verified}} verificados, {{unverified}} sin verificar, {{dropped}} descartados (caídos, cerrados, genéricos o fuera de filtro)."
   }
 }
