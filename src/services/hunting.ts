@@ -708,8 +708,12 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
   const dropReasons: Record<string, number> = {};
   const addDrop = (reason: string, n = 1) => { dropReasons[reason] = (dropReasons[reason] || 0) + n; };
   // Direct auction-site lots first (verified by construction, ranked)
+  const titleKey = (t?: string) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 28);
+  const directTitles = new Set(directMatches.map(m => titleKey(m.title)).filter(k => k.length >= 20));
   for (const m of directMatches) { seen.add(lotKey(m.url)); matches.push(m); }
   for (const o of outcomes) {
+    // the same lot found by web search on the other site (Interencheres <-> Drouot cross-listing)
+    if (o.match && o.match.source === 'web_search' && directTitles.has(titleKey(o.match.title))) { addDrop('cross_listed'); continue; }
     if (o.match && !seen.has(lotKey(o.match.url))) {
       seen.add(lotKey(o.match.url));
       matches.push(o.match);
