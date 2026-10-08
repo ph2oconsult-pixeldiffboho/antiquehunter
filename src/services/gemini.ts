@@ -99,7 +99,7 @@ All prices MUST be in ${targetCurrency} and respect these strict inequalities:
    For this auction lot: walk_away_price is the MAXIMUM HAMMER BID and walk_away_price x ${(1 + premiumPct / 100).toFixed(2)} (hammer + ${premiumPct}% buyer's premium) MUST be <= estimated_market_range_high.` : ''}
 3. estimated_market_range_low <= estimated_market_range_high
 4. good_buy_below (the smart-buy price) lies between estimated_market_range_low and the midpoint of the market range${isAuction ? ' (as a hammer price: hammer x ' + (1 + premiumPct / 100).toFixed(2) + ' must stay within that window)' : ''}, and opening_offer <= good_buy_below <= walk_away_price
-5. overpaying_above > estimated_market_range_high (where buying becomes uncommercial)
+5. overpaying_above = walk_away_price (paying more than the walk-away price is overpaying)
 6. fair_price_low <= fair_price_high (retail market tier)
 7. fair_price_low >= estimated_market_range_low and fair_price_high >= estimated_market_range_high (retail is never below auction/market level)
 
@@ -344,6 +344,8 @@ ${getGlossaryPrompt(language)}`;
     no_price: "Needs a Price",
   } as Record<PriceBasis, string>)[basis];
 
+  // One source of truth for confidence: this label (from the capped score) is used for item_summary.confidence AND
+  // buy_decision.confidence, and the UI renders both through the same analysis.confidence_* labels.
   const getConfidenceLabel = (score: number) => {
     if (score >= 80) return "high";
     if (score >= 60) return "medium";
@@ -413,9 +415,6 @@ ${getGlossaryPrompt(language)}`;
     pg.estimated_market_range_low = Math.max(0, Number(pg.estimated_market_range_low) || 0);
     pg.estimated_market_range_high = Math.max(pg.estimated_market_range_low, Number(pg.estimated_market_range_high) || pg.estimated_market_range_low * 1.5);
     
-    // Rule: market_low <= market_high, and overpaying > market_high
-    pg.overpaying_above = Math.max(pg.estimated_market_range_high + 1, Number(pg.overpaying_above) || Math.round(pg.estimated_market_range_high * 1.25));
-    
     // Retail bounds: fair_price_low <= fair_price_high
     pg.fair_price_low = Math.max(pg.estimated_market_range_low, Number(pg.fair_price_low) || Math.round(pg.estimated_market_range_low * 1.5));
     pg.fair_price_high = Math.max(pg.fair_price_low, pg.estimated_market_range_high, Number(pg.fair_price_high) || Math.round(pg.estimated_market_range_high * 2));
@@ -428,6 +427,9 @@ ${getGlossaryPrompt(language)}`;
       pg.estimated_market_range_low, pg.estimated_market_range_high, premiumPct, isAuction
     );
     pg.good_buy_below = nf.good_buy_below;
+    // "Overpaying" starts exactly at the walk-away price (same units: hammer at auction), so every price maps to
+    // one band: <= smart buy (good) / <= walk-away (fair) / above walk-away (overpriced) / above retail (walk away)
+    pg.overpaying_above = nf.walk_away_price;
     if (ns) {
       ns.opening_offer = nf.opening_offer;
       ns.target_price_low = nf.target_price_low;
@@ -443,10 +445,13 @@ ${getGlossaryPrompt(language)}`;
     // Ensure currency consistency
     item.price_guidance.currency = targetCurrency;
 
-    // Ensure dynamic teaser insight (never generic £450)
-    if (!item.teaser_insight || item.teaser_insight.includes('450') || item.teaser_insight.includes('£')) {
+    // Teaser: any figure in it must be the app's own smart-buy / walk-away (the model's teaser sometimes quoted a
+    // "buy below" figure above the market high). Qualitative teasers without money amounts are kept.
+    const teaserHasMoney = /(\d[\d\s.,]*\s?(€|£|\$|kr|eur|gbp|usd|sek))|((€|£|\$)\s?\d)/i.test(String(item.teaser_insight || ''));
+    if (!item.teaser_insight || teaserHasMoney) {
       if (item.price_guidance?.good_buy_below) {
-        item.teaser_insight = `Dealers would typically buy below ${currencySymbol}${Math.round(item.price_guidance.good_buy_below)}. Above this, margin disappears.`;
+        const money = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
+        item.teaser_insight = `Dealers would typically buy below ${money(item.price_guidance.good_buy_below)}${isAuction ? ' (hammer)' : ''}. Above ${money(nf.walk_away_price)}, you are overpaying.`;
       } else {
         item.teaser_insight = `Dealers typically negotiate 30–50% below retail on this category.`;
       }
@@ -471,6 +476,8 @@ ${getGlossaryPrompt(language)}`;
       marketLow: pg.estimated_market_range_low,
       marketHigh: pg.estimated_market_range_high,
       retailHigh: pg.fair_price_high,
+      smartBuy: nf.good_buy_below,
+      walkAway: nf.walk_away_price,
       riskPenalty: Number(s.risk_penalty) || 0,
       itemScore: calculatedScore,
       valueTier: item.item_summary.value_tier,
@@ -519,6 +526,9 @@ ${getGlossaryPrompt(language)}`;
         score: cappedScore,
         score_band: scoreBand,
         price_basis: basis,
+        price_cap: decision.cap || null,
+        smart_buy_all_in: decision.smartBuyAllIn || null,
+        walk_away_all_in: decision.walkAwayAllIn || null,
         effective_price: allIn || null,
         label: getBuyLabel(basis),
         confidence: confLabel

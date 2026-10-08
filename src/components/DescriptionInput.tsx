@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag, Mic, MicOff, Sparkles, Link as LinkIcon, Info, ChevronDown, ChevronUp, Gavel, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AntiqueCategory } from '../services/gemini';
+import { parsePriceInput, sanitizePriceTyping } from '../services/appraisalMath';
 
 interface DescriptionInputProps {
   onBack: () => void;
@@ -36,8 +37,11 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [lotUrl, setLotUrl] = useState('');
-  const [detectedPlatform, setDetectedPlatform] = useState<string | null>(null);
+  // Price is a text field (not type="number"): number inputs drop the whole value when you type "1 500" or "1,500",
+  // which garbled fast typing. We keep digits/separators only and parse on submit.
   const [price, setPrice] = useState('');
+  const [priceTouched, setPriceTouched] = useState(false);
+  const priceInvalid = priceTouched && price.trim() !== '' && parsePriceInput(price) === null;
   const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
   const [currency, setCurrency] = useState(globalCurrency);
   const [sellerType, setSellerType] = useState('Market/Fair');
@@ -52,36 +56,38 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   }, [globalCurrency]);
   const isSpeechSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
-  // Auto-detect listing/auction links from either the dedicated lot URL input or the description
-  useEffect(() => {
-    const textToCheck = `${lotUrl} ${description}`;
-    const urlMatch = textToCheck.match(/(https?:\/\/[^\s]+)/i);
-    if (urlMatch) {
-      const url = urlMatch[0].toLowerCase();
-      let platformName = 'Online Listing';
-      let isAuctionSite = false;
-
-      if (url.includes('drouot')) { platformName = 'Drouot Paris'; isAuctionSite = true; }
-      else if (url.includes('interencheres')) { platformName = 'Interencheres'; isAuctionSite = true; }
-      else if (url.includes('saleroom')) { platformName = 'The Saleroom'; isAuctionSite = true; }
-      else if (url.includes('liveauctioneers')) { platformName = 'LiveAuctioneers'; isAuctionSite = true; }
-      else if (url.includes('sothebys')) { platformName = "Sotheby's"; isAuctionSite = true; }
-      else if (url.includes('christies')) { platformName = "Christie's"; isAuctionSite = true; }
-      else if (url.includes('bonhams')) { platformName = 'Bonhams'; isAuctionSite = true; }
-      else if (url.includes('catawiki')) { platformName = 'Catawiki'; isAuctionSite = true; }
-      else if (url.includes('ebay')) { platformName = 'eBay'; }
-      else if (url.includes('leboncoin')) { platformName = 'LeBonCoin'; }
-      else if (url.includes('1stdibs')) { platformName = '1stDibs'; }
-      else if (url.includes('vinterior')) { platformName = 'Vinterior'; }
-
-      setDetectedPlatform(platformName);
-      if (isAuctionSite && sellerType !== 'Auction') {
-        setSellerType('Auction');
-      }
-    } else {
-      setDetectedPlatform(null);
-    }
+  // Auto-detect listing/auction links from either the dedicated lot URL input or the description.
+  // Derived with useMemo (not setState in an effect on every keystroke): the old effect queued an extra
+  // synchronous update per key press, and fast typing tripped React's "maximum update depth" guard,
+  // dropping characters.
+  const detected = React.useMemo(() => {
+    const urlMatch = `${lotUrl} ${description}`.match(/(https?:\/\/[^\s]+)/i);
+    if (!urlMatch) return null;
+    const url = urlMatch[0].toLowerCase();
+    let platformName = 'Online Listing';
+    let isAuctionSite = false;
+    if (url.includes('drouot')) { platformName = 'Drouot Paris'; isAuctionSite = true; }
+    else if (url.includes('interencheres')) { platformName = 'Interencheres'; isAuctionSite = true; }
+    else if (url.includes('saleroom')) { platformName = 'The Saleroom'; isAuctionSite = true; }
+    else if (url.includes('liveauctioneers')) { platformName = 'LiveAuctioneers'; isAuctionSite = true; }
+    else if (url.includes('sothebys')) { platformName = "Sotheby's"; isAuctionSite = true; }
+    else if (url.includes('christies')) { platformName = "Christie's"; isAuctionSite = true; }
+    else if (url.includes('bonhams')) { platformName = 'Bonhams'; isAuctionSite = true; }
+    else if (url.includes('catawiki')) { platformName = 'Catawiki'; isAuctionSite = true; }
+    else if (url.includes('auctionet')) { platformName = 'Auctionet'; isAuctionSite = true; }
+    else if (url.includes('easyliveauction')) { platformName = 'easyLive Auction'; isAuctionSite = true; }
+    else if (url.includes('ebay')) { platformName = 'eBay'; }
+    else if (url.includes('leboncoin')) { platformName = 'LeBonCoin'; }
+    else if (url.includes('1stdibs')) { platformName = '1stDibs'; }
+    else if (url.includes('vinterior')) { platformName = 'Vinterior'; }
+    return { platformName, isAuctionSite };
   }, [lotUrl, description]);
+  const detectedPlatform = detected?.platformName ?? null;
+  const detectedAuction = !!detected?.isAuctionSite;
+  useEffect(() => {
+    // only when an auction link first appears (not on every keystroke)
+    if (detectedAuction) setSellerType(prev => (prev === 'Auction' ? prev : 'Auction'));
+  }, [detectedAuction, detectedPlatform]);
 
   const toggleListening = () => {
     if (isListening) {
@@ -137,8 +143,14 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
     // Determine final lotUrl either from field or description
     const effectiveLotUrl = lotUrl.trim() || (description.match(/(https?:\/\/[^\s]+)/i)?.[0] || '');
 
+    const parsedPrice = parsePriceInput(price);
+    if (price.trim() && parsedPrice === null) {
+      setPriceTouched(true);
+      return; // validation message is shown under the field
+    }
+
     onAnalyze(description, { 
-      askingPrice: price ? parseFloat(price) : undefined, 
+      askingPrice: parsedPrice ?? undefined, 
       priceType,
       currency, 
       sellerType,
@@ -461,11 +473,17 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
             </div>
             <div className="relative">
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0.00"
-                className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm text-ink placeholder:text-muted/40"
+                onChange={(e) => setPrice(sanitizePriceTyping(e.target.value))}
+                onBlur={() => setPriceTouched(true)}
+                placeholder="e.g. 1 500"
+                aria-label={t('describe.asking_price')}
+                aria-invalid={priceInvalid}
+                data-testid="asking-price"
+                className={`w-full p-4 pr-24 bg-paper border rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm text-ink placeholder:text-muted/40 ${priceInvalid ? 'border-decision-red' : 'border-border-custom'}`}
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <select 
@@ -483,6 +501,9 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                 </select>
               </div>
             </div>
+            {priceInvalid && (
+              <p className="text-[11px] text-decision-red font-medium" role="alert">{t('describe.price_invalid')}</p>
+            )}
           </div>
 
           <div className="space-y-2">

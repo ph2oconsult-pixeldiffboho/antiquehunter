@@ -1,0 +1,77 @@
+{
+ "type": "item",
+ "data": {
+  "id": 89074306,
+  "pricing": {
+   "estimates": {
+    "max": 800,
+    "min": 600
+   },
+   "reserve_price": null,
+   "starting_price": null
+  },
+  "status": "confirmed",
+  "states": {
+   "hidden": false,
+   "suppressed": false
+  },
+  "title_translations": {
+   "en-US": "CHEST OF DRAWERS",
+   "fr-FR": "COMMODE"
+  },
+  "description_translations": {
+   "en-US": "CHEST OF DRAWERS \nWith a curved front and sides, inlaid with rosewood and violetwood veneers, with light-coloured wood borders and gilded brass fluting. It has three drawers in three rows. \nThe sides feature inlay work in a clover motif \nFlared front legs.\nLouis XV period piece\nGilded bronze fittings with Rocaille motifs.\nTop in red Languedoc marble (cracked and re-glued)\nH: 88 cm\nW: 114 cm\nD: 67 cm\n(Numerous visible imperfections and losses to the veneer) - Expert: François LACHAUD",
+   "fr-FR": "COMMODE \nÀ façade et côtés galbés, marquetée en placage de bois de rose et de violette et filets de bois clair et cannelures en laiton doré. Elle ouvre à trois tiroirs sur trois rangs. \nLes côtés marquetés en réserve en trèfle \nPiètement avant évasé.\nTravail d'époque Louis XV\nGarnitures de bronze doré à motifs Rocaille.\nPlateau de marbre rouge du Languedoc (cassé à recoller)\nH : 88 cm\nL : 114 cm\nP : 67 cm\n(Nombreux accidents et manques visibles au placage) - Expert : LACHAUD François"
+  },
+  "online": null,
+  "medias": [
+   {
+    "url": "//thumbor-indbupload.interencheres.com/2026/09/29/164712_618001468_5ff7042f265e3f6aa5f65b7fc9b2c114",
+    "meta": {
+     "name": "/Y:/eAuctionLive/Photos/-628618641.jpg",
+     "description": "COMMODE \r\nÀ façade et côtés galbés, marquetée en placage de bois de rose et de violette et filets de"
+    },
+    "rank": 0,
+    "type": "item_picture",
+    "dimensions": {
+     "width": 1920,
+     "height": 1288
+    },
+    "caption_translations": {
+     "en-US": "an image of a wooden chest of drawers with brass handles",
+     "fr-FR": "une image d'une commode en bois avec des poignées en laiton"
+    },
+    "rewriteImgUrl": {
+     "sm": "//thumbor-indbupload.interencheres.com/qWdZx9mgC935yVmaWGAzlJQqY3o=/160x120/smart/2026/09/29/164712_618001468_5ff7042f265e3f6aa5f65b7fc9b2c114",
+     "md": "//thumbor-indbupload.interencheres.com/7o9_LELj9UUOvHo7MPudyp6u6Kk=/fit-in/200x200/2026/09/29/164712_618001468_5ff7042f265e3f6aa5f65b7fc9b2c114",
+     "lg": "//thumbor-indbupload.interencheres.com/HDgemtevdxoLRvBUGvrddu3XG8s=/fit-in/400x400/2026/09/29/164712_618001468_5ff7042f265e3f6aa5f65b7fc9b2c114",
+     "lgcrop": "//thumbor-indbupload.interencheres.com/1v4aDpeHQ---H4JBsIfi1m67Xl0=/400x300/smart/2026/09/29/164712_618001468_5ff7042f265e3f6aa5f65b7fc9b2c114",
+     "original": "//thumbor-indbupload.interencheres.com/yBBkbqqxNuPhdqz0kUskVTVO8fA=/2026/09/29/164712_618001468_5ff7042f265e3f6aa5f65b7fc9b2c114"
+    }
+   }
+  ],
+  "sale": {
+   "currency": "EUR",
+   "datetime": "2026-11-05T13:30:00+00:00",
+   "start_at": "2026-11-05T13:30:00+00:00",
+   "states": {
+    "canceled": false
+   },
+   "live": {
+    "has_started": false,
+    "has_ended": false,
+    "result_is_confirmed": false
+   },
+   "address": {
+    "city": "Biarritz",
+    "country": "FR"
+   },
+   "options": {
+    "commission_rate": {
+     "judicial": null,
+     "voluntary": 28.8
+    }
+   }
+  }
+ }
+}

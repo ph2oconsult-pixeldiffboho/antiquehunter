@@ -59,7 +59,7 @@
     "confidence_high": "Haute confiance",
     "confidence_medium": "Confiance moyenne",
     "confidence_low": "Confiance faible — Vérification nécessaire",
-    "confidence_very_low": "Confiance faible — Vérification nécessaire",
+    "confidence_very_low": "Confiance très faible — Vérification nécessaire",
     "explanation": "Évaluation de l'antiquaire",
     "preliminary_findings": "Premier coup d'œil",
     "checklist": "La liste de contrôle de l'antiquaire",
@@ -94,7 +94,7 @@
     "smart_buy": "Achat intelligent",
     "retail_range": "Gamme de détail",
     "overpaying": "Surpayer",
-    "overpaying_desc": "C'est là que les acheteurs se trompent",
+    "overpaying_desc": "= votre prix plafond",
     "dealers_buy": "Achat de l'antiquaire",
     "dealers_buy_desc": "Prix d'acquisition de l'antiquaire",
     "exit_strategy": "Stratégie de sortie",
@@ -166,13 +166,17 @@
     "reason_high_risk": "Les photos montrent un risque sérieux d'authenticité ou d'état : le prix seul ne suffit pas.",
     "reason_no_price": "Indiquez le prix demandé ou l'estimation pour obtenir un verdict.",
     "reason_premium_suffix": " frais compris ({{pct}} % de frais acheteur)",
-    "smart_buy_hammer": "Enchère max · {{allIn}} frais compris",
+    "smart_buy_hammer": "Enchère · {{allIn}} frais compris",
     "gauge_label": "Score d'achat",
     "gauge_confidence": "Confiance : {{level}}",
     "conf_level_high": "élevée",
     "conf_level_medium": "moyenne",
     "conf_level_low": "faible",
-    "conf_level_very_low": "très faible"
+    "conf_level_very_low": "très faible",
+    "reason_above_walk_away": "{{price}}{{premium}} dépasse votre prix plafond ({{walkAway}}) – trop cher, plus de marge. Ne dépassez pas {{walkAway}}.",
+    "reason_above_smart_buy": "{{price}}{{premium}} dépasse le prix d'achat malin ({{smartBuy}}) mais reste sous votre plafond ({{walkAway}}) – correct, peu de marge.",
+    "overpaying_value": "Au-delà de {{price}}",
+    "overpaying_all_in": "{{allIn}} frais compris"
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",
@@ -246,7 +250,8 @@
     "title": "Journal de chasse de l'antiquaire",
     "search_placeholder": "Rechercher vos trouvailles...",
     "empty": "Pas encore de trouvailles. Commencez à chasser !",
-    "delete_confirm": "Êtes-vous sûr de vouloir supprimer cette trouvaille ?"
+    "delete_confirm": "Êtes-vous sûr de vouloir supprimer cette trouvaille ?",
+    "no_photo": "Pas de photo"
   },
   "describe": {
     "title": "Détails de l'article",
@@ -283,7 +288,8 @@
     "try_item": "Essayez un objet — même quelque chose à proximité",
     "upload_photo_hint": "Une photo est le point de départ. Les détails affinent le prix.",
     "simple_start_hint": "« Commencez par quelque chose de simple — même un verre ou un petit objet »",
-    "lot_url_label": "Lien de la vente ou de l'annonce (Lot Link)"
+    "lot_url_label": "Lien de la vente ou de l'annonce (Lot Link)",
+    "price_invalid": "Chiffres uniquement, ex. 1500, 1 500 ou 1 500,50"
   },
   "categories": {
     "furniture": "Meubles",
@@ -404,11 +410,13 @@
     "unverified_desc": "Ce site bloque les vérifications automatiques : estimation, date de vente et disponibilité non confirmées – ouvrez l'annonce pour vérifier.",
     "checked_summary": "Liens vérifiés : {{verified}} confirmés, {{unverified}} non vérifiés, {{dropped}} écartés (morts, terminés, génériques ou hors filtre).",
     "check_listing": "Estimation : voir l'annonce",
-    "search_hint": "Résultat de recherche : {{hint}}"
+    "budget_invalid": "Chiffres uniquement, ex. 1500 ou 500 – 2000",
+    "geo_platform_note": "Seules les sources de vos régions sont interrogées ; les résultats d'autres pays sont écartés.",
+    "premium_note": "+{{pct}} % de frais acheteur"
   },
   "toast": {
     "saved": "Enregistré dans votre journal.",
-    "saved_local": "Enregistré dans votre journal sur cet appareil (non connecté).",
+    "saved_local": "Enregistré sur cet appareil – connectez-vous pour synchroniser.",
     "save_failed": "Échec de l'enregistrement : {{reason}}",
     "signin_needed": "Connectez-vous avec Google pour enregistrer dans votre compte…",
     "save_failed_local": "Impossible d'enregistrer dans votre compte ({{reason}}). Enregistré sur cet appareil à la place."

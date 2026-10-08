@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { MapPin, Calendar, ArrowRight, Trash2 } from 'lucide-react';
+import { MapPin, Calendar, Trash2, Armchair } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { analysisItems } from '../services/localFinds';
 import { basisFromScore } from '../services/appraisalMath';
@@ -57,8 +57,9 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
         {displayImage ? (
           <img src={displayImage} alt={find.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
         ) : (
-          <div className="w-full h-full bg-paper flex items-center justify-center">
-            <span className="text-muted/20 font-serif text-4xl">?</span>
+          <div className="w-full h-full bg-gradient-to-br from-paper to-gold/10 flex flex-col items-center justify-center gap-2" aria-label={t('collection.no_photo', 'No photo')}>
+            <Armchair className="w-10 h-10 text-gold/40" strokeWidth={1.25} />
+            <span className="text-[9px] uppercase tracking-widest font-bold text-muted/50">{t('collection.no_photo', 'No photo')}</span>
           </div>
         )}
         <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">
