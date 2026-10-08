@@ -709,6 +709,8 @@ check("direct lots: all-in budget (estimate × (1 + premium)), period, type, sol
   const cheap = { ...ie.find(l => l.id === "89224678")!, estimateLow: 100, estimateHigh: 150 };
   assert.equal(evaluateLot(cheap, mirrorParams, mirrorPlan, NOW_8_OCT).dropReason, "under_budget");
   assert.equal(evaluateLot({ ...cheap, soldOrEnded: true }, mirrorParams, mirrorPlan, NOW_8_OCT).dropReason, "sold_or_ended");
+  const toy = { ...cheap, estimateLow: 300, estimateHigh: 400, title: "JOUETS. Ensemble de 6 meubles de poupée en bois : un buffet, un miroir", description: undefined };
+  assert.equal(evaluateLot(toy, mirrorParams, mirrorPlan, NOW_8_OCT).dropReason, "not_requested_type");
 
   const dr = parseDrouotSearch(fixture("drouot_search_fr_miroir_napoleon_iii.html")).lots;
   const evd = (id: string, p: any = mirrorParams, requireRegion = false) => evaluateLot(dr.find(l => l.id === id)!, p, planHunt(p), NOW_8_OCT, requireRegion);

@@ -62,6 +62,7 @@ export const lotRegion = (lot: DirectLot): Region | null => {
 };
 
 const firstSentence = (s?: string) => String(s || '').split(/(?<=[.;!?])\s|\n/)[0].slice(0, 200);
+const TOY_WORDS = /(^|[^a-zà-ÿ])(jouets?|poup[ée]es?|dinette|maquettes?|miniatures?|doll'?s?|dolls'? house|toys?)([^a-zà-ÿ]|$)/i;
 const PERIOD_HINT = /([ée]poque|XVIII|XIX|18th|19th|1[78]\d\d|vers 1[78]|circa 1[78])/i;
 
 /** Decide whether a lot can be shown, and score it. `requireRegion` = the lot page has been read (or never will be). */
@@ -74,6 +75,8 @@ export const evaluateLot = (lot: DirectLot, params: DirectParams, plan: DirectPl
     if (t < cutoff) return { dropReason: 'past_sale' };
   }
   if (!matchesItemType(plan.itemTypes, lot.title, firstSentence(lot.description))) return { dropReason: 'not_requested_type' };
+  // Doll's-house / toy / miniature furniture ("JOUETS. Ensemble de 6 meubles de poupée : un buffet…")
+  if (plan.itemTypes.length && TOY_WORDS.test(`${lot.title} ${firstSentence(lot.description)}`)) return { dropReason: 'not_requested_type' };
   if (params.periodOnly !== false && periodProblem(lot.title, lot.description)) return { dropReason: 'not_period' };
 
   const region = lotRegion(lot);
