@@ -242,7 +242,8 @@ export const validateMatch = async (
   if (!isSpecificListingUrl(finalUrl)) return { dropReason: page.status ? `unreadable_generic_${page.status}` : 'unreadable_generic' };
   // The model's price/date for an unread page is a guess from search snippets (often wrong, e.g. €150–250 shown
   // for a lot estimated €100–150): never show it as the estimate. Keep it only as a clearly labelled hint.
-  const hintParts = [result.price, result.date].filter(Boolean);
+  const hintPrice = (result.price || '').replace(/^\s*(estimate|estimation|est\.?)\s*:?\s*/i, '').replace(/\s*\((estimate|estimation)\)\s*/i, ' ').trim();
+  const hintParts = [hintPrice, result.date].filter(Boolean);
   result.searchHint = hintParts.length ? `~${hintParts.join(' · ')} (unverified)` : undefined;
   result.price = UNVERIFIED_PRICE;
   result.date = undefined;

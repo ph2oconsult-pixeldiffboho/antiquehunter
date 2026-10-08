@@ -272,6 +272,13 @@ if (process.env.AUCTIONET_PAGE && existsSync(process.env.AUCTIONET_PAGE)) {
     assert.equal(out.match!.price, UNVERIFIED_PRICE);
     assert.equal(out.match!.date, undefined);
     assert.match(out.match!.searchHint || "", /^~150 - 250 € · 12 Oct 2026 \(unverified\)$/);
+    const out2 = await validateMatch(
+      { url: "https://www.bukowskis.com/en/lots/1741375-chest-of-drawers", title: "Chest of drawers, Late Gustavian, circa 1800", price: "Estimate: 8,000 SEK", date: "", location: "Stockholm", dealerAnalysis: "ok" },
+      { query: "commode", geographies: ["Sweden"], platforms: ["Bukowskis"], periodOnly: true },
+      allowedDomainsFor(["Bukowskis"]),
+      Date.now() + 5000
+    );
+    assert.equal(out2.match!.searchHint, "~8,000 SEK (unverified)");
     passed++; console.log("ok - unverified listing shows 'check listing', guessed estimate only as a labelled hint");
   } finally {
     globalThis.fetch = realFetch;
