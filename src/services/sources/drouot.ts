@@ -24,6 +24,9 @@ const firstLine = (s: string) => {
   const line = String(s || '').split(/\n/).map(x => x.trim()).find(Boolean) || '';
   return line.length > 160 ? line.slice(0, 157).replace(/\s+\S*$/, '') + '…' : line;
 };
+/** Some houses start the description with the lot number ("419 Buffet vaisselier…"): drop it from the title. */
+export const stripLotNumber = (title: string, lotNumber?: number) =>
+  lotNumber && new RegExp(`^${lotNumber}(\\s*[-.):]\\s*|\\s+)`).test(title) ? title.replace(new RegExp(`^${lotNumber}(\\s*[-.):]\\s*|\\s+)`), '').trim() || title : title;
 const num = (v: unknown) => (typeof v === 'number' && isFinite(v) && v > 0 ? v : undefined);
 
 const ENDED_STATUSES = /^(ENDED|CLOSED|FINISHED|TERMINATED|CANCELED|CANCELLED|ARCHIVED|RESULTS?)$/i;
@@ -51,7 +54,7 @@ const lotFromData = (o: any, houses: Record<string, string>): DirectLot | null =
     site: 'drouot',
     id: String(id),
     url: 'https://drouot.com' + href,
-    title: firstLine(description) || clean(o.slug).replace(/-/g, ' '),
+    title: stripLotNumber(firstLine(description), num(o.num)) || clean(o.slug).replace(/-/g, ' '),
     description: clean(description).slice(0, 600) || undefined,
     estimateLow: low,
     estimateHigh: high,
@@ -128,7 +131,7 @@ export const parseDrouotLotPage = (html: string): Partial<DirectLot> | null => {
   const fees = num(lot.fees) ?? num(lot.saleFees);
   return {
     id: String(lot.id),
-    title: firstLine(description) || undefined,
+    title: stripLotNumber(firstLine(description), num(lot.num)) || undefined,
     description: clean(description).slice(0, 600) || undefined,
     estimateLow: num(lot.lowEstim),
     estimateHigh: num(lot.highEstim),

@@ -18,7 +18,7 @@ import {
 } from "../src/services/hunting.ts";
 import { analysisItems } from "../src/services/localFinds.ts";
 import { parseJsLiteralAfter, parseJsLiteralAt } from "../src/services/sources/jsLiteral.ts";
-import { parseDrouotLotPage, parseDrouotSearch } from "../src/services/sources/drouot.ts";
+import { parseDrouotLotPage, parseDrouotSearch, stripLotNumber } from "../src/services/sources/drouot.ts";
 import { parseInterencheresSearch, parisDate } from "../src/services/sources/interencheres.ts";
 import { clearSourceCache, fetchSource, requestUrlFor } from "../src/services/sources/fetchSource.ts";
 import { candidateToMatch, crossListingKey, evaluateLot, finishDirect, searchDirectSites } from "../src/services/directSearch.ts";
@@ -633,6 +633,8 @@ check("Drouot lot page gives city, country, house, fees and the full description
   assert.equal(f.saleDate?.toISOString(), "2026-10-30T12:30:00.000Z");
   assert.match(f.description || "", /Style Louis XV, époque Napoléon III/);
   assert.equal(parseDrouotLotPage("<html>nothing</html>"), null);
+  assert.equal(stripLotNumber("419 Buffet vaisselier à deux corps", 419), "Buffet vaisselier à deux corps");
+  assert.equal(stripLotNumber("1850 commode", 18), "1850 commode");
 });
 
 check("Interencheres search cards: estimate, title, sale type, date (incl. 'À 14h00' today), house", () => {
