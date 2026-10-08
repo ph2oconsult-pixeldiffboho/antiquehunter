@@ -25,7 +25,23 @@ interface SourcingMatch {
   verificationNote?: string;
   buyerPremiumPct?: number;
   source?: string;
+  house?: string;
+  lotNumber?: number;
+  allInLow?: number;
+  allInHigh?: number;
+  premiumPct?: number;
+  premiumAssumed?: boolean;
 }
+
+const formatAllIn = (low: number, high: number | undefined, currency: string) => {
+  const fmt = (n: number) => {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(n); }
+    catch { return `${Math.round(n)} ${currency}`; }
+  };
+  return high && high !== low ? `${fmt(low)} – ${fmt(high)}` : fmt(low);
+};
+
+const DIRECT_SOURCE_LABEL: Record<string, string> = { drouot_search: 'Drouot', interencheres_search: 'Interencheres', auctionet_api: 'Auctionet' };
 
 interface SourcingResults {
   marketBrief: string;
@@ -511,6 +527,11 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
                                   <Check className="w-3 h-3" /> {t('hunter.verified')}
                                 </span>
                               )}
+                              {item.source && DIRECT_SOURCE_LABEL[item.source] && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-sky-50 text-sky-800 border border-sky-200" title={t('hunter.found_direct_desc')}>
+                                  {t('hunter.found_direct', { site: DIRECT_SOURCE_LABEL[item.source] })}
+                                </span>
+                              )}
                               {item.verification === 'unverified' && (
                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200" title={t('hunter.unverified_desc')}>
                                   {t('hunter.unverified')}
@@ -525,6 +546,11 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
                             <h4 className="serif text-lg font-light text-ink mt-1.5 leading-snug group-hover:text-gold transition-colors">
                               {item.title}
                             </h4>
+                            {(item.house || item.lotNumber) && (
+                              <p className="text-[10px] text-stone-500 font-sans">
+                                {[item.lotNumber ? t('hunter.lot_number', { num: item.lotNumber }) : '', item.house].filter(Boolean).join(' · ')}
+                              </p>
+                            )}
                           </div>
                           
                           {/* Price Display */}
@@ -535,6 +561,12 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
                             {item.verification === 'verified' && typeof item.buyerPremiumPct === 'number' && item.buyerPremiumPct > 0 && (
                               <p className="text-[9px] text-muted font-sans mt-1">
                                 {t('hunter.premium_note', { pct: item.buyerPremiumPct })}
+                              </p>
+                            )}
+                            {item.verification === 'verified' && typeof item.allInLow === 'number' && item.allInLow > 0 && (
+                              <p className="text-[10px] text-ink font-sans font-semibold mt-1">
+                                {t('hunter.all_in', { range: formatAllIn(item.allInLow, item.allInHigh, huntCurrency) })}
+                                {item.premiumAssumed && typeof item.premiumPct === 'number' ? ` ${t('hunter.fees_assumed', { pct: item.premiumPct })}` : ''}
                               </p>
                             )}
                             {item.date && (

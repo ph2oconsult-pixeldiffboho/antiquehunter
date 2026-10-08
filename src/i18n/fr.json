@@ -412,7 +412,12 @@
     "check_listing": "Estimation : voir l'annonce",
     "budget_invalid": "Chiffres uniquement, ex. 1500 ou 500 – 2000",
     "geo_platform_note": "Seules les sources de vos régions sont interrogées ; les résultats d'autres pays sont écartés.",
-    "premium_note": "+{{pct}} % de frais acheteur"
+    "premium_note": "+{{pct}} % de frais acheteur",
+    "found_direct": "Trouvé sur {{site}}",
+    "found_direct_desc": "Lu directement sur la page de recherche du site d'enchères : estimation, date et frais sont ceux de la maison de ventes.",
+    "all_in": "Frais compris ≈ {{range}}",
+    "fees_assumed": "(~{{pct}} % de frais supposés)",
+    "lot_number": "Lot {{num}}"
   },
   "toast": {
     "saved": "Enregistré dans votre journal.",

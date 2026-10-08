@@ -147,11 +147,31 @@ const NON_PERIOD_PATTERNS: RegExp[] = [
   /\bikea\b/i,            // e.g. IKEA "1700-talsserie" reproductions
 ];
 
+// French catalogues often say "de style Louis XV, époque Napoléon III": a period (19th-century) piece made in an
+// earlier style. An explicit "époque <period>" / "period" / 18th–19th-century date means the "style" word alone
+// does not make it a later copy. Anything 20th-century, a reproduction or a copy is still rejected.
+const PERIOD_EVIDENCE: RegExp[] = [
+  // (no \b before "é": JavaScript treats accented letters as non-word characters)
+  /(^|[^a-z])(d['’]\s*)?[ée]poque\s+(louis|napol|second empire|restauration|charles\s*x\b|louis[\s-]*philippe|empire|directoire|consulat|r[ée]gence|transition|xviii|xix|fin du xviii|fin du xix|d[ée]but du xix)/i,
+  /\b(george\s*(ii|iii|iv)|william\s*iv|victorian|regency|napoleon\s*iii|louis[\s-]*philippe)\s+period\b/i,
+  /\bperiod\s+(george|william|victorian|regency|napoleon|louis)/i,
+  /\b(vers|circa|c\.|ca\.)\s*1[78]\d\d\b/i,
+  // "Miroir Napoléon III de style Louis XV": a 19th-century period name qualifying the piece, then the earlier style
+  /napol[ée]on\s*iii\s*,?\s*(de\s+)?style\s+(louis|r[ée]gence|renaissance|henri|gothique|troubadour|empire)/i,
+  /louis[\s-]*philippe\s*,?\s*(de\s+)?style\s+(louis|r[ée]gence|renaissance|gothique|troubadour)/i,
+];
+// "Style" words that the evidence above may excuse (never XXe, reproduction, copie, d'après, stil, IKEA...)
+const STYLE_ONLY = new Set(['style', 'de style']);
+
 export const failsPeriodRule = (...texts: Array<string | undefined | null>): string | null => {
   const joined = texts.filter(Boolean).join(' \n ');
+  const hasPeriodEvidence = PERIOD_EVIDENCE.some(re => re.test(joined));
   for (const re of NON_PERIOD_PATTERNS) {
     const m = joined.match(re);
-    if (m) return m[0];
+    if (!m) continue;
+    // "de style Louis XV, époque Napoléon III": the style word is excused; XXe, copies etc. are still checked
+    if (hasPeriodEvidence && STYLE_ONLY.has(m[0].toLowerCase())) continue;
+    return m[0];
   }
   return null;
 };

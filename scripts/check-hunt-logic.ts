@@ -17,6 +17,14 @@ import {
   auctionetToMatch, budgetMax, pageShowsLot, planHunt, withinBudget,
 } from "../src/services/hunting.ts";
 import { analysisItems } from "../src/services/localFinds.ts";
+import { parseJsLiteralAfter, parseJsLiteralAt } from "../src/services/sources/jsLiteral.ts";
+import { parseDrouotLotPage, parseDrouotSearch } from "../src/services/sources/drouot.ts";
+import { parseInterencheresSearch, parisDate } from "../src/services/sources/interencheres.ts";
+import { clearSourceCache, fetchSource, requestUrlFor } from "../src/services/sources/fetchSource.ts";
+import { candidateToMatch, crossListingKey, evaluateLot, finishDirect, searchDirectSites } from "../src/services/directSearch.ts";
+import { allIn, budgetMin } from "../src/services/budget.ts";
+import { frenchSiteQuery, localQueries } from "../src/services/huntGeo.ts";
+import { applyRanking } from "../src/services/hunting.ts";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => { fn(); passed++; console.log("ok -", name); };
@@ -544,5 +552,265 @@ check("confidence: one label set (top badge and gauge agree)", () => {
     assert.ok(top.startsWith(gauge + " confidence"), `${lvl}: "${top}" vs "${gauge}"`);
   }
 });
+
+
+// ---------------------------------------------------------------------------
+// Direct auction-site search (Drouot, Interencheres) – parsers and filters, against saved pages (8 Oct 2026)
+// ---------------------------------------------------------------------------
+const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
+const NOW_8_OCT = Date.UTC(2026, 9, 8, 7, 0, 0); // 8 Oct 2026, 09:00 Paris
+
+check("embedded JS literal parser (SvelteKit data) handles void 0, new Date, escapes, quoted keys", () => {
+  const src = 'x = [{type:"data",data:{lots:[{a:void 0,b:new Date(1338984000000),c:"l\\u00e9 \\"q\\"\\nx",d:-1.5,"e-f":[true,false,null],g:{}}],n:2}}];';
+  const v: any = parseJsLiteralAfter(src, "data:{lots:");
+  assert.equal(v.lots[0].a, undefined);
+  assert.equal(v.lots[0].b, 1338984000000);
+  assert.equal(v.lots[0].c, 'lé "q"\nx');
+  assert.equal(v.lots[0].d, -1.5);
+  assert.deepEqual(v.lots[0]["e-f"], [true, false, null]);
+  assert.equal(v.n, 2);
+  assert.equal(parseJsLiteralAt("{a:", 0), undefined);
+  assert.equal(parseJsLiteralAfter("no marker here", "data:{lots:"), undefined);
+});
+
+check("Drouot search page (French) – embedded data: estimates, start price, fees, house, dates", () => {
+  const r = parseDrouotSearch(fixture("drouot_search_fr_miroir_napoleon_iii.html"));
+  assert.equal(r.lang, "fr");
+  assert.equal(r.from, "data");
+  assert.equal(r.lots.length, 7);
+  const strasbourg = r.lots.find(l => l.id === "35219341")!;
+  assert.equal(strasbourg.startingPrice, 150);
+  assert.equal(strasbourg.estimateLow, undefined);
+  assert.equal(strasbourg.premiumPct, 30);
+  assert.equal(strasbourg.saleType, "online");
+  assert.equal(strasbourg.house, "Alexandre Landre Strasbourg");
+  assert.equal(strasbourg.saleDate?.toISOString(), "2026-10-14T18:02:30.000Z");
+  assert.match(strasbourg.url, /^https:\/\/drouot\.com\/fr\/l\/35219341-grand-miroir/);
+  assert.match(strasbourg.image || "", /^https:\/\/cdn\.drouot\.com\/d\/lot\/ftall\//);
+  const artmark = r.lots.find(l => l.id === "35162138")!;
+  assert.equal(artmark.estimateLow, 300);
+  assert.equal(artmark.estimateHigh, 500);
+  assert.match(artmark.title, /Miroir de style Napoléon III/);
+  assert.ok(r.lots.every(l => !l.soldOrEnded));
+});
+
+check("Drouot search page served in English – parsed the same way, links kept on the French site", () => {
+  const r = parseDrouotSearch(fixture("drouot_search_en_commode_louis_xv.html"));
+  assert.equal(r.lang, "en");
+  assert.equal(r.from, "data");
+  assert.equal(r.lots.length, 33);
+  assert.ok(r.lots.every(l => /^https:\/\/drouot\.com\/fr\/l\/\d+/.test(l.url)));
+  const usd = r.lots.find(l => l.id === "35150586")!;
+  assert.equal(usd.currency, "USD");
+  assert.equal(usd.estimateLow, 300);
+  assert.equal(usd.house, "ACES - All Country Estate Sales");
+});
+
+check("Drouot HTML-card fallback reads FR and EN labels (Estimation / Estimate, Mise à prix)", () => {
+  const fr = parseDrouotSearch(fixture("drouot_search_fr_miroir_napoleon_iii.html").replace("data:{lots:", "data:{gone:"));
+  assert.equal(fr.from, "cards");
+  assert.equal(fr.lots.length, 3);
+  assert.equal(fr.lots.find(l => l.id === "35219341")!.startingPrice, 150);
+  assert.equal(fr.lots.find(l => l.id === "35091713")!.estimateLow, 800);
+  assert.equal(fr.lots.find(l => l.id === "35091713")!.estimateHigh, 1000);
+  const en = parseDrouotSearch(fixture("drouot_search_en_commode_louis_xv.html").replace("data:{lots:", "data:{gone:"));
+  assert.equal(en.from, "cards");
+  assert.ok(en.lots.length >= 3);
+  assert.ok(en.lots.some(l => (l.estimateLow || 0) > 0), "EN 'Estimate' label parsed");
+  assert.ok(en.lots.every(l => /^https:\/\/drouot\.com\/fr\/l\/\d+/.test(l.url)));
+});
+
+check("Drouot lot page gives city, country, house, fees and the full description", () => {
+  const f = parseDrouotLotPage(fixture("drouot_lot_35314556.html"))!;
+  assert.equal(f.id, "35314556");
+  assert.equal(f.city, "Paris");
+  assert.equal(f.countryId, 75);
+  assert.equal(f.house, "Beaussant Lefèvre & Associés");
+  assert.equal(f.premiumPct, 28.8);
+  assert.equal(f.estimateLow, 200);
+  assert.equal(f.estimateHigh, 300);
+  assert.equal(f.lotNumber, 228);
+  assert.equal(f.saleDate?.toISOString(), "2026-10-30T12:30:00.000Z");
+  assert.match(f.description || "", /Style Louis XV, époque Napoléon III/);
+  assert.equal(parseDrouotLotPage("<html>nothing</html>"), null);
+});
+
+check("Interencheres search cards: estimate, title, sale type, date (incl. 'À 14h00' today), house", () => {
+  const lots = parseInterencheresSearch(fixture("interencheres_search_miroir_napoleon_iii.html"), NOW_8_OCT);
+  assert.equal(lots.length, 7);
+  const beaussant = lots.find(l => l.id === "89224678")!;
+  assert.equal(beaussant.estimateLow, 200);
+  assert.equal(beaussant.estimateHigh, 300);
+  assert.equal(beaussant.saleType, "catalogue");
+  assert.equal(beaussant.house, "BEAUSSANT LEFÈVRE & Associés");
+  assert.equal(beaussant.dateOnly, true);
+  assert.match(beaussant.url, /^https:\/\/www\.interencheres\.com\/art-decoration\/.+\/lot-89224678\.html$/);
+  const today = lots.find(l => l.id === "89071358")!;
+  assert.equal(today.saleDate?.toISOString(), "2026-10-08T12:00:00.000Z"); // 14:00 Paris (CEST)
+  assert.equal(today.dateOnly, false);
+  const chrono = lots.find(l => l.id === "89085542")!;
+  assert.equal(chrono.saleType, "online");
+  assert.equal(chrono.estimateLow, undefined);
+  const coin = lots.find(l => l.id === "88592460")!;
+  assert.equal(coin.estimateLow, 150);
+  assert.equal(coin.estimateHigh, undefined);
+  assert.equal(parisDate(2026, 12, 1, 14, 0).toISOString(), "2026-12-01T13:00:00.000Z"); // winter time
+});
+
+check("English -> French site keywords keep the period and the wood", () => {
+  assert.equal(frenchSiteQuery("Napoleon III mirror"), "miroir napoleon iii");
+  assert.equal(frenchSiteQuery("Louis XV commode walnut"), "commode louis xv noyer");
+  assert.equal(frenchSiteQuery("Louis XV commode walnut", { fallback: true }), "commode louis xv");
+  assert.equal(frenchSiteQuery("Welsh dresser oak"), "vaisselier chene");
+  assert.equal(frenchSiteQuery("vaisselier"), "vaisselier");
+  assert.equal(frenchSiteQuery("Gustavian cabinet"), "armoire gustavien");
+  assert.equal(frenchSiteQuery("Second Empire gilt mirror"), "miroir napoleon iii dore");
+  assert.deepEqual(localQueries("Napoleon III mirror").fr, ["miroir Napoléon III", "trumeau Napoléon III"]);
+  assert.deepEqual(localQueries("Louis XV commode walnut").fr, ["commode Louis XV noyer"]);
+  assert.deepEqual(localQueries("Welsh dresser oak").fr, ["vaisselier chêne", "buffet deux corps chêne"]);
+  assert.equal(localQueries("Louis-Philippe commode").fr[0], "commode Louis-Philippe");
+});
+
+check("period rule: 'de style X, époque Napoléon III' is a period piece; 'style Napoléon III' alone is not", () => {
+  assert.equal(failsPeriodRule("Miroir de cheminée. Style Louis XV, époque Napoléon III."), null);
+  assert.equal(failsPeriodRule("Grand miroir Napoléon III de style Louis XV en bois et stuc"), null);
+  assert.equal(failsPeriodRule("Commode de style Louis XVI, Epoque Louis-Philippe"), null);
+  assert.ok(failsPeriodRule("Miroir de style Napoléon III, bois doré, fin du XIXe siècle"));
+  assert.ok(failsPeriodRule("Miroir « trumeau » de style Napoléon III en bois doré"));
+  assert.ok(failsPeriodRule("Commode de style Louis XV, époque XXe"));
+  assert.ok(failsPeriodRule("Commode de style Louis XV, époque Napoléon III, reproduction"));
+});
+
+const mirrorParams = { query: "Napoleon III mirror", geographies: ["France"], platforms: [], priceRange: "250 - 500 EUR", currency: "EUR", periodOnly: true };
+const mirrorPlan = planHunt(mirrorParams);
+
+check("direct lots: all-in budget (estimate × (1 + premium)), period, type, sold/past and geography filters", () => {
+  assert.deepEqual(mirrorPlan.directSites.sort(), ["drouot", "interencheres"]);
+  assert.equal(budgetMin("250 - 500 EUR"), 250);
+  assert.equal(budgetMin("2000 EUR"), null);
+  assert.equal(allIn(200, 28.8), 258);
+  const ie = parseInterencheresSearch(fixture("interencheres_search_miroir_napoleon_iii.html"), NOW_8_OCT);
+  const ev = (id: string, p: any = mirrorParams, now = NOW_8_OCT) => evaluateLot(ie.find(l => l.id === id)!, p, planHunt(p), now);
+  // €200–300 + 28% assumed fees = €256–384: in budget
+  const ok = ev("89224678");
+  assert.ok(ok.candidate, JSON.stringify(ok));
+  assert.equal(ok.candidate!.allInLow, 256);
+  assert.equal(ok.candidate!.allInHigh, 384);
+  assert.equal(ok.candidate!.premiumAssumed, true);
+  // €400–600 + 28% = €512 at the low estimate: over a €500 budget
+  assert.equal(ev("89071358").dropReason, "over_budget");
+  // a coin is not a mirror
+  assert.equal(ev("88592460").dropReason, "not_requested_type");
+  // the sale today at 14:00 is gone the next day
+  assert.equal(ev("89071358", { ...mirrorParams, priceRange: "2000 EUR" }, Date.UTC(2026, 9, 9, 7)).dropReason, "past_sale");
+  // too cheap for a 250–500 range (€100–150 + fees < 80% of €250)
+  const cheap = { ...ie.find(l => l.id === "89224678")!, estimateLow: 100, estimateHigh: 150 };
+  assert.equal(evaluateLot(cheap, mirrorParams, mirrorPlan, NOW_8_OCT).dropReason, "under_budget");
+  assert.equal(evaluateLot({ ...cheap, soldOrEnded: true }, mirrorParams, mirrorPlan, NOW_8_OCT).dropReason, "sold_or_ended");
+
+  const dr = parseDrouotSearch(fixture("drouot_search_fr_miroir_napoleon_iii.html")).lots;
+  const evd = (id: string, p: any = mirrorParams, requireRegion = false) => evaluateLot(dr.find(l => l.id === id)!, p, planHunt(p), NOW_8_OCT, requireRegion);
+  // "Miroir de style Napoléon III, fin du XIXe" is rejected when period pieces only, kept otherwise
+  assert.equal(evd("35162138").dropReason, "not_period");
+  assert.ok(evd("35162138", { ...mirrorParams, periodOnly: false, geographies: [] }).candidate);
+  // Napoléon III piece in Louis XV style, Strasbourg, start price €150 + 30% = €195
+  const strasbourg = evd("35219341");
+  assert.ok(strasbourg.candidate, JSON.stringify(strasbourg));
+  assert.equal(strasbourg.candidate!.allInLow, 195);
+  assert.equal(strasbourg.candidate!.premiumAssumed, false);
+  // Spanish house (Bayeu Subastas / Balclis Barcelona) on Drouot: not shown for a France-only search
+  const barcelona = { ...dr.find(l => l.id === "35278823")!, description: "Miroir trumeau, époque Napoléon III", title: "Miroir trumeau, époque Napoléon III" };
+  assert.equal(evaluateLot(barcelona, mirrorParams, mirrorPlan, NOW_8_OCT).dropReason, "geo_location_mismatch");
+  // unknown country once the lot page has been read (or could not be): not shown when a region is selected
+  const unknown = { ...dr.find(l => l.id === "35219341")!, house: "Maison X", city: undefined };
+  assert.equal(evaluateLot(unknown, mirrorParams, mirrorPlan, NOW_8_OCT, true).dropReason, "geo_location_unknown");
+});
+
+check("direct lot -> result card: verified, real estimate, all-in, fees, house, sale date, lot link", () => {
+  const lot = { ...parseDrouotSearch(fixture("drouot_search_fr_miroir_napoleon_iii.html")).lots.find(l => l.id === "35219341")!, city: "Strasbourg", countryId: 75 };
+  const c = evaluateLot(lot, mirrorParams, mirrorPlan, NOW_8_OCT, true).candidate!;
+  const m = candidateToMatch(c, mirrorParams);
+  assert.equal(m.verification, "verified");
+  assert.equal(m.platform, "Drouot");
+  assert.equal(m.source, "drouot_search");
+  assert.equal(m.price, "Starting price €150");
+  assert.equal(m.buyerPremiumPct, 30);
+  assert.equal(m.allInLow, 195);
+  assert.match(m.allInEstimate || "", /All-in ≈ €195 incl\. 30% fees \(from the starting price\)/);
+  assert.equal(m.location, "Strasbourg, France");
+  assert.equal(m.house, "Alexandre Landre Strasbourg");
+  assert.match(m.date || "", /^Auction: 14 Oct 2026, 20:02 \(Paris\)$/);
+  assert.match(m.url, /^https:\/\/drouot\.com\/fr\/l\/35219341-/);
+  // the same lot listed on Drouot and Interencheres is recognised as one
+  const a = { ...lot, site: "drouot" as const, estimateLow: 200, estimateHigh: 300, title: "Miroir de cheminée à encadrement cintré en bois et stuc doré", saleDate: new Date("2026-10-30T12:30:00Z") };
+  const b = { ...a, site: "interencheres" as const, title: "Miroir de cheminée à encadrement cintré en bois et stuc doré…", saleDate: new Date("2026-10-30T21:59:00Z"), dateOnly: true };
+  assert.equal(crossListingKey(a), crossListingKey(b));
+});
+
+check("ranker output only reorders/sets aside the real lots it was given", () => {
+  const lots = parseInterencheresSearch(fixture("interencheres_search_miroir_napoleon_iii.html"), NOW_8_OCT);
+  const cands = ["89224678", "89209687", "89014385"].map(id => evaluateLot(lots.find(l => l.id === id)!, { ...mirrorParams, priceRange: "2000 EUR" }, mirrorPlan, NOW_8_OCT).candidate!);
+  const r = applyRanking(cands, { order: [
+    { id: "interencheres:89014385", keep: true, dealerAnalysis: "Best" },
+    { id: "interencheres:99999999", keep: true, dealerAnalysis: "invented" },
+    { id: "interencheres:89209687", keep: false, dealerAnalysis: "not period" },
+  ] });
+  assert.deepEqual(r.kept.map(k => k.c.lot.id), ["89014385", "89224678"]);
+  assert.equal(r.kept[0].analysis, "Best");
+  assert.equal(r.rejected, 1);
+  assert.deepEqual(applyRanking(cands, null).kept.map(k => k.c.lot.id), ["89224678", "89209687", "89014385"]);
+});
+
+check("optional fetch relay: only for the listed hosts, key sent as a header", () => {
+  const env = { FETCH_RELAY_URL: "https://relay.example/fetch", FETCH_RELAY_KEY: "k1" };
+  const ie = requestUrlFor("https://www.interencheres.com/recherche/lots?search=miroir", env);
+  assert.equal(ie.viaRelay, true);
+  assert.equal(ie.url, "https://relay.example/fetch?url=" + encodeURIComponent("https://www.interencheres.com/recherche/lots?search=miroir"));
+  assert.equal(ie.headers["X-Relay-Key"], "k1");
+  assert.equal(requestUrlFor("https://asgardgw.interencheres.com/v2/items/1", env).viaRelay, true);
+  assert.equal(requestUrlFor("https://drouot.com/fr/s?query=x", env).viaRelay, false);
+  assert.equal(requestUrlFor("https://www.interencheres.com/x", {}).viaRelay, false);
+  assert.equal(requestUrlFor("https://drouot.com/fr/s?query=x", { ...env, FETCH_RELAY_HOSTS: "interencheres.com,drouot.com" }).viaRelay, true);
+});
+
+{
+  // End-to-end direct search with the network mocked: Drouot answers, Interencheres blocks (as from Vercel)
+  const realFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = (async (u: any) => {
+    const url = String(u);
+    calls.push(url);
+    if (url.startsWith("https://drouot.com/fr/s?query=")) return new Response(fixture("drouot_search_fr_miroir_napoleon_iii.html"), { status: 200 });
+    if (url.startsWith("https://drouot.com/fr/l/35219341")) return new Response(fixture("drouot_lot_35314556.html").replace("id:35314556", "id:35219341").replace(/city:"Paris"/, 'city:"Strasbourg"'), { status: 200 });
+    if (url.startsWith("https://drouot.com/fr/l/")) return new Response("<html></html>", { status: 200 });
+    return new Response("blocked", { status: 403 });
+  }) as typeof fetch;
+  clearSourceCache();
+  try {
+    const p1 = await searchDirectSites(mirrorParams, mirrorPlan, Date.now() + 5000, NOW_8_OCT);
+    const res = await finishDirect(p1, mirrorParams, mirrorPlan, Date.now() + 3000);
+    const ieStat = res.stats.find(s => s.site === "interencheres")!;
+    const drStat = res.stats.find(s => s.site === "drouot")!;
+    assert.equal(ieStat.status, 403);
+    assert.equal(drStat.status, 200);
+    assert.equal(drStat.found, 7);
+    assert.deepEqual(res.coveredDomains, ["drouot.com"]);
+    assert.equal(calls.filter(c => c.includes("/fr/s?query=")).length, 1, "one search page per site");
+    assert.equal(calls.filter(c => c.includes("interencheres.com/recherche")).length, 1);
+    const ids = res.candidates.map(c => c.lot.id);
+    assert.ok(ids.includes("35219341"), ids.join());
+    const c = res.candidates.find(x => x.lot.id === "35219341")!;
+    assert.equal(c.lot.city, "Strasbourg");
+    assert.equal(c.lot.enriched, true);
+    assert.ok(!ids.includes("35162138"), "style Napoléon III (not period) dropped");
+    // a blocked site is remembered: the next hunt does not hit it again for a while
+    const again = await fetchSource("https://www.interencheres.com/recherche/lots?search=miroir%20napoleon%20iii", { timeoutMs: 1000, ttlMs: 1000 });
+    assert.equal(again.cached, true);
+    passed++; console.log("ok - direct search end-to-end (mocked network): Drouot lots verified + enriched, blocked Interencheres reported, one search page per site");
+  } finally {
+    globalThis.fetch = realFetch;
+    clearSourceCache();
+  }
+}
 
 console.log(`\n${passed} checks passed`);

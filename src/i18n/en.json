@@ -412,7 +412,12 @@
     "check_listing": "Estimate: check listing",
     "budget_invalid": "Enter numbers only, e.g. 1500 or 500 – 2000",
     "geo_platform_note": "Only sources in your selected regions are searched; results from other countries are removed.",
-    "premium_note": "+{{pct}}% buyer's premium"
+    "premium_note": "+{{pct}}% buyer's premium",
+    "found_direct": "Found on {{site}}",
+    "found_direct_desc": "Read directly from the auction site's own search page: estimate, sale date and fees are the auction house's.",
+    "all_in": "All-in ≈ {{range}}",
+    "fees_assumed": "(~{{pct}}% fees assumed)",
+    "lot_number": "Lot {{num}}"
   },
   "toast": {
     "saved": "Saved to your log.",

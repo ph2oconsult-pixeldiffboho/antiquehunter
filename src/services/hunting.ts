@@ -35,6 +35,11 @@ import {
   type LocalQueries,
   type Region,
 } from "./huntGeo.js";
+import {
+  candidateToMatch, DIRECT_ENRICH_BUDGET_MS, DIRECT_SEARCH_BUDGET_MS, directSitesFor, finishDirect, MAX_DIRECT_RESULTS,
+  searchDirectSites, SITE_DOMAIN, type DirectCandidate, type DirectSearchResult, type DirectSourceStat,
+} from "./directSearch.js";
+import { requestUrlFor } from "./sources/fetchSource.js";
 
 export interface HuntParams {
   query: string;
@@ -63,8 +68,20 @@ export interface HuntMatch {
   checkStatus?: number; // HTTP status seen when checking the page (0 = timeout/network error)
   /** Buyer's premium in % when the auction house publishes it (Interencheres) */
   buyerPremiumPct?: number;
-  /** How the listing was found: web search (Gemini) or the Auctionet public API */
-  source?: 'web_search' | 'auctionet_api';
+  /** How the listing was found: web search (Gemini), the Auctionet public API, or the auction site's own search page */
+  source?: 'web_search' | 'auctionet_api' | 'drouot_search' | 'interencheres_search';
+  /** Auction house (direct auction-site results) */
+  house?: string;
+  /** "All-in ≈ €258 – €386 incl. 28.8% fees" (direct auction-site results) */
+  allInEstimate?: string;
+  /** True when the buyer's premium is not published and a typical rate was assumed for the all-in figure */
+  premiumAssumed?: boolean;
+  lotNumber?: number;
+  /** All-in estimate (hammer × (1 + premium)) in the user's currency */
+  allInLow?: number;
+  allInHigh?: number;
+  /** Premium used for the all-in figure (published, or assumed when premiumAssumed) */
+  premiumPct?: number;
 }
 
 export interface HuntResults {
@@ -78,8 +95,13 @@ export interface HuntResults {
   searched?: { regions: string[] | null; platforms: string[]; ignoredPlatforms: string[] };
   stats: {
     returned: number; verified: number; unverified: number; dropped: number; dropReasons: Record<string, number>;
-    timingMs?: { gemini: number; validation: number; total: number; auctionet?: number };
+    timingMs?: { gemini: number; validation: number; total: number; auctionet?: number; direct?: number; directEnrich?: number; ranker?: number };
     geminiError?: string;
+    /** Direct auction-site searches (status per site, lots found / kept) */
+    direct?: DirectSourceStat[];
+    /** Web search (Gemini + Google Search) skipped when every selected site was searched directly */
+    webSearch?: 'ran' | 'skipped';
+    rankerError?: string;
   };
 }
 
@@ -154,7 +176,8 @@ const fetchPage = async (url: string, budgetMs: number): Promise<FetchOutcome> =
 const fetchJson = async (url: string, budgetMs: number): Promise<{ status: number; json?: any }> => {
   try {
     return await withDeadline(Math.min(FETCH_TIMEOUT_MS, budgetMs), async (signal) => {
-      const res = await fetch(url, { method: 'GET', headers: { ...BROWSER_HEADERS, Accept: 'application/json' }, signal });
+      const req = requestUrlFor(url); // optional relay for hosts that block Vercel (FETCH_RELAY_URL)
+      const res = await fetch(req.url, { method: 'GET', headers: { ...BROWSER_HEADERS, Accept: 'application/json', ...req.headers }, signal });
       if (!res.ok) return { status: res.status };
       return { status: res.status, json: await res.json() };
     });
@@ -175,6 +198,8 @@ export interface HuntPlan {
   itemTypes: string[];
   local: LocalQueries;
   useAuctionet: boolean;
+  /** French auction sites searched directly (their own search pages) */
+  directSites: Array<'drouot' | 'interencheres'>;
 }
 
 export const planHunt = (params: HuntParams): HuntPlan => {
@@ -188,7 +213,9 @@ export const planHunt = (params: HuntParams): HuntPlan => {
     return r === 'multi' || r === null || r.some(x => regions.has(x));
   });
   const useAuctionet = allowedDomains.includes('auctionet.com') && (!regions || regions.has('Sweden') || regions.has('Europe'));
-  return { regions, platforms, ignoredPlatforms: ignored, allowedDomains, itemTypes: itemTypesInQuery(params.query), local: localQueries(params.query), useAuctionet };
+  const itemTypes = itemTypesInQuery(params.query);
+  const directSites = directSitesFor({ regions, itemTypes, allowedDomains });
+  return { regions, platforms, ignoredPlatforms: ignored, allowedDomains, itemTypes, local: localQueries(params.query), useAuctionet, directSites };
 };
 
 const buildPrompts = (params: HuntParams, plan: HuntPlan) => {
@@ -405,24 +432,9 @@ export const validateMatch = async (
 // Auctionet: search the public API directly (verified data, no web search needed)
 // ---------------------------------------------------------------------------
 
-// Approximate rates, ONLY used to compare an estimate with the user's budget (never shown).
-const APPROX_EUR: Record<string, number> = { EUR: 1, SEK: 0.088, DKK: 0.134, NOK: 0.086, GBP: 1.17, USD: 0.92 };
-
-/** Upper end of the typed budget ("2000 EUR", "500 – 2000 EUR"), in the user's currency. */
-export const budgetMax = (priceRange?: string): number | null => {
-  const nums = String(priceRange || '').replace(/(\d)[\s\u00a0.,](?=\d{3}\b)/g, '$1').match(/\d+(?:[.,]\d+)?/g);
-  if (!nums) return null;
-  const vals = nums.map(n => Number(n.replace(',', '.'))).filter(n => n > 0);
-  return vals.length ? Math.max(...vals) : null;
-};
-
-export const withinBudget = (estimateLow: number | undefined, estCurrency: string | undefined, maxBudget: number | null, budgetCurrency = 'EUR'): boolean => {
-  if (!maxBudget || !estimateLow) return true;
-  const a = APPROX_EUR[String(estCurrency || '').toUpperCase()];
-  const b = APPROX_EUR[String(budgetCurrency || '').toUpperCase()];
-  if (!a || !b) return true;
-  return estimateLow * a <= maxBudget * b * 1.1;
-};
+// Budget helpers live in budget.ts (shared with the direct auction-site search); re-exported for existing callers.
+export { budgetMax, budgetMin, withinBudget } from "./budget.js";
+import { budgetMax, withinBudget } from "./budget.js";
 
 export const auctionetToMatch = (it: AuctionetItem, params: HuntParams, plan: HuntPlan, now = Date.now()): { match?: HuntMatch; dropReason?: string } => {
   const f = auctionetFacts(it, now);
@@ -475,6 +487,114 @@ export const searchAuctionet = async (params: HuntParams, plan: HuntPlan, deadli
   return { matches: matches.slice(0, MAX_AUCTIONET_DIRECT), dropped };
 };
 
+// ---------------------------------------------------------------------------
+// Gemini as RANKER of real lots (no web search tool: fast). It can only order, explain or set aside the lots it is
+// given; it never adds a lot. On timeout/error the heuristic order and a template note are used.
+// ---------------------------------------------------------------------------
+
+export const RANKER_TIMEOUT_MS = 15_000;
+const MAX_RANKER_CANDIDATES = 14;
+
+const rankerSchema = {
+  type: Type.OBJECT,
+  properties: {
+    marketBrief: { type: Type.STRING, description: "2-3 sentences on what these real lots say about availability and price for this piece." },
+    dealerClosingTip: { type: Type.STRING, description: "One insider tip for bidding on this type of piece at French auctions." },
+    ranked: {
+      type: Type.ARRAY,
+      description: "The candidate lots, best first. Use ONLY ids from the list.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          id: { type: Type.STRING },
+          keep: { type: Type.BOOLEAN, description: "false if it is not the kind of piece asked for, or (when period pieces only) clearly a later copy/style piece." },
+          periodConfidence: { type: Type.STRING, enum: ["high", "medium", "low"] },
+          dealerAnalysis: { type: Type.STRING, description: "2-3 short sentences: why it fits (or not), value vs the all-in estimate, what to check before bidding." },
+        },
+        required: ["id", "keep", "dealerAnalysis"],
+      },
+    },
+  },
+  required: ["ranked"],
+};
+
+export interface RankerOutcome { order: Array<{ id: string; keep: boolean; dealerAnalysis: string; periodConfidence?: string }>; marketBrief?: string; dealerClosingTip?: string }
+
+export const candidateId = (c: DirectCandidate) => `${c.lot.site}:${c.lot.id}`;
+
+export const rankWithGemini = async (ai: GoogleGenAI, params: HuntParams, candidates: DirectCandidate[], timeoutMs: number): Promise<RankerOutcome> => {
+  const list = candidates.slice(0, MAX_RANKER_CANDIDATES).map(c => ({
+    id: candidateId(c),
+    site: c.lot.site,
+    title: c.lot.title,
+    description: (c.lot.description || '').slice(0, 350),
+    estimate: [c.lot.estimateLow, c.lot.estimateHigh].filter(Boolean).join('-') + ' ' + c.lot.currency,
+    startingPrice: c.lot.startingPrice,
+    allIn: c.allInLow ? `${c.allInLow}${c.allInHigh && c.allInHigh !== c.allInLow ? '-' + c.allInHigh : ''} ${params.currency || 'EUR'} (fees ${c.premiumPct}%${c.premiumAssumed ? ' assumed' : ''})` : 'unknown',
+    sale: c.lot.saleDate ? c.lot.saleDate.toISOString().slice(0, 16) : 'unknown',
+    house: c.lot.house, city: c.lot.city,
+  }));
+  const ids = new Set(list.map(l => l.id));
+  const today = new Date().toISOString().slice(0, 10);
+  const systemInstruction = `You are an expert antique dealer helping a private buyer in France. Today is ${today}.
+You receive REAL auction lots read from the auction sites' own pages. Rank them for the buyer's request, best first.
+Rules: use only the ids given; never invent lots, prices or dates; judge only from the text given.
+${params.periodOnly !== false ? 'The buyer wants authentic 18th–19th-century period pieces: set keep=false for lots described as "de style" of the requested period with no period evidence, 20th-century pieces, reproductions or copies. "Style Louis XV, époque Napoléon III" IS a period (19th-century) piece.' : ''}
+Set keep=false when the lot is not the kind of piece asked for (e.g. a jewellery box shaped like a commode, a coin).
+Write all text in the language '${params.language || 'en'}'. Return JSON only.`;
+  const prompt = `Request: ${params.query}\nBudget: ${params.priceRange || 'none'} (all-in, incl. buyer's premium)\nCandidates:\n${JSON.stringify(list)}`;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const response: any = await Promise.race([
+      ai.models.generateContent({
+        model: MODEL,
+        contents: prompt,
+        config: { systemInstruction, thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, responseMimeType: "application/json", responseSchema: rankerSchema, abortSignal: controller.signal },
+      }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('ranker_timeout')); }, Math.max(1, timeoutMs)); }),
+    ]);
+    const parsed = JSON.parse(String(response?.text || '').trim());
+    const order = (Array.isArray(parsed?.ranked) ? parsed.ranked : [])
+      .filter((r: any) => r && ids.has(String(r.id)))
+      .map((r: any) => ({ id: String(r.id), keep: r.keep !== false, dealerAnalysis: cleanText(r.dealerAnalysis), periodConfidence: r.periodConfidence ? String(r.periodConfidence) : undefined }));
+    return { order, marketBrief: cleanText(parsed?.marketBrief), dealerClosingTip: cleanText(parsed?.dealerClosingTip) };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+/** Apply the ranker's order (unknown/missing ids keep the heuristic order after the ranked ones). */
+export const applyRanking = (candidates: DirectCandidate[], ranking: RankerOutcome | null): { kept: Array<{ c: DirectCandidate; analysis?: string }>; rejected: number } => {
+  if (!ranking || ranking.order.length === 0) return { kept: candidates.map(c => ({ c })), rejected: 0 };
+  const byId = new Map(candidates.map(c => [candidateId(c), c]));
+  const used = new Set<string>();
+  const kept: Array<{ c: DirectCandidate; analysis?: string }> = [];
+  let rejected = 0;
+  for (const r of ranking.order) {
+    const c = byId.get(r.id);
+    if (!c || used.has(r.id)) continue;
+    used.add(r.id);
+    if (!r.keep) { rejected++; continue; }
+    const conf = r.periodConfidence && r.periodConfidence !== 'high' ? ` (Period confidence: ${r.periodConfidence}.)` : '';
+    kept.push({ c, analysis: r.dealerAnalysis ? r.dealerAnalysis + conf : undefined });
+  }
+  for (const c of candidates) if (!used.has(candidateId(c))) kept.push({ c });
+  return { kept, rejected };
+};
+
+const lotKey = (u: string): string => {
+  const a = u.match(/auctionet\.com\/[a-z]{2}\/(\d+)-/)?.[1];
+  if (a) return `auctionet:${a}`;
+  const d = u.match(/drouot\.com\/(?:[a-z]{2}\/)?l\/(\d+)/)?.[1];
+  if (d) return `drouot:${d}`;
+  const ie = u.match(/interencheres\.com\/.*\/lot-(\d+)\.html/)?.[1];
+  if (ie) return `interencheres:${ie}`;
+  return u.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '');
+};
+
+const MAX_TOTAL_RESULTS = 8;
+
 export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults> => {
   const startedAt = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
@@ -484,9 +604,8 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
 
   const ai = new GoogleGenAI({ apiKey });
   const plan = planHunt(params);
-  const { systemInstruction, promptText } = buildPrompts(params, plan);
 
-  // Auctionet API search runs alongside the web search
+  // Auctionet API search runs alongside everything else
   let auctionetMs = 0;
   const auctionetP = plan.useAuctionet
     ? searchAuctionet(params, plan, startedAt + AUCTIONET_BUDGET_MS)
@@ -494,92 +613,146 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
         .finally(() => { auctionetMs = Date.now() - startedAt; })
     : Promise.resolve({ matches: [] as HuntMatch[], dropped: {} as Record<string, number> });
 
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      controller.abort();
-      reject(new HuntTimeoutError());
-    }, GEMINI_TIMEOUT_MS);
+  // 1. Direct auction-site search pages (Drouot, Interencheres): about 0.2–1 s, at most DIRECT_SEARCH_BUDGET_MS
+  const phase1 = plan.directSites.length
+    ? await searchDirectSites(params, plan, startedAt + DIRECT_SEARCH_BUDGET_MS)
+    : null;
+  const directSearchMs = Date.now() - startedAt;
+  const covered = new Set(phase1 ? phase1.outcomes.filter(o => o.stat.status >= 200 && o.stat.status < 300).map(o => SITE_DOMAIN[o.stat.site]) : []);
+
+  // 2. Gemini web search only for the selected sites that were NOT searched directly (e.g. LeBonCoin, eBay, or
+  //    Interencheres when it blocks the server). Validation of its results still uses every selected site.
+  const webDomains = plan.allowedDomains.filter(d => !covered.has(d));
+  const webPlatforms = plan.platforms.filter(p => {
+    const doms = allowedDomainsFor([p]);
+    return doms.length === 0 || doms.some(d => !covered.has(d));
   });
+  const runWeb = webDomains.length > 0;
+  const geminiStart = Date.now();
+  const geminiBudget = Math.min(GEMINI_TIMEOUT_MS, FUNCTION_BUDGET_MS - VALIDATION_BUDGET_MS - (geminiStart - startedAt));
 
-  let parsed: any = null;
-  let geminiError: Error | null = null;
-  try {
-    const response: any = await Promise.race([
-      ai.models.generateContent({
-        model: MODEL,
-        contents: promptText,
-        config: {
-          systemInstruction,
-          tools: [{ googleSearch: {} }],
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          responseMimeType: "application/json",
-          responseSchema,
-          abortSignal: controller.signal,
-        }
-      }),
-      timeout,
-    ]);
-    const text = response?.text;
-    if (!text) throw new Error("The search engine returned an empty response.");
+  const webP: Promise<{ parsed: any; error: Error | null; doneAt: number }> = runWeb ? (async () => {
+    const { systemInstruction, promptText } = buildPrompts(params, { ...plan, allowedDomains: webDomains, platforms: webPlatforms });
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new HuntTimeoutError()); }, geminiBudget);
+    });
     try {
-      parsed = JSON.parse(String(text).trim());
-    } catch {
-      throw new Error("The search engine returned an unreadable response.");
+      const response: any = await Promise.race([
+        ai.models.generateContent({
+          model: MODEL,
+          contents: promptText,
+          config: {
+            systemInstruction,
+            tools: [{ googleSearch: {} }],
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+            responseMimeType: "application/json",
+            responseSchema,
+            abortSignal: controller.signal,
+          }
+        }),
+        timeout,
+      ]);
+      const text = response?.text;
+      if (!text) throw new Error("The search engine returned an empty response.");
+      try {
+        return { parsed: JSON.parse(String(text).trim()), error: null, doneAt: Date.now() };
+      } catch {
+        throw new Error("The search engine returned an unreadable response.");
+      }
+    } catch (err: any) {
+      return { parsed: null, error: (err instanceof HuntTimeoutError || controller.signal.aborted) ? new HuntTimeoutError() : err, doneAt: Date.now() };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-  } catch (err: any) {
-    geminiError = (err instanceof HuntTimeoutError || controller.signal.aborted) ? new HuntTimeoutError() : err;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  })() : Promise.resolve({ parsed: null, error: null, doneAt: Date.now() });
 
-  const geminiDone = Date.now();
-  const auctionet = await auctionetP;
-  if (geminiError && auctionet.matches.length === 0) throw geminiError;
+  // 3. In parallel: enrich the best direct lots from their lot pages, then let Gemini rank and explain them
+  let rankerMs = 0;
+  let rankerError: string | undefined;
+  const directP: Promise<{ result: DirectSearchResult | null; ranking: RankerOutcome | null }> = phase1 ? (async () => {
+    const result = await finishDirect(phase1, params, plan, Date.now() + DIRECT_ENRICH_BUDGET_MS);
+    if (result.candidates.length === 0) return { result, ranking: null };
+    const t = Date.now();
+    try {
+      const budget = Math.min(RANKER_TIMEOUT_MS, startedAt + FUNCTION_BUDGET_MS - 2_000 - t);
+      const ranking = await rankWithGemini(ai, params, result.candidates, budget);
+      return { result, ranking };
+    } catch (err: any) {
+      rankerError = String(err?.message || err).slice(0, 120);
+      return { result, ranking: null };
+    } finally {
+      rankerMs = Date.now() - t;
+    }
+  })() : Promise.resolve({ result: null, ranking: null });
 
-  // Validation gets at most VALIDATION_BUDGET_MS, and never runs past the overall function budget
+  const [web, direct, auctionet] = await Promise.all([webP, directP, auctionetP]);
+  const geminiDone = web.doneAt;
+  const geminiError = web.error;
+  const parsed = web.parsed;
+
+  const directRanked = direct.result ? applyRanking(direct.result.candidates, direct.ranking) : { kept: [], rejected: 0 };
+  const directMatches: HuntMatch[] = directRanked.kept.slice(0, MAX_DIRECT_RESULTS).map(({ c, analysis }) => candidateToMatch(c, params, analysis));
+
+  if (geminiError && auctionet.matches.length === 0 && directMatches.length === 0) throw geminiError;
+
+  // Validation of web-search results gets at most VALIDATION_BUDGET_MS, never past the overall budget
   const deadline = Math.min(geminiDone + VALIDATION_BUDGET_MS, startedAt + FUNCTION_BUDGET_MS);
   const rawMatches: any[] = parsed && Array.isArray(parsed.matches) ? parsed.matches.slice(0, MAX_RESULTS + 2) : [];
+  const validationStart = Date.now();
   const outcomes = await Promise.all(rawMatches.map(m => validateMatch(m, params, plan, deadline)));
 
   const seen = new Set<string>();
   const matches: HuntMatch[] = [];
   const dropReasons: Record<string, number> = {};
-  const key = (u: string) => u.match(/auctionet\.com\/[a-z]{2}\/(\d+)-/)?.[1] ? `auctionet:${u.match(/auctionet\.com\/[a-z]{2}\/(\d+)-/)![1]}` : u.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '');
+  const addDrop = (reason: string, n = 1) => { dropReasons[reason] = (dropReasons[reason] || 0) + n; };
+  // Direct auction-site lots first (verified by construction, ranked)
+  for (const m of directMatches) { seen.add(lotKey(m.url)); matches.push(m); }
   for (const o of outcomes) {
-    if (o.match && !seen.has(key(o.match.url))) {
-      seen.add(key(o.match.url));
+    if (o.match && !seen.has(lotKey(o.match.url))) {
+      seen.add(lotKey(o.match.url));
       matches.push(o.match);
     } else {
-      const reason = o.dropReason || 'duplicate';
-      dropReasons[reason] = (dropReasons[reason] || 0) + 1;
+      addDrop(o.dropReason || 'duplicate');
     }
   }
   // Add Auctionet API lots not already found by the web search
   for (const m of auctionet.matches) {
-    if (!seen.has(key(m.url))) { seen.add(key(m.url)); matches.push(m); }
+    if (!seen.has(lotKey(m.url))) { seen.add(lotKey(m.url)); matches.push(m); }
   }
-  // Verified listings first; keep at most MAX_AUCTIONET_DIRECT Auctionet API lots so web results still show
+  // Verified listings first (stable: direct lots keep the ranker's order)
   matches.sort((a, b) => (a.verification === b.verification ? 0 : a.verification === 'verified' ? -1 : 1));
-  const finalMatches = matches.slice(0, MAX_RESULTS + (auctionet.matches.length ? 1 : 0));
+  const finalMatches = matches.slice(0, MAX_TOTAL_RESULTS);
+  if (direct.result) for (const [r, n] of Object.entries(direct.result.dropped)) addDrop(`direct_${r}`, n);
+  if (directRanked.rejected) addDrop('direct_ranker_rejected', directRanked.rejected);
 
+  const directReturned = direct.result ? direct.result.stats.reduce((n, s) => n + s.found, 0) : 0;
+  const returned = rawMatches.length + auctionet.matches.length + directReturned;
   const results: HuntResults = {
-    marketBrief: cleanText(parsed?.marketBrief),
+    marketBrief: cleanText(direct.ranking?.marketBrief) || cleanText(parsed?.marketBrief),
     matches: finalMatches,
-    dealerClosingTip: cleanText(parsed?.dealerClosingTip),
+    dealerClosingTip: cleanText(direct.ranking?.dealerClosingTip) || cleanText(parsed?.dealerClosingTip),
     searched: { regions: plan.regions ? Array.from(plan.regions) : null, platforms: plan.platforms, ignoredPlatforms: plan.ignoredPlatforms },
     stats: {
-      returned: rawMatches.length + auctionet.matches.length,
+      returned,
       verified: finalMatches.filter(m => m.verification === 'verified').length,
       unverified: finalMatches.filter(m => m.verification === 'unverified').length,
-      dropped: rawMatches.length + auctionet.matches.length - finalMatches.length,
+      dropped: Math.max(0, returned - finalMatches.length),
       dropReasons,
-      timingMs: { gemini: geminiDone - startedAt, validation: Date.now() - geminiDone, total: Date.now() - startedAt, auctionet: auctionetMs },
+      timingMs: {
+        gemini: runWeb ? geminiDone - geminiStart : 0, validation: Date.now() - validationStart, total: Date.now() - startedAt, auctionet: auctionetMs,
+        direct: directSearchMs, directEnrich: direct.result?.ms.enrich, ranker: rankerMs,
+      },
       ...(geminiError ? { geminiError: geminiError.name === 'HuntTimeoutError' ? 'timeout' : String(geminiError.message).slice(0, 120) } : {}),
+      ...(direct.result ? { direct: direct.result.stats } : {}),
+      webSearch: runWeb ? 'ran' : 'skipped',
+      ...(rankerError ? { rankerError } : {}),
     },
   };
-  if (geminiError) results.notice = 'The web search took too long, so only lots found directly on Auctionet are shown.';
+  if (geminiError) results.notice = directMatches.length
+    ? 'The web search took too long, so only lots found directly on the auction sites are shown.'
+    : 'The web search took too long, so only lots found directly on Auctionet are shown.';
   if (finalMatches.length === 0) results.message = NO_VERIFIED_MESSAGE;
   return results;
 };

@@ -243,31 +243,100 @@ export const LOCAL_TERMS: Record<string, { en: string[]; fr: string[]; sv: strin
   table: { en: ['table'], fr: ['table', 'guéridon'], sv: ['bord'] },
 };
 
-const STYLE_TERMS: Array<[RegExp, { fr: string; sv: string }]> = [
-  [/gustavian/i, { fr: 'gustavien', sv: 'gustaviansk' }],
-  [/louis\s*xvi\b|louis\s*16|louis seize/i, { fr: 'Louis XVI', sv: 'gustaviansk' }],
-  [/louis\s*xv\b|louis\s*15|rococo|rocaille/i, { fr: 'Louis XV', sv: 'rokoko' }],
-  [/transition/i, { fr: 'Transition', sv: 'övergångsstil' }],
-  [/empire/i, { fr: 'Empire', sv: 'empire' }],
-  [/directoire/i, { fr: 'Directoire', sv: 'sengustaviansk' }],
-  [/regence|régence/i, { fr: 'Régence', sv: 'frihetstid' }],
-  [/georgian|george (ii|iii)/i, { fr: 'georgien', sv: 'georgiansk' }],
-  [/victorian/i, { fr: 'victorien', sv: 'viktoriansk' }],
+// Period / style names in a query -> the words French and Swedish catalogues use, plus the words that show a lot
+// is in that style (used to rank direct auction results). Order matters: the first match wins
+// ("Louis XVI" before "Louis XV", "Louis-Philippe" before "Louis").
+export interface StyleTerm { fr: string; sv: string; en: string; match: string[] }
+export const STYLE_TERMS: Array<[RegExp, StyleTerm]> = [
+  [/napol[eé]on\s*(iii|3)\b|second\s*empire|nap\s*iii/i, { fr: 'Napoléon III', sv: 'Napoleon III', en: 'Napoleon III', match: ['napoleon iii', 'napoleon 3', 'second empire', 'nap. iii'] }],
+  [/louis[\s-]*philippe/i, { fr: 'Louis-Philippe', sv: 'Louis Philippe', en: 'Louis Philippe', match: ['louis-philippe', 'louis philippe'] }],
+  [/charles\s*x\b/i, { fr: 'Charles X', sv: 'Charles X', en: 'Charles X', match: ['charles x'] }],
+  [/restauration|restoration period/i, { fr: 'Restauration', sv: 'empire', en: 'Restauration', match: ['restauration'] }],
+  [/gustavian/i, { fr: 'gustavien', sv: 'gustaviansk', en: 'Gustavian', match: ['gustavien', 'gustavienne', 'gustaviansk', 'gustavian'] }],
+  [/louis\s*xvi\b|louis\s*16|louis seize/i, { fr: 'Louis XVI', sv: 'gustaviansk', en: 'Louis XVI', match: ['louis xvi', 'louis 16'] }],
+  [/louis\s*xv\b|louis\s*15|rococo|rocaille/i, { fr: 'Louis XV', sv: 'rokoko', en: 'Louis XV', match: ['louis xv', 'louis 15', 'rocaille', 'rococo', 'rokoko'] }],
+  [/louis\s*xiv\b|louis\s*14/i, { fr: 'Louis XIV', sv: 'barock', en: 'Louis XIV', match: ['louis xiv', 'louis 14'] }],
+  [/louis\s*xiii\b|louis\s*13/i, { fr: 'Louis XIII', sv: 'barock', en: 'Louis XIII', match: ['louis xiii', 'louis 13'] }],
+  [/transition/i, { fr: 'Transition', sv: 'övergångsstil', en: 'Transition', match: ['transition', 'overgangsstil'] }],
+  [/directoire/i, { fr: 'Directoire', sv: 'sengustaviansk', en: 'Directoire', match: ['directoire'] }],
+  [/\bempire\b/i, { fr: 'Empire', sv: 'empire', en: 'Empire', match: ['empire'] }],
+  [/r[eé]gence\b/i, { fr: 'Régence', sv: 'frihetstid', en: 'Régence', match: ['regence'] }],
+  [/henri\s*(ii|2)\b/i, { fr: 'Henri II', sv: 'renässans', en: 'Henri II', match: ['henri ii'] }],
+  [/biedermeier/i, { fr: 'Biedermeier', sv: 'biedermeier', en: 'Biedermeier', match: ['biedermeier'] }],
+  [/regency/i, { fr: 'Regency', sv: 'regency', en: 'Regency', match: ['regency'] }],
+  [/georgian|george\s*(ii|iii|iv)\b/i, { fr: 'georgien', sv: 'georgiansk', en: 'Georgian', match: ['georgian', 'george ii', 'george iii', 'george iv', 'georgien'] }],
+  [/victorian/i, { fr: 'victorien', sv: 'viktoriansk', en: 'Victorian', match: ['victorian', 'victorien'] }],
 ];
+
+// Woods and materials (the old translation dropped them: "Louis XV commode walnut" searched just "commode Louis XV")
+export const MATERIAL_TERMS: Array<[RegExp, { fr: string; sv: string; match: string[] }]> = [
+  [/\boak\b|ch[eê]ne/i, { fr: 'chêne', sv: 'ek', match: ['oak', 'chene'] }],
+  [/walnut|noyer/i, { fr: 'noyer', sv: 'valnöt', match: ['walnut', 'noyer'] }],
+  [/cherry|merisier/i, { fr: 'merisier', sv: 'körsbär', match: ['cherry', 'merisier'] }],
+  [/mahogany|acajou/i, { fr: 'acajou', sv: 'mahogny', match: ['mahogany', 'acajou'] }],
+  [/rosewood|palissandre/i, { fr: 'palissandre', sv: 'jakaranda', match: ['rosewood', 'palissandre'] }],
+  [/\belm\b|orme/i, { fr: 'orme', sv: 'alm', match: ['elm', 'orme'] }],
+  [/\bpine\b|sapin/i, { fr: 'sapin', sv: 'furu', match: ['pine', 'sapin', 'pin'] }],
+  [/fruitwood|bois fruitier/i, { fr: 'bois fruitier', sv: 'fruktträ', match: ['fruitwood', 'fruitier'] }],
+  [/\bbirch\b|bouleau/i, { fr: 'bouleau', sv: 'björk', match: ['birch', 'bouleau'] }],
+  [/marquetry|marqueterie/i, { fr: 'marqueterie', sv: 'intarsia', match: ['marquetry', 'marqueterie'] }],
+  [/\bgilt\b|gilded|giltwood|dor[ée]/i, { fr: 'doré', sv: 'förgylld', match: ['gilt', 'dore', 'doree'] }],
+  [/painted|peint/i, { fr: 'peint', sv: 'målad', match: ['painted', 'peint', 'laque'] }],
+  [/marble|marbre/i, { fr: 'marbre', sv: 'marmor', match: ['marble', 'marbre'] }],
+];
+
+export const styleInQuery = (query: string): StyleTerm | undefined => STYLE_TERMS.find(([re]) => re.test(query))?.[1];
+export const materialsInQuery = (query: string) => MATERIAL_TERMS.filter(([re]) => re.test(query)).map(([, m]) => m);
 
 export interface LocalQueries { fr: string[]; sv: string[]; en: string[] }
 
 /** Local-language search phrases for a query (e.g. "Gustavian commode" -> sv: "gustaviansk byrå", "gustaviansk kommod"). */
 export const localQueries = (query: string): LocalQueries => {
   const types = itemTypesInQuery(query);
-  const style = STYLE_TERMS.find(([re]) => re.test(query))?.[1];
+  const style = styleInQuery(query);
+  const material = materialsInQuery(query)[0];
   const out: LocalQueries = { fr: [], sv: [], en: [] };
   for (const t of types) {
     const terms = LOCAL_TERMS[t];
     if (!terms) continue;
-    for (const w of terms.fr) out.fr.push(style ? `${w} ${style.fr}` : w);
-    for (const w of terms.sv) out.sv.push(style ? `${style.sv} ${w}` : w);
-    for (const w of terms.en) out.en.push(w);
+    for (const w of terms.fr) out.fr.push([w, style?.fr, material?.fr].filter(Boolean).join(' '));
+    for (const w of terms.sv) out.sv.push([style?.sv, w, material?.sv].filter(Boolean).join(' '));
+    for (const w of terms.en) out.en.push([style?.en, material ? material.match[0] : '', w].filter(Boolean).join(' '));
+  }
+  // No known type: keep the style / material words so the search is never just one generic noun
+  if (!types.length && (style || material)) {
+    out.fr.push([style?.fr, material?.fr].filter(Boolean).join(' '));
+    out.sv.push([style?.sv, material?.sv].filter(Boolean).join(' '));
   }
   return { fr: Array.from(new Set(out.fr)).slice(0, 3), sv: Array.from(new Set(out.sv)).slice(0, 3), en: Array.from(new Set(out.en)).slice(0, 3) };
+};
+
+/** Strip accents for site keyword searches (both sites ignore accents; plain ASCII keeps URLs simple). */
+const ascii = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/**
+ * The ONE keyword query sent to a French auction site's search page (Interencheres / Drouot): type + style + wood,
+ * short, accent-free. Falls back to the user's own words when the dictionary knows nothing.
+ * `fallback` drops the material (used only when the first search returns no lots at all).
+ */
+export const frenchSiteQuery = (query: string, opts: { fallback?: boolean } = {}): string => {
+  const types = itemTypesInQuery(query);
+  const style = styleInQuery(query);
+  const material = opts.fallback ? undefined : materialsInQuery(query)[0];
+  const typeWord = types.length ? LOCAL_TERMS[types[0]]?.fr[0] : '';
+  const words = [typeWord, style?.fr, material?.fr].filter(Boolean) as string[];
+  if (!typeWord) {
+    // unknown type: user's own words (minus filler) + translated style / material
+    const own = query.replace(/\b(antique|period|french|authentic|old|vintage|for sale|a|an|the)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    return ascii(own || words.join(' ')).toLowerCase().slice(0, 80);
+  }
+  return ascii(words.join(' ')).toLowerCase();
+};
+
+/** Does a lot text name the style asked for in the query? (null = no style in the query) */
+export const matchesStyle = (query: string, ...texts: Array<string | undefined | null>): boolean | null => {
+  const style = styleInQuery(query);
+  if (!style) return null;
+  const text = normalise(texts.filter(Boolean).join(' '));
+  return style.match.some(w => text.includes(w));
 };
