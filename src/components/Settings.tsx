@@ -35,10 +35,11 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
   ];
 
   const currencies = [
+    { code: 'EUR', symbol: '€', name: 'Euro' },
     { code: 'GBP', symbol: '£', name: 'British Pound' },
     { code: 'USD', symbol: '$', name: 'US Dollar' },
-    { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'AUD', symbol: '$', name: 'Australian Dollar' },
+    { code: 'SEK', symbol: 'kr', name: 'Svensk krona' },
+    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
     { code: 'CNY', symbol: '¥', name: '人民币 (CNY)' },
     { code: 'JPY', symbol: '¥', name: '日本円 (JPY)' }
   ];

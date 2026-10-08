@@ -23,7 +23,8 @@
     "score": "Score",
     "home": "Home",
     "collection": "Collection",
-    "profile": "Profile"
+    "profile": "Profile",
+    "saving": "Saving…"
   },
   "home": {
     "hero_badge": "Professional Field Tool",
@@ -149,7 +150,29 @@
     "must_have_insight_fallback": "A great purchase for personal enjoyment. The condition is secondary to your aesthetic preference, but do budget for restoration.",
     "resale_insight_fallback": "Profit depends entirely on buying below dealer level. High restoration costs severely limit your margin.",
     "paddle_rule_label": "Dealer Paddle Rule:",
-    "paddle_rule": "Your maximum hammer bid (walk-away) is {{hammer}}. With the {{pct}}% buyer's premium that comes to {{allIn}} all-in. Rule of thumb: maximum hammer bid = your total budget ÷ {{mult}}."
+    "paddle_rule": "Your maximum hammer bid (walk-away) is {{hammer}}. With the {{pct}}% buyer's premium that comes to {{allIn}} all-in. Rule of thumb: maximum hammer bid = your total budget ÷ {{mult}}.",
+    "verdict_strong_buy": "Strong Buy",
+    "verdict_good_buy": "Good Buy",
+    "verdict_fair": "Fair Price",
+    "verdict_overpriced": "Overpriced",
+    "verdict_walk_away": "Walk Away",
+    "verdict_high_risk": "High Risk",
+    "verdict_no_price": "Needs a Price",
+    "reason_strong_buy": "{{price}}{{premium}} is at or below the market low ({{low}}) – clear room for a dealer margin.",
+    "reason_good_buy": "{{price}}{{premium}} is in the lower half of the market range ({{low}}–{{high}}) – a good buy if condition holds.",
+    "reason_fair": "{{price}}{{premium}} is in the upper half of the market range ({{low}}–{{high}}) – fair, but little margin left.",
+    "reason_overpriced": "{{price}}{{premium}} is above the market high ({{high}}) – you would be paying retail-level money.",
+    "reason_walk_away": "{{price}}{{premium}} is above the top of the retail range ({{retailHigh}}) – no margin at this price.",
+    "reason_high_risk": "The photos show a serious authenticity or condition risk, so the price alone does not make this a buy.",
+    "reason_no_price": "Add the asking price or estimate to get a buy verdict.",
+    "reason_premium_suffix": " all-in (incl. {{pct}}% buyer's premium)",
+    "smart_buy_hammer": "Max hammer · {{allIn}} all-in",
+    "gauge_label": "Buy score",
+    "gauge_confidence": "Confidence: {{level}}",
+    "conf_level_high": "high",
+    "conf_level_medium": "medium",
+    "conf_level_low": "low",
+    "conf_level_very_low": "very low"
   },
   "results": {
     "title": "Dealer's Findings",
@@ -378,7 +401,16 @@
     "no_verified": "No verified live listings found – try widening the budget or sources.",
     "verified": "Link checked",
     "unverified": "Not verified",
-    "unverified_desc": "This site blocks automated checks, so the price, sale date and availability come from search results and are not confirmed – open the link to check.",
-    "checked_summary": "Links checked: {{verified}} verified, {{unverified}} unverified, {{dropped}} removed (dead, closed, generic or off-filter)."
+    "unverified_desc": "This site blocks automated checks, so the estimate, sale date and availability could not be confirmed – open the listing to check.",
+    "checked_summary": "Links checked: {{verified}} verified, {{unverified}} unverified, {{dropped}} removed (dead, closed, generic or off-filter).",
+    "check_listing": "Estimate: check listing",
+    "search_hint": "Search result said {{hint}}"
+  },
+  "toast": {
+    "saved": "Saved to your log.",
+    "saved_local": "Saved on this device (not signed in). Sign in from Profile to sync it to your account.",
+    "save_failed": "Could not save: {{reason}}",
+    "signin_needed": "Sign in with Google to save to your account…",
+    "save_failed_local": "Couldn't save to your account ({{reason}}). Saved on this device instead."
   }
 }

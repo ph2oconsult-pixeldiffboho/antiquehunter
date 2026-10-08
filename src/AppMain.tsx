@@ -15,10 +15,13 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AntiqueHunter } from './components/AntiqueHunter';
 import { IntroChoice } from './components/IntroChoice';
 import { searchAntiques } from './services/gemini';
+import { loadCurrency, saveCurrency } from './services/currencyPref';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Sparkles } from 'lucide-react';
+import { Toast, type ToastKind, type ToastMessage } from './components/Toast';
+import { analysisItems, saveLocalFind } from './services/localFinds';
 
 type Screen = 'intro-choice' | 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'legal' | 'upload-choice' | 'profile' | 'hunt';
 
@@ -26,18 +29,13 @@ export default function Main() {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [plan, setPlan] = useState<'free' | 'pro' | 'dealer'>('free');
-  // Default currency is EUR; the user's last choice (Settings or appraisal form) is kept in localStorage
-  const [currency, setCurrency] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem('user_currency');
-      if (saved && ['GBP', 'USD', 'EUR', 'AUD', 'CNY', 'JPY'].includes(saved)) return saved;
-    } catch (e) {}
-    return 'EUR';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('user_currency', currency);
-  }, [currency]);
+  // One shared currency for the whole app: EUR by default; only an explicit user choice
+  // (Settings, appraisal form or Find Me an Antique) is stored (see services/currencyPref.ts)
+  const [currency, setCurrencyState] = useState<string>(() => loadCurrency());
+  const setCurrency = (c: string) => {
+    setCurrencyState(c);
+    saveCurrency(c);
+  };
 
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return localStorage.getItem('onboarding_complete') !== 'true';
@@ -56,6 +54,8 @@ export default function Main() {
   const [autoStartListening, setAutoStartListening] = useState(false);
   const [showResetPrompt, setShowResetPrompt] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [savedResult, setSavedResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -166,44 +166,82 @@ export default function Main() {
     });
   };
 
+  const showToast = (kind: ToastKind, text: string) => setToast({ id: Date.now(), kind, text });
+
+  const friendlySaveError = (err: any): string => {
+    const code = String(err?.code || '');
+    if (code.includes('unauthorized-domain')) return 'sign-in is not enabled for this website yet';
+    if (code.includes('popup-blocked')) return 'the sign-in window was blocked';
+    if (code.includes('popup-closed') || code.includes('cancelled-popup')) return 'sign-in was cancelled';
+    if (code.includes('permission-denied')) return 'permission denied';
+    if (code.includes('unavailable') || code.includes('network')) return 'no connection';
+    return (err?.message || 'unknown error').slice(0, 120);
+  };
+
+  // Save the current appraisal to the user's log (Firestore when signed in, otherwise this device),
+  // always with visible feedback. The Firestore document only uses fields allowed by firestore.rules (isValidFind).
   const handleSaveFind = async (status: string) => {
-    if (!user) {
-      await handleLogin();
+    if (!analysisResult) return;
+    const items = analysisItems(analysisResult).filter((it: any) => it && !it.error && it.item_summary);
+    if (items.length === 0) {
+      showToast('error', t('toast.save_failed', { reason: 'nothing to save' }));
       return;
     }
+    const mainTitle = (items.length > 1
+      ? `${items.length} ${t('common.items', 'Items')} Detected`
+      : items[0].item_summary?.title) || 'Antique Find';
+    // JSON round-trip drops undefined values (Firestore rejects them)
+    const analysis = { items: JSON.parse(JSON.stringify(items)) };
+    const record = {
+      title: String(mainTitle).slice(0, 250),
+      analysis,
+      status,
+      location: lastDetails?.location ? String(lastDetails.location).slice(0, 250) : null,
+      askingPrice: Number(lastDetails?.askingPrice) > 0 ? Number(lastDetails.askingPrice) : null,
+      currency: String(items[0].price_guidance?.currency || lastDetails?.currency || currency).slice(0, 9),
+      sellerType: lastDetails?.sellerType ? String(lastDetails.sellerType).slice(0, 63) : null,
+    };
 
-    if (!analysisResult) return;
+    const saveOnDevice = (reasonKey: 'saved_local' | 'save_failed_local', reason?: string) => {
+      try {
+        saveLocalFind(record);
+        setSavedResult(analysisResult);
+        showToast(reasonKey === 'saved_local' ? 'success' : 'error', t(`toast.${reasonKey}`, { reason }));
+      } catch (e: any) {
+        showToast('error', t('toast.save_failed', { reason: reason || friendlySaveError(e) }));
+      }
+    };
 
-    const items = Array.isArray(analysisResult) ? analysisResult : [analysisResult];
-    const mainTitle = items.length > 1 
-      ? `${items.length} ${t('common.items', 'Items')} Detected` 
-      : items[0].item_summary.title;
+    let currentUser = user || auth.currentUser;
+    if (!currentUser) {
+      showToast('info', t('toast.signin_needed'));
+      try {
+        const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+        currentUser = cred.user;
+      } catch (error) {
+        console.error('Login error:', error);
+        saveOnDevice('saved_local');
+        return;
+      }
+    }
 
-    const path = 'finds';
     try {
-      await addDoc(collection(db, path), {
-        userId: user.uid,
-        title: mainTitle || 'Antique Find',
-        category: items[0].item_summary.category,
-        images: capturedImages,
-        analysis: analysisResult,
-        status: status,
-        location: lastDetails?.location || 'Current Location',
+      await addDoc(collection(db, 'finds'), {
+        userId: currentUser.uid,
+        ...record,
         notes: '',
         createdAt: serverTimestamp()
       });
-      alert('Find saved to your collection!');
-      setAnalysisResult(null);
-      setCapturedImages([]);
-      setIsFromCollection(false);
-      setCurrentScreen('collection');
+      setSavedResult(analysisResult);
+      showToast('success', t('toast.saved'));
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+      console.error('Save to Firestore failed:', error);
+      saveOnDevice('save_failed_local', friendlySaveError(error));
     }
   };
 
   const handleResetAndAction = (action: () => void) => {
-    if (analysisResult && !isFromCollection) {
+    if (analysisResult && !isFromCollection && savedResult !== analysisResult) {
       setPendingAction(() => action);
       setShowResetPrompt(true);
     } else {
@@ -387,6 +425,7 @@ export default function Main() {
                 result={analysisResult} 
                 images={capturedImages}
                 onSave={handleSaveFind}
+                isSaved={isFromCollection || (!!analysisResult && savedResult === analysisResult)}
                 onBack={() => setCurrentScreen('home')}
                 onNewAppraisal={() => {
                   setAnalysisResult(null);
@@ -406,7 +445,7 @@ export default function Main() {
         return (
           <Collection 
             onViewFind={(find) => {
-              setAnalysisResult(find.analysis);
+              setAnalysisResult(analysisItems(find.analysis));
               setCapturedImages(find.images || (find.image ? [find.image] : []));
               setIsFromCollection(true);
               setCurrentScreen('analysis');
@@ -444,6 +483,7 @@ export default function Main() {
           <AntiqueHunter
             onBack={() => setCurrentScreen('home')}
             currency={currency}
+            onCurrencyChange={setCurrency}
           />
         );
       default:
@@ -469,6 +509,7 @@ export default function Main() {
           setCurrentScreen('intro-choice');
         }} />
       )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
       <MainLayout onViewChange={setCurrentScreen}>
         <input 
           type="file" 

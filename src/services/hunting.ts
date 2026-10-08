@@ -38,6 +38,8 @@ export interface HuntMatch {
   imageUrl?: string;
   verification: Verification;
   verificationNote?: string;
+  /** Unverified listings only: what the search result claimed (price / date). Never shown as fact. */
+  searchHint?: string;
   checkStatus?: number; // HTTP status seen when checking the page (0 = timeout/network error)
 }
 
@@ -46,16 +48,23 @@ export interface HuntResults {
   matches: HuntMatch[];
   dealerClosingTip: string;
   message?: string;
-  stats: { returned: number; verified: number; unverified: number; dropped: number; dropReasons: Record<string, number> };
+  stats: {
+    returned: number; verified: number; unverified: number; dropped: number; dropReasons: Record<string, number>;
+    timingMs?: { gemini: number; validation: number; total: number };
+  };
 }
 
+export const UNVERIFIED_PRICE = "Estimate: check listing";
 export const NO_VERIFIED_MESSAGE = "No verified live listings found – try widening the budget or sources";
 
 const MODEL = "gemini-3.5-flash";
-const GEMINI_TIMEOUT_MS = 45_000;
-const FUNCTION_BUDGET_MS = 56_000; // Vercel maxDuration is 60s
+// Time budget (Vercel maxDuration is 60 s; keep well under it incl. cold start):
+// Gemini <= 40 s, link validation <= 10 s total, whole request <= 50 s.
+export const GEMINI_TIMEOUT_MS = 40_000;
+export const VALIDATION_BUDGET_MS = 10_000;
+export const FUNCTION_BUDGET_MS = 50_000;
 const FETCH_TIMEOUT_MS = 5_000;
-const REDIRECT_TIMEOUT_MS = 3_000;
+const REDIRECT_TIMEOUT_MS = 2_500;
 const MAX_RESULTS = 4;
 
 const BROWSER_HEADERS = {
@@ -66,7 +75,7 @@ const BROWSER_HEADERS = {
 
 export class HuntTimeoutError extends Error {
   constructor() {
-    super("The live search took too long (over 45 seconds). Please try again or narrow the search.");
+    super("The live search took too long (over 40 seconds). Please try again or narrow the search.");
     this.name = "HuntTimeoutError";
   }
 }
@@ -231,15 +240,20 @@ export const validateMatch = async (
 
   // Page could not be read (bot protection, timeout...). Keep only specific listing URLs, flagged.
   if (!isSpecificListingUrl(finalUrl)) return { dropReason: page.status ? `unreadable_generic_${page.status}` : 'unreadable_generic' };
+  // The model's price/date for an unread page is a guess from search snippets (often wrong, e.g. €150–250 shown
+  // for a lot estimated €100–150): never show it as the estimate. Keep it only as a clearly labelled hint.
+  const hintParts = [result.price, result.date].filter(Boolean);
+  result.searchHint = hintParts.length ? `~${hintParts.join(' · ')} (unverified)` : undefined;
+  result.price = UNVERIFIED_PRICE;
+  result.date = undefined;
   result.verificationNote = page.status === 403 || page.status === 429
-    ? 'Site blocks automated checks: price, date and availability come from search results and are not confirmed – open the link to check.'
-    : 'Page did not load in time: price, date and availability come from search results and are not confirmed – open the link to check.';
+    ? 'Site blocks automated checks: estimate, sale date and availability are not confirmed – open the listing to check.'
+    : 'Page did not load in time: estimate, sale date and availability are not confirmed – open the listing to check.';
   return { match: result };
 };
 
 export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults> => {
   const startedAt = Date.now();
-  const deadline = startedAt + FUNCTION_BUDGET_MS;
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not defined in the environment.");
@@ -291,6 +305,9 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
     throw new Error("The search engine returned an unreadable response.");
   }
 
+  const geminiDone = Date.now();
+  // Validation gets at most VALIDATION_BUDGET_MS, and never runs past the overall function budget
+  const deadline = Math.min(geminiDone + VALIDATION_BUDGET_MS, startedAt + FUNCTION_BUDGET_MS);
   const rawMatches: any[] = Array.isArray(parsed.matches) ? parsed.matches.slice(0, MAX_RESULTS + 2) : [];
   const outcomes = await Promise.all(rawMatches.map(m => validateMatch(m, params, allowedDomains, deadline)));
 
@@ -320,6 +337,7 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
       unverified: finalMatches.filter(m => m.verification === 'unverified').length,
       dropped: rawMatches.length - finalMatches.length,
       dropReasons,
+      timingMs: { gemini: geminiDone - startedAt, validation: Date.now() - geminiDone, total: Date.now() - startedAt },
     },
   };
   if (finalMatches.length === 0) results.message = NO_VERIFIED_MESSAGE;

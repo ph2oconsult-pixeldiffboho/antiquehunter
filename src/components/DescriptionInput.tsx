@@ -476,6 +476,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                   <option>EUR</option>
                   <option>GBP</option>
                   <option>USD</option>
+                  <option>SEK</option>
                   <option>AUD</option>
                   <option>CNY</option>
                   <option>JPY</option>

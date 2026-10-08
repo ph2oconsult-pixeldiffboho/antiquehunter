@@ -51,10 +51,12 @@ export const BuyGaugeScore: React.FC<BuyGaugeScoreProps> = ({ score, confidence,
         <span className="text-3xl font-bold tracking-tighter">{score}</span>
         <div className="flex flex-col items-center -mt-1">
           <span className="text-[7px] uppercase tracking-widest font-bold text-white/60">
-            {t(`analysis.goal_${goal}`)} {t('analysis.rating')}
+            {t('analysis.gauge_label', 'Buy score')}
           </span>
           {confidence && (
-            <span className="text-[6px] uppercase tracking-widest font-bold text-white/30">{confidence.replace('_', ' ')}</span>
+            <span className="text-[6px] uppercase tracking-widest font-bold text-white/40">
+              {t('analysis.gauge_confidence', { level: t(`analysis.conf_level_${confidence}`, confidence.replace('_', ' ')) })}
+            </span>
           )}
         </div>
       </div>
