@@ -1,4 +1,5 @@
 {
+  "regions": ["cdg1"],
   "functions": {
     "api/hunt.ts": {
       "maxDuration": 60
