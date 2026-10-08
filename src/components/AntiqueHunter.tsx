@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
+import { parseBudget } from '../services/appraisalMath';
 import { Search, MapPin, Globe, Sparkles, ExternalLink, Loader2, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Check, ChevronDown, ChevronUp, Copy, BookOpen } from 'lucide-react';
 
 interface AntiqueHunterProps {
@@ -22,7 +23,8 @@ interface SourcingMatch {
   imageUrl?: string;
   verification?: 'verified' | 'unverified';
   verificationNote?: string;
-  searchHint?: string;
+  buyerPremiumPct?: number;
+  source?: string;
 }
 
 interface SourcingResults {
@@ -30,6 +32,7 @@ interface SourcingResults {
   matches: SourcingMatch[];
   dealerClosingTip: string;
   message?: string;
+  notice?: string;
   stats?: { returned: number; verified: number; unverified: number; dropped: number };
 }
 
@@ -45,6 +48,13 @@ interface HuntRequest {
 
 const HUNT_CURRENCIES = ['EUR', 'GBP', 'USD', 'SEK'];
 const SWEDISH_PLATFORMS = ['Auctionet', 'Bukowskis'];
+// Sources added automatically when a region is switched on (the server also enforces the region on every result)
+const REGION_PLATFORMS: Record<string, string[]> = {
+  'France': ['Interencheres', 'Drouot', 'LeBonCoin'],
+  'United Kingdom': ['The Saleroom', 'easyLive Auction'],
+  'Sweden': SWEDISH_PLATFORMS,
+  'Europe': SWEDISH_PLATFORMS,
+};
 // Server answers within ~50 s (Gemini 40 s + link checks 10 s); Vercel cuts the function at 60 s (504 -> timeout message)
 const CLIENT_TIMEOUT_MS = 58_000;
 
@@ -52,6 +62,8 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [targetBudget, setTargetBudget] = useState('');
+  const [budgetTouched, setBudgetTouched] = useState(false);
+  const budgetInvalid = targetBudget.trim() !== '' && parseBudget(targetBudget) === null;
   const [isSourcing, setIsSourcing] = useState(false);
   const [results, setResults] = useState<SourcingResults | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,16 +81,16 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
 
   // Platform preferences
   const [platforms, setPlatforms] = useState<string[]>(['Interencheres', 'Drouot', 'LeBonCoin', 'Christie\'s']);
-  const availablePlatforms = ['Interencheres', 'Drouot', 'LeBonCoin', 'Christie\'s', 'Sotheby\'s', 'eBay', ...SWEDISH_PLATFORMS];
+  const availablePlatforms = ['Interencheres', 'Drouot', 'LeBonCoin', 'The Saleroom', 'easyLive Auction', 'Christie\'s', 'Sotheby\'s', 'Bonhams', 'Catawiki', 'eBay', ...SWEDISH_PLATFORMS];
 
   // Sourcing loading message cycle
   const [sourcingStep, setSourcingStep] = useState(0);
   const sourcingMessages = [
-    'Connecting to European auction archives...',
-    'Querying Interencheres catalog indexes...',
-    'Analyzing current active lots on Drouot...',
-    'Scouring LeBonCoin classified market listings...',
-    'Auditing Sotheby\'s and Christie\'s database archives...',
+    'Connecting to auction sites in your regions...',
+    'Searching current catalogues in local terms...',
+    'Opening each listing to check it is still live...',
+    'Reading published estimates and sale dates...',
+    'Removing lots outside your regions or period...',
     'Compiling matching pieces and checking asking rates...',
     'Adding professional dealer valuation and sourcing notes...'
   ];
@@ -88,9 +100,9 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
     setGeographies(prev =>
       prev.includes(geo) ? prev.filter(g => g !== geo) : [...prev, geo]
     );
-    // Swedish auction sources are added automatically when Sweden or Europe is selected
-    if (turningOn && (geo === 'Sweden' || geo === 'Europe')) {
-      setPlatforms(prev => Array.from(new Set([...prev, ...SWEDISH_PLATFORMS])));
+    // Regional sources are added automatically when a region is switched on
+    if (turningOn && REGION_PLATFORMS[geo]) {
+      setPlatforms(prev => Array.from(new Set([...prev, ...REGION_PLATFORMS[geo]])));
     }
   };
 
@@ -164,11 +176,13 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
   const executeSourcing = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
+    if (budgetInvalid) { setBudgetTouched(true); return; }
+    const budget = targetBudget.trim() ? parseBudget(targetBudget) : null;
     await runSearch({
       query,
       geographies,
       platforms,
-      priceRange: targetBudget.trim() ? `${targetBudget.trim()} ${huntCurrency}` : undefined,
+      priceRange: budget ? `${budget.join(' - ')} ${huntCurrency}` : undefined,
       currency: huntCurrency,
       language: i18n.language,
       periodOnly
@@ -185,6 +199,10 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
     if (name.includes('ebay')) return { bg: 'bg-slate-50 border-slate-200 text-slate-800', label: 'eBay Secondary' };
     if (name.includes('auctionet')) return { bg: 'bg-sky-50 border-sky-200 text-sky-800', label: 'Auctionet' };
     if (name.includes('bukowski')) return { bg: 'bg-indigo-50 border-indigo-200 text-indigo-800', label: 'Bukowskis' };
+    if (name.includes('saleroom')) return { bg: 'bg-rose-50 border-rose-200 text-rose-800', label: 'The Saleroom' };
+    if (name.includes('easylive')) return { bg: 'bg-teal-50 border-teal-200 text-teal-800', label: 'easyLive Auction' };
+    if (name.includes('bonhams')) return { bg: 'bg-zinc-50 border-zinc-300 text-zinc-800', label: 'Bonhams' };
+    if (name.includes('catawiki')) return { bg: 'bg-orange-50 border-orange-200 text-orange-800', label: 'Catawiki' };
     return { bg: 'bg-stone-50 border-stone-200 text-stone-700', label: platformName };
   };
 
@@ -242,8 +260,11 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
                   inputMode="decimal"
                   placeholder={t('hunter.budget_placeholder')}
                   value={targetBudget}
-                  onChange={(e) => setTargetBudget(e.target.value)}
-                  className="flex-1 min-w-0 px-4 py-4 bg-paper border border-border-custom rounded-2xl text-ink focus:outline-none focus:border-gold transition-colors text-sm"
+                  onChange={(e) => setTargetBudget(e.target.value.replace(/[^\d.,\s–—-]/g, '').slice(0, 25))}
+                  onBlur={() => setBudgetTouched(true)}
+                  aria-invalid={budgetTouched && budgetInvalid}
+                  data-testid="hunt-budget"
+                  className={`flex-1 min-w-0 px-4 py-4 bg-paper border rounded-2xl text-ink focus:outline-none focus:border-gold transition-colors text-sm ${budgetTouched && budgetInvalid ? 'border-red-400' : 'border-border-custom'}`}
                 />
                 <select
                   value={huntCurrency}
@@ -256,6 +277,9 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
                   ))}
                 </select>
               </div>
+              {budgetTouched && budgetInvalid && (
+                <p className="text-[11px] text-red-700" role="alert">{t('hunter.budget_invalid')}</p>
+              )}
             </div>
 
             {/* Period pieces only */}
@@ -301,6 +325,7 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
                   );
                 })}
               </div>
+              <p className="text-[10px] text-muted">{t('hunter.geo_platform_note')}</p>
             </div>
 
             {/* Platform Priorities */}
@@ -437,6 +462,12 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
               </button>
             </h3>
 
+            {results.notice && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {results.notice}
+              </p>
+            )}
+
             {results.stats && (
               <p className="text-[10px] text-muted pl-2 -mt-3">
                 {t('hunter.checked_summary', { verified: results.stats.verified, unverified: results.stats.unverified, dropped: results.stats.dropped })}
@@ -501,9 +532,9 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
                             <p className={`font-mono text-xs font-semibold px-3 py-1.5 border rounded-xl shadow-inner inline-block ${item.verification === 'unverified' ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-ink bg-paper border-border-custom'}`}>
                               {item.verification === 'unverified' ? t('hunter.check_listing') : (item.price || t('hunter.check_listing'))}
                             </p>
-                            {item.verification === 'unverified' && item.searchHint && (
-                              <p className="text-[9px] text-amber-700/80 font-sans mt-1 max-w-[12rem] whitespace-normal">
-                                {t('hunter.search_hint', { hint: item.searchHint })}
+                            {item.verification === 'verified' && typeof item.buyerPremiumPct === 'number' && item.buyerPremiumPct > 0 && (
+                              <p className="text-[9px] text-muted font-sans mt-1">
+                                {t('hunter.premium_note', { pct: item.buyerPremiumPct })}
                               </p>
                             )}
                             {item.date && (

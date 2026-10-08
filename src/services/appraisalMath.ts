@@ -7,7 +7,7 @@ export type PriceBasis =
   | 'strong_buy'   // at or below market low
   | 'good_buy'     // market low .. market mid
   | 'fair'         // market mid .. market high
-  | 'overpriced'   // above market high (up to retail high)
+  | 'overpriced'   // above the walk-away price / market high (up to retail high)
   | 'walk_away'    // above retail high
   | 'high_risk'    // serious authenticity/condition risk seen in photos caps the verdict
   | 'no_price';    // no asking price given: no deal verdict
@@ -233,33 +233,114 @@ export interface BuyDecisionInput {
   marketLow: number;
   marketHigh: number;
   retailHigh: number;
+  /** Smart-buy price in the units the user pays (hammer at auction). Caps the verdict at "Fair" above it. */
+  smartBuy?: number;
+  /** Walk-away price (max hammer bid at auction). Above it the verdict is never better than "Overpriced". */
+  walkAway?: number;
   riskPenalty?: number;      // model's scoring_inputs.risk_penalty (0 .. -40)
   itemScore?: number;        // sum of the model's scoring_inputs (used only when no price is given)
   valueTier?: string;
 }
+
+/** Why the market band was overridden: the price is above the smart-buy or the walk-away price. */
+export type VerdictCap = 'above_smart_buy' | 'above_walk_away';
 
 export interface BuyDecision {
   score: number;
   band: ScoreBand;
   basis: PriceBasis;
   effectivePrice: number;    // 0 when no price
+  cap?: VerdictCap;
+  smartBuyAllIn?: number;
+  walkAwayAllIn?: number;
 }
 
+/**
+ * Final verdict. Bands are contiguous and consistent with the negotiation figures
+ * (effective = all-in at auction; smart buy / walk-away converted to all-in the same way):
+ *   effective <= market low                  -> Strong Buy
+ *   market low < effective <= smart buy       -> Good Buy
+ *   smart buy < effective <= walk-away        -> Fair Price      (never Good/Strong above the smart buy)
+ *   walk-away < effective <= retail high      -> Overpriced      (never Fair or better above the walk-away)
+ *   effective > retail high                   -> Walk Away
+ * The market-range bands still apply on top (e.g. above market high is Overpriced even with no walk-away).
+ */
 export const decideBuy = (i: BuyDecisionInput): BuyDecision => {
   const asking = num(i.askingPrice);
   const effective = asking > 0 ? allInCost(asking, i.premiumPct, i.isAuction) : 0;
-  const ps = effective > 0 ? priceBandScore(effective, i.marketLow, i.marketHigh, i.retailHigh) : null;
+  const smartAllIn = num(i.smartBuy) > 0 ? allInCost(num(i.smartBuy), i.premiumPct, i.isAuction) : 0;
+  const walkAllIn = num(i.walkAway) > 0 ? allInCost(num(i.walkAway), i.premiumPct, i.isAuction) : 0;
+  const extra = { smartBuyAllIn: smartAllIn || undefined, walkAwayAllIn: walkAllIn || undefined };
+  let ps = effective > 0 ? priceBandScore(effective, i.marketLow, i.marketHigh, i.retailHigh) : null;
+  let cap: VerdictCap | undefined;
   if (ps) {
+    const retail = Math.max(num(i.marketHigh), num(i.retailHigh) || num(i.marketHigh) * 2);
+    // Above the walk-away: never Fair or better. Scores use min() with the market-band score so the
+    // score never rises as the price rises.
+    if (walkAllIn > 0 && effective > walkAllIn && ps.basis !== 'walk_away') {
+      const r = retail > walkAllIn ? clamp((effective - walkAllIn) / (retail - walkAllIn), 0, 1) : 0;
+      const capped = Math.round(34 - 19 * r);
+      const score = ps.basis === 'overpriced' ? Math.min(capped, ps.score) : capped;
+      ps = { score: clamp(score, PRICE_BANDS.overpriced.min, PRICE_BANDS.overpriced.max), band: PRICE_BANDS.overpriced, basis: 'overpriced' };
+      cap = 'above_walk_away';
+    // Above the smart buy (but within the walk-away): never Good Buy or better
+    } else if (smartAllIn > 0 && effective > smartAllIn && ['strong_buy', 'good_buy', 'fair'].includes(ps.basis)) {
+      const top = walkAllIn > smartAllIn ? walkAllIn : Math.max(smartAllIn, num(i.marketHigh));
+      const r = top > smartAllIn ? clamp((effective - smartAllIn) / (top - smartAllIn), 0, 1) : 0;
+      const capped = Math.round(64 - 19 * r);
+      if (ps.basis !== 'fair') cap = 'above_smart_buy';
+      const score = ps.basis === 'fair' ? Math.min(capped, ps.score) : capped;
+      ps = { score: clamp(score, PRICE_BANDS.fair.min, PRICE_BANDS.fair.max), band: PRICE_BANDS.fair, basis: 'fair' };
+    }
     // A serious authenticity/condition problem SEEN IN PHOTOS (reproduction, marriage, major damage) caps the verdict
     // whatever the price. Text-only appraisals are NOT capped: there the model's risk penalty mostly reflects
     // "cannot verify without photos" (shown as low confidence), and capping it made every text appraisal "Walk Away".
     if (i.hasPhotos && num(i.riskPenalty) <= -25 && ps.score > 40) {
-      return { score: 40, band: { min: 40, max: 40 }, basis: 'high_risk', effectivePrice: effective };
+      return { score: 40, band: { min: 40, max: 40 }, basis: 'high_risk', effectivePrice: effective, ...extra };
     }
-    return { score: ps.score, band: ps.band, basis: ps.basis, effectivePrice: effective };
+    return { score: ps.score, band: ps.band, basis: ps.basis, effectivePrice: effective, cap, ...extra };
   }
   // No price: we cannot judge the deal; the score reflects the item only and stays below "Good buy"
   let score = clamp(Math.round(num(i.itemScore)), 1, 60);
   if (i.valueTier === 'D') score = Math.min(score, 30); // utility items never look like good buys
-  return { score, band: { min: score, max: score }, basis: 'no_price', effectivePrice: 0 };
+  return { score, band: { min: score, max: score }, basis: 'no_price', effectivePrice: 0, ...extra };
+};
+
+/** Which reason text to show for a verdict (the cap reasons cite the smart-buy / walk-away figures). */
+export const reasonKeyFor = (basis: PriceBasis, cap?: VerdictCap): string =>
+  cap === 'above_walk_away' ? 'reason_above_walk_away'
+  : cap === 'above_smart_buy' ? 'reason_above_smart_buy'
+  : `reason_${basis}`;
+
+// ---------------------------------------------------------------------------
+// Price input parsing (appraisal + hunt forms)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a typed price: accepts digits with spaces / commas / dots as thousand or decimal separators and strips
+ * currency symbols/codes ("€1 500", "1.500,50", "£1,250", "900 EUR"). Returns null for anything else (letters, empty).
+ */
+export const parsePriceInput = (raw: string): number | null => {
+  let s = String(raw ?? '').trim();
+  if (!s) return null;
+  s = s.replace(/(€|£|\$|¥|kr\.?|sek|eur|gbp|usd|aud|cny|jpy)/gi, '').replace(/[\s\u00a0\u202f']/g, '');
+  if (!s || !/^\d[\d.,]*$/.test(s)) return null;
+  const lastSep = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
+  const decimals = lastSep >= 0 ? s.length - lastSep - 1 : 0;
+  // A last separator followed by 1-2 digits is the decimal separator ("1.500,50", "99.5"); 3 digits = thousands ("1,500")
+  const n = decimals === 1 || decimals === 2
+    ? Number(s.slice(0, lastSep).replace(/[.,]/g, '') + '.' + s.slice(lastSep + 1))
+    : Number(s.replace(/[.,]/g, ''));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/** Keep only characters that can be part of a price while typing (digits, separators, spaces). */
+export const sanitizePriceTyping = (raw: string): string => String(raw ?? '').replace(/[^\d.,\s]/g, '').slice(0, 15);
+
+/** Budget: one amount or a range ("1500", "1 500 €", "500 – 2000"); numbers only. */
+export const parseBudget = (raw: string): number[] | null => {
+  const parts = raw.split(/\s*(?:–|—|-|to|à)\s*/i).map(p => p.trim()).filter(Boolean);
+  if (!parts.length || parts.length > 2) return null;
+  const nums = parts.map(p => parsePriceInput(p));
+  return nums.every((n): n is number => n !== null) ? nums : null;
 };

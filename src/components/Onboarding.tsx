@@ -3,11 +3,21 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Sparkles, Camera, ShieldCheck } from 'lucide-react';
 
 interface OnboardingProps {
-  onComplete: () => void;
+  /** 'appraise' = "Try your first item" (opens the appraisal form); 'skip' = Skip (opens the home chooser) */
+  onComplete: (next: 'appraise' | 'skip') => void;
+  /** The user's currency (EUR by default) so the example figures match what the app will show */
+  currency?: string;
 }
 
-export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
+export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, currency = 'EUR' }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const money = (n: number) => {
+    try {
+      return new Intl.NumberFormat('en-GB', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
+    } catch {
+      return `€${n.toLocaleString('en-GB')}`;
+    }
+  };
 
   const steps = [
     {
@@ -37,7 +47,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      onComplete();
+      onComplete('appraise');
     }
   };
 
@@ -56,7 +66,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           ))}
         </div>
         <button 
-          onClick={onComplete}
+          onClick={() => onComplete('skip')}
           className="text-[10px] uppercase tracking-widest font-bold text-muted hover:text-ink transition-colors"
         >
           Skip
@@ -93,14 +103,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                   >
                     <div className="text-center">
                       <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/50 mb-1">Asking Price</p>
-                      <p className="text-2xl font-light text-white/40 line-through decoration-decision-red/60 decoration-2">£1,250</p>
+                      <p className="text-2xl font-light text-white/40 line-through decoration-decision-red/60 decoration-2">{money(1250)}</p>
                     </div>
                     
                     <div className="w-8 h-px bg-white/20" />
                     
                     <div className="text-center">
                       <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-gold mb-1">Real Market Value</p>
-                      <p className="text-4xl font-bold text-white tracking-tight">£650 – £800</p>
+                      <p className="text-4xl font-bold text-white tracking-tight">{money(650)} – {money(800)}</p>
                     </div>
                   </motion.div>
                 )}
@@ -116,7 +126,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     {/* Decision Anchor - Most Prominent */}
                     <div className="text-center mb-5 pb-5 border-b border-white/10">
                       <p className="text-[9px] uppercase tracking-[0.2em] font-bold text-gold mb-2">Expert Verdict</p>
-                      <h2 className="serif text-2xl text-white leading-tight italic">“Only buy below £8,000”</h2>
+                      <h2 className="serif text-2xl text-white leading-tight italic">“Only buy below {money(700)}”</h2>
                     </div>
 
                     <div className="flex items-center justify-between mb-6">

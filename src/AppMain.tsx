@@ -23,6 +23,16 @@ import { Loader2, Sparkles } from 'lucide-react';
 import { Toast, type ToastKind, type ToastMessage } from './components/Toast';
 import { analysisItems, saveLocalFind } from './services/localFinds';
 
+const SIGNIN_TIMEOUT_MS = 60_000;      // give up on the Google popup after 1 minute
+const SIGNIN_RETURN_GRACE_MS = 4_000;  // after the user comes back to the app, wait this long for the sign-in to land
+const SAVE_TIMEOUT_MS = 15_000;        // Firestore write (offline writes never resolve)
+
+const withTimeout = <T,>(p: Promise<T>, ms: number, message: string): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(Object.assign(new Error(message), { code: 'timeout' })), ms);
+    p.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
+  });
+
 type Screen = 'intro-choice' | 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'legal' | 'upload-choice' | 'profile' | 'hunt';
 
 export default function Main() {
@@ -178,6 +188,35 @@ export default function Main() {
     return (err?.message || 'unknown error').slice(0, 120);
   };
 
+  // Google sign-in for "Save to Log" that always settles. Firebase sometimes never rejects when the user closes the
+  // popup (e.g. cross-origin popup policies), which left the button stuck on "Saving…". We resolve with null when:
+  // signInWithPopup fails, the app window regains focus / becomes visible again and no user signed in within a few
+  // seconds (popup closed), or after SIGNIN_TIMEOUT_MS.
+  const signInOrGiveUp = (): Promise<User | null> => new Promise((resolve) => {
+    let settled = false;
+    let returnTimer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (u: User | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(hardTimer);
+      if (returnTimer) clearTimeout(returnTimer);
+      window.removeEventListener('focus', onReturn);
+      document.removeEventListener('visibilitychange', onReturn);
+      resolve(u);
+    };
+    const onReturn = () => {
+      if (document.visibilityState === 'hidden') return;
+      if (returnTimer) clearTimeout(returnTimer);
+      returnTimer = setTimeout(() => finish(auth.currentUser), SIGNIN_RETURN_GRACE_MS);
+    };
+    const hardTimer = setTimeout(() => finish(auth.currentUser), SIGNIN_TIMEOUT_MS);
+    window.addEventListener('focus', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+    signInWithPopup(auth, new GoogleAuthProvider())
+      .then(cred => finish(cred.user))
+      .catch(error => { console.error('Login error:', error?.code || error); finish(null); });
+  });
+
   // Save the current appraisal to the user's log (Firestore when signed in, otherwise this device),
   // always with visible feedback. The Firestore document only uses fields allowed by firestore.rules (isValidFind).
   const handleSaveFind = async (status: string) => {
@@ -215,23 +254,22 @@ export default function Main() {
     let currentUser = user || auth.currentUser;
     if (!currentUser) {
       showToast('info', t('toast.signin_needed'));
-      try {
-        const cred = await signInWithPopup(auth, new GoogleAuthProvider());
-        currentUser = cred.user;
-      } catch (error) {
-        console.error('Login error:', error);
+      // Every sign-in outcome ends here: success, error (popup closed/blocked, unauthorized domain...), the user
+      // coming back to the app without finishing (popup closed but Firebase never reports it), or a hard timeout.
+      currentUser = await signInOrGiveUp();
+      if (!currentUser) {
         saveOnDevice('saved_local');
         return;
       }
     }
 
     try {
-      await addDoc(collection(db, 'finds'), {
+      await withTimeout(addDoc(collection(db, 'finds'), {
         userId: currentUser.uid,
         ...record,
         notes: '',
         createdAt: serverTimestamp()
-      });
+      }), SAVE_TIMEOUT_MS, 'no connection (timed out)');
       setSavedResult(analysisResult);
       showToast('success', t('toast.saved'));
     } catch (error) {
@@ -503,11 +541,21 @@ export default function Main() {
   return (
     <ErrorBoundary>
       {showOnboarding && (
-        <Onboarding onComplete={() => {
-          setShowOnboarding(false);
-          localStorage.setItem('onboarding_complete', 'true');
-          setCurrentScreen('intro-choice');
-        }} />
+        <Onboarding
+          currency={currency}
+          onComplete={(next) => {
+            setShowOnboarding(false);
+            localStorage.setItem('onboarding_complete', 'true');
+            // "Try your first item" goes straight to the appraisal form; Skip shows the home chooser
+            if (next === 'appraise') {
+              setIsDetailedScan(false);
+              setAutoStartListening(false);
+              setCurrentScreen('describe');
+            } else {
+              setCurrentScreen('intro-choice');
+            }
+          }}
+        />
       )}
       <Toast toast={toast} onClose={() => setToast(null)} />
       <MainLayout onViewChange={setCurrentScreen}>

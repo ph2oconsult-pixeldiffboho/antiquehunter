@@ -3,14 +3,19 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import {
-  allowedDomainsFor, cleanText, failsPeriodRule, isAllowedHost, isGenericUrl, isSpecificListingUrl, parsePage,
+  allowedDomainsFor, cleanText, failsPeriodRule, interencheresLotId, isAllowedHost, isGenericUrl, isSpecificListingUrl,
+  modernYearInTitle, parseInterencheresItem, parsePage,
 } from "../src/services/huntValidation.ts";
 import {
-  alignProseRanges, allInCost, basisFromScore, clampToBand, decideBuy, maxHammerForMarketHigh, priceBandScore,
-  reconcileNegotiation, sanitizeDeep, sanitizeProse,
+  alignProseRanges, allInCost, basisFromScore, clampToBand, decideBuy, maxHammerForMarketHigh, parseBudget, parsePriceInput, priceBandScore,
+  reconcileNegotiation, sanitizeDeep, sanitizePriceTyping, sanitizeProse,
 } from "../src/services/appraisalMath.ts";
+import { checkGeography, itemTypesInQuery, matchesItemType, regionsFor, regionsInLocation } from "../src/services/huntGeo.ts";
 import { CURRENCY_STORAGE_KEY, loadCurrency, saveCurrency } from "../src/services/currencyPref.ts";
-import { UNVERIFIED_PRICE, validateMatch, GEMINI_TIMEOUT_MS, VALIDATION_BUDGET_MS, FUNCTION_BUDGET_MS } from "../src/services/hunting.ts";
+import {
+  UNVERIFIED_PRICE, validateMatch, GEMINI_TIMEOUT_MS, VALIDATION_BUDGET_MS, FUNCTION_BUDGET_MS, AUCTIONET_BUDGET_MS,
+  auctionetToMatch, budgetMax, planHunt, withinBudget,
+} from "../src/services/hunting.ts";
 import { analysisItems } from "../src/services/localFinds.ts";
 
 let passed = 0;
@@ -42,7 +47,10 @@ check("specific listing urls are recognised", () => {
     "https://onlineonly.christies.com/s/irene-roosevelt-aitken-love-18th-century/george-i-oak-console-table-641/286363",
   ]) assert.equal(isSpecificListingUrl(u), true, u);
   assert.equal(isSpecificListingUrl("https://www.interencheres.com/art-decoration/belle-vente-mobiliere-685868"), false);
-  assert.equal(isSpecificListingUrl("https://www.selency.fr/p/8G7ZRWYD/commode"), false);
+  assert.equal(isSpecificListingUrl("https://www.selency.fr/p/8G7ZRWYD/commode"), true);
+  assert.equal(isSpecificListingUrl("https://www.the-saleroom.com/en-gb/auction-catalogues/rogersjones/catalogue-id-rogers10584/lot-edfa53d2-861c-4dfd-ab09-b32a00b9fb95"), true);
+  assert.equal(isSpecificListingUrl("https://www.the-saleroom.com/en-gb/auction-catalogues/rogersjones/catalogue-id-rogers10584"), false);
+  assert.equal(isSpecificListingUrl("https://www.easyliveauction.com/catalogue/lot/f79293ca7f90423cd9a03d86abedb1dc/0af8d24542e81eb9357e7ef448a6646f/antiques-lot-127/"), true);
 });
 
 check("platform filter maps names to domains", () => {
@@ -205,7 +213,8 @@ check("saved finds: analysis stored as a map and read back from any old shape", 
 
 check("hunt time budget stays well under Vercel's 60 s", () => {
   assert.ok(GEMINI_TIMEOUT_MS + VALIDATION_BUDGET_MS <= FUNCTION_BUDGET_MS);
-  assert.ok(FUNCTION_BUDGET_MS <= 52_000);
+  assert.ok(FUNCTION_BUDGET_MS <= 50_000);
+  assert.ok(AUCTIONET_BUDGET_MS < GEMINI_TIMEOUT_MS);
 });
 
 check("auction walk-away cap and all-in maths", () => {
@@ -256,7 +265,7 @@ if (process.env.AUCTIONET_PAGE && existsSync(process.env.AUCTIONET_PAGE)) {
   });
 }
 
-// Unverified listing (site returns 403 to the server): the model's guessed estimate is never shown as the price
+// Unverified listing (site returns 403 to the server): the model's guessed estimate/date is never shown, not even as a hint
 {
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async () => new Response("blocked", { status: 403 })) as typeof fetch;
@@ -271,18 +280,263 @@ if (process.env.AUCTIONET_PAGE && existsSync(process.env.AUCTIONET_PAGE)) {
     assert.equal(out.match!.verification, "unverified");
     assert.equal(out.match!.price, UNVERIFIED_PRICE);
     assert.equal(out.match!.date, undefined);
-    assert.match(out.match!.searchHint || "", /^~150 - 250 € · 12 Oct 2026 \(unverified\)$/);
+    assert.equal(out.match!.searchHint, undefined);
+    assert.ok(!JSON.stringify(out.match).includes("150 - 250"), "model estimate leaked");
     const out2 = await validateMatch(
       { url: "https://www.bukowskis.com/en/lots/1741375-chest-of-drawers", title: "Chest of drawers, Late Gustavian, circa 1800", price: "Estimate: 8,000 SEK", date: "", location: "Stockholm", dealerAnalysis: "ok" },
       { query: "commode", geographies: ["Sweden"], platforms: ["Bukowskis"], periodOnly: true },
       allowedDomainsFor(["Bukowskis"]),
       Date.now() + 5000
     );
-    assert.equal(out2.match!.searchHint, "~8,000 SEK (unverified)");
-    passed++; console.log("ok - unverified listing shows 'check listing', guessed estimate only as a labelled hint");
+    assert.equal(out2.match!.price, UNVERIFIED_PRICE);
+    assert.equal(out2.match!.searchHint, undefined);
+    passed++; console.log("ok - unverified listing shows only 'Estimate: check listing' (no model figures)");
   } finally {
     globalThis.fetch = realFetch;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Round 3 (8 Oct 2026 road test)
+// ---------------------------------------------------------------------------
+
+// 1. Geography is enforced on the server
+check("geography: UK-only drops French sites, keeps UK sites", () => {
+  const uk = regionsFor(["United Kingdom"]);
+  assert.equal(checkGeography("https://www.interencheres.com/meubles/vente-1/lot-89000001.html", ["Marseille"], uk).ok, false);
+  assert.equal(checkGeography("https://www.interencheres.com/meubles/vente-1/lot-89000001.html", [""], uk).ok, false);
+  assert.equal(checkGeography("https://www.ebay.fr/itm/123456789012", ["Lyon"], uk).ok, false);
+  assert.equal(checkGeography("https://www.the-saleroom.com/en-gb/auction-catalogues/x/catalogue-id-1/lot-edfa53d2-861c-4dfd-ab09-b32a00b9fb95", ["Colwyn Bay, Conwy"], uk).ok, true);
+  assert.equal(checkGeography("https://www.ebay.co.uk/itm/123456789012", ["Carmarthen, Wales"], uk).ok, true);
+  assert.equal(checkGeography("https://www.ebay.co.uk/itm/123456789012", ["Lyon, France"], uk).ok, false);
+  // multi-country houses need a matching location
+  assert.equal(checkGeography("https://www.christies.com/en/lot/lot-123", ["London"], uk).ok, true);
+  assert.equal(checkGeography("https://www.christies.com/en/lot/lot-123", ["Paris"], uk).ok, false);
+  assert.equal(checkGeography("https://www.christies.com/en/lot/lot-123", [""], uk).ok, false);
+  // Europe covers France / UK / Sweden; Global switches the filter off
+  assert.equal(checkGeography("https://www.interencheres.com/x/v-1/lot-1.html", ["Paris"], regionsFor(["Europe"])).ok, true);
+  assert.equal(checkGeography("https://auctionet.com/en/1-x", ["Norrköping"], regionsFor(["Sweden"])).ok, true);
+  assert.equal(checkGeography("https://auctionet.com/en/1-x", ["Barcelona"], regionsFor(["Sweden"])).ok, false);
+  assert.equal(regionsFor(["Global/Rest of World", "France"]), null);
+  assert.equal(regionsInLocation("Kyiv, Ukraine").has("United Kingdom"), false);
+});
+
+check("geography: platforms follow the selected regions", () => {
+  // Road test: UK only with the default (French) platforms selected
+  const p = planHunt({ query: "Welsh dresser", geographies: ["United Kingdom"], platforms: ["Interencheres", "Drouot", "LeBonCoin", "Christie's"], periodOnly: true });
+  assert.ok(!p.allowedDomains.includes("interencheres.com") && !p.allowedDomains.includes("drouot.com") && !p.allowedDomains.includes("leboncoin.fr"), p.allowedDomains.join());
+  assert.ok(p.allowedDomains.includes("the-saleroom.com") && p.allowedDomains.includes("easyliveauction.com") && p.allowedDomains.includes("ebay.co.uk"), p.allowedDomains.join());
+  assert.ok(!p.allowedDomains.includes("ebay.fr"));
+  assert.deepEqual(p.ignoredPlatforms, ["Interencheres", "Drouot", "LeBonCoin"]);
+  assert.deepEqual(p.itemTypes, ["dresser"]);
+  const s = planHunt({ query: "Gustavian commode", geographies: ["Europe"], platforms: ["Interencheres", "Auctionet", "Bukowskis"], periodOnly: true });
+  assert.equal(s.useAuctionet, true);
+  assert.ok(s.local.sv.includes("gustaviansk byrå") && s.local.sv.includes("gustaviansk kommod"), s.local.sv.join());
+  const f = planHunt({ query: "Louis XV commode", geographies: ["France"], platforms: ["Interencheres", "Drouot"], periodOnly: true });
+  assert.equal(f.useAuctionet, false);
+  assert.ok(f.local.fr.includes("commode Louis XV"));
+});
+
+check("relevance: results must be the requested type of piece (EN/FR/SV)", () => {
+  assert.deepEqual(itemTypesInQuery("Welsh dresser"), ["dresser"]);
+  assert.deepEqual(itemTypesInQuery("Gustavian commode"), ["commode"]);
+  assert.deepEqual(itemTypesInQuery("Louis XVI console table"), ["console"]);
+  assert.deepEqual(itemTypesInQuery("something old and nice for my hallway"), []);
+  const d = ["dresser"];
+  assert.equal(matchesItemType(d, "Buffet-vaisselier en chêne, XIXe"), true);
+  assert.equal(matchesItemType(d, "An oak dresser base with boarded top"), true);
+  assert.equal(matchesItemType(d, "Commode Louis XV en noyer"), false);
+  assert.equal(matchesItemType(d, "Armoire normande"), false);
+  const c = ["commode"];
+  assert.equal(matchesItemType(c, "BYRÅ, 1800-talets början, sengustaviansk"), true);
+  assert.equal(matchesItemType(c, "George III mahogany chest of drawers"), true);
+  assert.equal(matchesItemType(c, "SKRIVBYRÅ med marmorskiva"), false);
+  assert.equal(matchesItemType(c, "Console d'applique en bois doré"), false);
+  assert.equal(matchesItemType([], "anything"), true);
+});
+
+check("period rule: modern years in titles, IKEA", () => {
+  assert.equal(modernYearInTitle("BYRÅ, gustaviansk stil, Tibro, 1985."), "1985");
+  assert.equal(modernYearInTitle("BYRÅ, 1800-talets början"), null);
+  assert.equal(modernYearInTitle("Commode vers 1780"), null);
+  assert.equal(modernYearInTitle("Dresser, 190 cm wide"), null);
+  assert.ok(failsPeriodRule('BYRÅ, "Medevi", IKEA, 1700-talsserie.'));
+});
+
+check("Auctionet API results: only live period lots of the right type, in budget", () => {
+  const json = JSON.parse(readFileSync(new URL("./fixtures/auctionet_gustaviansk_byra.json", import.meta.url), "utf8"));
+  const params = { query: "Gustavian commode", geographies: ["Europe"], platforms: ["Auctionet"], periodOnly: true, priceRange: "2000 EUR", currency: "EUR" };
+  const plan = planHunt(params);
+  const now = Date.UTC(2026, 9, 8, 6, 0, 0);
+  const kept = json.items.map((it: any) => auctionetToMatch(it, params, plan, now)).filter((o: any) => o.match).map((o: any) => o.match);
+  const ids = kept.map((m: any) => m.url.match(/\/(\d+)-/)[1]);
+  assert.deepEqual(ids.sort(), ["5380331", "5384954", "5408971"], ids.join());
+  for (const m of kept) {
+    assert.equal(m.verification, "verified");
+    assert.match(m.price, /^Estimate SEK/);
+    assert.ok(m.date && /^Auction: /.test(m.date));
+    assert.match(m.location, /Sweden/);
+  }
+  // Sweden-only search drops the Spanish house (EUR) and a tight budget drops the expensive lot
+  assert.equal(auctionetToMatch(json.items.find((i: any) => i.id === 5329913), { ...params, periodOnly: false, query: "antique" }, planHunt({ ...params, geographies: ["Sweden"], query: "antique" }), now).dropReason, "geo_location_mismatch");
+  assert.equal(auctionetToMatch(json.items.find((i: any) => i.id === 5384954), { ...params, priceRange: "300 EUR" }, plan, now).dropReason, "over_budget");
+  assert.equal(budgetMax("500 – 2 000 EUR"), 2000);
+  assert.equal(withinBudget(6000, "SEK", 2000, "EUR"), true);
+  assert.equal(withinBudget(60000, "SEK", 2000, "EUR"), false);
+});
+
+// 2. Interencheres: real estimate / date / city / fees from the lot's public JSON
+check("Interencheres lot JSON gives the real estimate, sale date, city and fees", () => {
+  const json = JSON.parse(readFileSync(new URL("./fixtures/interencheres_item_89074306.json", import.meta.url), "utf8"));
+  const f = parseInterencheresItem(json)!;
+  assert.equal(f.estimateLow, 600);
+  assert.equal(f.estimateHigh, 800);
+  assert.equal(f.saleDate?.toISOString(), "2026-11-05T13:30:00.000Z");
+  assert.equal(f.location, "Biarritz, France");
+  assert.equal(f.buyerPremiumPct, 28.8);
+  assert.ok(f.image?.startsWith("https://thumbor-indbupload.interencheres.com/"));
+  assert.ok(!f.soldOrEnded);
+  assert.equal(parseInterencheresItem({ data: { ...json.data, sale: { ...json.data.sale, live: { has_ended: true } } } })!.soldOrEnded, true);
+  assert.equal(interencheresLotId("https://www.interencheres.com/art-decoration/collections-dautomne-678390/lot-89074306.html"), "89074306");
+});
+
+{
+  const realFetch = globalThis.fetch;
+  const fixture = readFileSync(new URL("./fixtures/interencheres_item_89074306.json", import.meta.url), "utf8");
+  globalThis.fetch = (async (u: any) => String(u).includes("asgardgw.interencheres.com/v2/items/89074306")
+    ? new Response(fixture, { status: 200, headers: { "content-type": "application/json" } })
+    : new Response("blocked", { status: 403 })) as typeof fetch;
+  try {
+    const out = await validateMatch(
+      { url: "https://www.interencheres.com/art-decoration/collections-dautomne-678390/lot-89074306.html", title: "Commode Louis XV", price: "1 000 - 1 500 €", date: "5 Nov", location: "Biarritz", dealerAnalysis: "ok" },
+      { query: "Louis XV commode", geographies: ["France"], platforms: ["Interencheres"], periodOnly: true },
+      planHunt({ query: "Louis XV commode", geographies: ["France"], platforms: ["Interencheres"], periodOnly: true }),
+      Date.now() + 5000
+    );
+    assert.ok(out.match, JSON.stringify(out));
+    assert.equal(out.match!.verification, "verified");
+    assert.equal(out.match!.price, "Estimate €600 – €800");
+    assert.equal(out.match!.buyerPremiumPct, 28.8);
+    assert.match(out.match!.date || "", /5 Nov 2026/);
+    // UK-only: the same lot is dropped before any network call
+    const uk = await validateMatch(
+      { url: "https://www.interencheres.com/art-decoration/collections-dautomne-678390/lot-89074306.html", title: "Buffet vaisselier", location: "Biarritz", dealerAnalysis: "ok" },
+      { query: "Welsh dresser", geographies: ["United Kingdom"], platforms: ["Interencheres"], periodOnly: true },
+      { ...planHunt({ query: "Welsh dresser", geographies: ["United Kingdom"], platforms: ["Interencheres"], periodOnly: true }), allowedDomains: ["interencheres.com"] },
+      Date.now() + 5000
+    );
+    assert.equal(uk.dropReason, "geo_site_mismatch");
+    // wrong type of piece is dropped (road test: Welsh dresser search returned commodes/buffets from France)
+    const wrongType = await validateMatch(
+      { url: "https://www.interencheres.com/art-decoration/collections-dautomne-678390/lot-89074306.html", title: "Commode Louis XV", location: "Biarritz", dealerAnalysis: "ok" },
+      { query: "Welsh dresser", geographies: ["France"], platforms: ["Interencheres"], periodOnly: true },
+      planHunt({ query: "Welsh dresser", geographies: ["France"], platforms: ["Interencheres"], periodOnly: true }),
+      Date.now() + 5000
+    );
+    assert.equal(wrongType.dropReason, "not_requested_type");
+    passed++; console.log("ok - interencheres lot verified from its JSON (real estimate, fees), off-region / wrong-type lots dropped");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+// 3. The verdict can never contradict the smart-buy / walk-away figures
+const verdictCases = [
+  { name: "auction EUR80 (EUR100 all-in) vs smart buy EUR60 (EUR75 all-in), walk-away EUR100 (EUR125 all-in) -> Fair",
+    in: { askingPrice: 80, isAuction: true, premiumPct: 25, marketLow: 50, marketHigh: 150, retailHigh: 400, smartBuy: 60, walkAway: 100 },
+    basis: "fair", cap: "above_smart_buy" },
+  { name: "auction EUR2,000 (EUR2,500 all-in) vs walk-away EUR1,600 (EUR2,000 all-in) -> Overpriced",
+    in: { askingPrice: 2000, isAuction: true, premiumPct: 25, marketLow: 1200, marketHigh: 2000, retailHigh: 3500, smartBuy: 1100, walkAway: 1600 },
+    basis: "overpriced", cap: "above_walk_away" },
+  { name: "private GBP900 vs walk-away GBP650 (market 300-900) -> Overpriced",
+    in: { askingPrice: 900, isAuction: false, premiumPct: 0, marketLow: 300, marketHigh: 900, retailHigh: 1600, smartBuy: 450, walkAway: 650 },
+    basis: "overpriced", cap: "above_walk_away" },
+  { name: "auction EUR60 (EUR75 all-in) = smart buy -> Good Buy",
+    in: { askingPrice: 60, isAuction: true, premiumPct: 25, marketLow: 50, marketHigh: 150, retailHigh: 400, smartBuy: 60, walkAway: 100 },
+    basis: "good_buy", cap: undefined },
+];
+for (const tc of verdictCases) {
+  check(`verdict vs walk-away: ${tc.name}`, () => {
+    for (const hasPhotos of [false]) {
+      const d = decideBuy({ ...tc.in, hasPhotos, riskPenalty: -30, itemScore: 50 });
+      assert.equal(d.basis, tc.basis, JSON.stringify(d));
+      assert.equal(d.cap, tc.cap, JSON.stringify(d));
+      assert.ok(d.score >= d.band.min && d.score <= d.band.max, JSON.stringify(d));
+    }
+  });
+}
+
+check("verdict invariants over many prices: never Fair+ above walk-away, never Good+ above smart buy", () => {
+  const en = JSON.parse(readFileSync(new URL("../src/i18n/en.json", import.meta.url), "utf8"));
+  assert.match(en.analysis.reason_above_walk_away, /\{\{walkAway\}\}/);
+  assert.match(en.analysis.reason_above_smart_buy, /\{\{smartBuy\}\}/);
+  for (const auction of [true, false]) {
+    for (const [lo, hi, rh] of [[50, 150, 400], [300, 900, 1600], [1200, 2000, 3500], [2000, 4200, 6000]]) {
+      const nf = reconcileNegotiation({}, lo, hi, 25, auction);
+      for (let price = 10; price <= rh * 1.5; price += Math.max(5, Math.round(hi / 40))) {
+        const d = decideBuy({ askingPrice: price, isAuction: auction, premiumPct: 25, hasPhotos: false, marketLow: lo, marketHigh: hi, retailHigh: rh, smartBuy: nf.good_buy_below, walkAway: nf.walk_away_price });
+        const eff = allInCost(price, 25, auction);
+        if (eff > d.walkAwayAllIn!) assert.ok(["overpriced", "walk_away"].includes(d.basis), `${price}: ${d.basis}`);
+        if (eff > d.smartBuyAllIn!) assert.ok(!["strong_buy", "good_buy"].includes(d.basis), `${price}: ${d.basis}`);
+        assert.ok(d.basis !== "no_price");
+      }
+    }
+  }
+});
+
+// 4. Contiguous bands: every price maps to exactly one band, and "Overpaying" = walk-away
+check("price bands are contiguous; overpaying threshold = walk-away", () => {
+  // market top 4,200, old 'overpaying' 5,000, price 4,500 used to fall in no displayed band
+  const nf = reconcileNegotiation({ good_buy_below: 2500, walk_away_price: 4000 }, 2000, 4200, 0, false);
+  const at = (p: number) => decideBuy({ askingPrice: p, isAuction: false, premiumPct: 0, hasPhotos: false, marketLow: 2000, marketHigh: 4200, retailHigh: 6000, smartBuy: nf.good_buy_below, walkAway: nf.walk_away_price });
+  assert.equal(at(4500).basis, "overpriced");
+  assert.equal(at(nf.walk_away_price).basis, "fair");
+  assert.equal(at(nf.walk_away_price + 1).basis, "overpriced");
+  assert.equal(at(nf.good_buy_below).basis, "good_buy");
+  assert.equal(at(nf.good_buy_below + 1).basis, "fair");
+  assert.equal(at(6001).basis, "walk_away");
+  let prev = 100;
+  for (let p = 500; p <= 8000; p += 50) { const s = at(p).score; assert.ok(s <= prev, `score rises at ${p}`); prev = s; }
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  assert.match(gem, /pg\.overpaying_above = nf\.walk_away_price/);
+});
+
+// 5. Smart buy never above market mid (and never above market high)
+check("smart buy is clamped within [market low, market mid]", () => {
+  for (const auction of [false, true]) {
+    const f = auction ? 1.25 : 1;
+    const r = reconcileNegotiation({ good_buy_below: 350, walk_away_price: 400 }, 80, 300, 25, auction);
+    assert.ok(r.good_buy_below * f <= 190 + 1, JSON.stringify(r));          // mid = 190
+    assert.ok(r.good_buy_below * f >= 80 - 1, JSON.stringify(r));
+    assert.ok(r.walk_away_price * f <= 300, JSON.stringify(r));
+    assert.ok(r.good_buy_below <= r.walk_away_price);
+  }
+});
+
+// 11. Price input: numbers only, common separators, currency symbols stripped
+check("price input parsing", () => {
+  const cases: Array<[string, number | null]> = [
+    ["1500", 1500], ["1 500", 1500], ["1,500", 1500], ["1.500", 1500], ["€1,500", 1500], ["1 500 €", 1500], ["£900", 900],
+    ["1.500,50", 1500.5], ["1,500.50", 1500.5], ["99.5", 99.5], ["2 000 000", 2000000], ["900 EUR", 900],
+    ["abc", null], ["12abc", null], ["", null], ["0", null], [".", null], ["-5", null],
+  ];
+  for (const [raw, want] of cases) assert.equal(parsePriceInput(raw), want, raw);
+  assert.equal(sanitizePriceTyping("€1,5a00x"), "1,500");
+  assert.equal(sanitizePriceTyping("12e3"), "123");
+  assert.deepEqual(parseBudget("1 500"), [1500]);
+  assert.deepEqual(parseBudget("500 – 2 000"), [500, 2000]);
+  assert.deepEqual(parseBudget("500-2000"), [500, 2000]);
+  assert.equal(parseBudget("cheap"), null);
+  assert.equal(parseBudget("1-2-3"), null);
+});
+
+check("confidence: one label set (top badge and gauge agree)", () => {
+  const en = JSON.parse(readFileSync(new URL("../src/i18n/en.json", import.meta.url), "utf8"));
+  for (const lvl of ["high", "medium", "low", "very_low"]) {
+    const top = en.analysis[`confidence_${lvl}`].toLowerCase();
+    const gauge = en.analysis[`conf_level_${lvl}`].toLowerCase();
+    assert.ok(top.startsWith(gauge + " confidence"), `${lvl}: "${top}" vs "${gauge}"`);
+  }
+});
 
 console.log(`\n${passed} checks passed`);

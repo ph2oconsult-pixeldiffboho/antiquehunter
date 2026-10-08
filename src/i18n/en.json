@@ -59,7 +59,7 @@
     "confidence_high": "High Confidence",
     "confidence_medium": "Medium Confidence",
     "confidence_low": "Low Confidence — Needs Verification",
-    "confidence_very_low": "Low Confidence — Needs Verification",
+    "confidence_very_low": "Very Low Confidence — Needs Verification",
     "explanation": "Dealer's Assessment",
     "preliminary_findings": "First Look",
     "checklist": "The Dealer's Checklist",
@@ -87,7 +87,7 @@
     "smart_buy": "Smart buy",
     "retail_range": "Retail Range",
     "overpaying": "Overpaying",
-    "overpaying_desc": "This is where buyers go wrong",
+    "overpaying_desc": "= your walk-away price",
     "dealers_buy": "Dealer's Buy",
     "dealers_buy_desc": "Dealer acquisition price",
     "exit_strategy": "Exit Strategy",
@@ -166,13 +166,17 @@
     "reason_high_risk": "The photos show a serious authenticity or condition risk, so the price alone does not make this a buy.",
     "reason_no_price": "Add the asking price or estimate to get a buy verdict.",
     "reason_premium_suffix": " all-in (incl. {{pct}}% buyer's premium)",
-    "smart_buy_hammer": "Max hammer · {{allIn}} all-in",
+    "smart_buy_hammer": "Hammer bid · {{allIn}} all-in",
     "gauge_label": "Buy score",
     "gauge_confidence": "Confidence: {{level}}",
     "conf_level_high": "high",
     "conf_level_medium": "medium",
     "conf_level_low": "low",
-    "conf_level_very_low": "very low"
+    "conf_level_very_low": "very low",
+    "reason_above_walk_away": "{{price}}{{premium}} is above your walk-away price ({{walkAway}}) – overpriced, no margin left. Don't go above {{walkAway}}.",
+    "reason_above_smart_buy": "{{price}}{{premium}} is above the smart-buy price ({{smartBuy}}) but within your walk-away ({{walkAway}}) – fair, but little margin left.",
+    "overpaying_value": "Above {{price}}",
+    "overpaying_all_in": "{{allIn}} all-in"
   },
   "results": {
     "title": "Dealer's Findings",
@@ -246,7 +250,8 @@
     "title": "Dealer's Hunting Log",
     "search_placeholder": "Search your finds...",
     "empty": "No items logged. Start your first appraisal.",
-    "delete_confirm": "Are you sure you want to delete this find?"
+    "delete_confirm": "Are you sure you want to delete this find?",
+    "no_photo": "No photo"
   },
   "describe": {
     "title": "Item Details",
@@ -283,7 +288,8 @@
     "try_item": "Try an item — even something nearby",
     "upload_photo_hint": "A photo is the starting point. Details sharpen the price.",
     "simple_start_hint": "“Start with something simple — even a glass or small item”",
-    "lot_url_label": "Paste Auction or Listing Link (Lot Link)"
+    "lot_url_label": "Paste Auction or Listing Link (Lot Link)",
+    "price_invalid": "Enter numbers only, e.g. 1500, 1 500 or 1,500.50"
   },
   "categories": {
     "furniture": "Furniture",
@@ -404,11 +410,13 @@
     "unverified_desc": "This site blocks automated checks, so the estimate, sale date and availability could not be confirmed – open the listing to check.",
     "checked_summary": "Links checked: {{verified}} verified, {{unverified}} unverified, {{dropped}} removed (dead, closed, generic or off-filter).",
     "check_listing": "Estimate: check listing",
-    "search_hint": "Search result said {{hint}}"
+    "budget_invalid": "Enter numbers only, e.g. 1500 or 500 – 2000",
+    "geo_platform_note": "Only sources in your selected regions are searched; results from other countries are removed.",
+    "premium_note": "+{{pct}}% buyer's premium"
   },
   "toast": {
     "saved": "Saved to your log.",
-    "saved_local": "Saved to your log on this device (not signed in).",
+    "saved_local": "Saved on this device – sign in to sync.",
     "save_failed": "Could not save: {{reason}}",
     "signin_needed": "Sign in with Google to save to your account…",
     "save_failed_local": "Couldn't save to your account ({{reason}}). Saved on this device instead."

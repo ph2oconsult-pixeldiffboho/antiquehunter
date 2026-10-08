@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag, Mic, MicOff, Sparkles, Link as LinkIcon, Info, ChevronDown, ChevronUp, Gavel, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AntiqueCategory } from '../services/gemini';
+import { parsePriceInput, sanitizePriceTyping } from '../services/appraisalMath';
 
 interface DescriptionInputProps {
   onBack: () => void;
@@ -37,7 +38,11 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const [description, setDescription] = useState('');
   const [lotUrl, setLotUrl] = useState('');
   const [detectedPlatform, setDetectedPlatform] = useState<string | null>(null);
+  // Price is a text field (not type="number"): number inputs drop the whole value when you type "1 500" or "1,500",
+  // which garbled fast typing. We keep digits/separators only and parse on submit.
   const [price, setPrice] = useState('');
+  const [priceTouched, setPriceTouched] = useState(false);
+  const priceInvalid = priceTouched && price.trim() !== '' && parsePriceInput(price) === null;
   const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
   const [currency, setCurrency] = useState(globalCurrency);
   const [sellerType, setSellerType] = useState('Market/Fair');
@@ -137,8 +142,14 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
     // Determine final lotUrl either from field or description
     const effectiveLotUrl = lotUrl.trim() || (description.match(/(https?:\/\/[^\s]+)/i)?.[0] || '');
 
+    const parsedPrice = parsePriceInput(price);
+    if (price.trim() && parsedPrice === null) {
+      setPriceTouched(true);
+      return; // validation message is shown under the field
+    }
+
     onAnalyze(description, { 
-      askingPrice: price ? parseFloat(price) : undefined, 
+      askingPrice: parsedPrice ?? undefined, 
       priceType,
       currency, 
       sellerType,
@@ -461,11 +472,17 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
             </div>
             <div className="relative">
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0.00"
-                className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm text-ink placeholder:text-muted/40"
+                onChange={(e) => setPrice(sanitizePriceTyping(e.target.value))}
+                onBlur={() => setPriceTouched(true)}
+                placeholder="e.g. 1 500"
+                aria-label={t('describe.asking_price')}
+                aria-invalid={priceInvalid}
+                data-testid="asking-price"
+                className={`w-full p-4 pr-24 bg-paper border rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm text-ink placeholder:text-muted/40 ${priceInvalid ? 'border-decision-red' : 'border-border-custom'}`}
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <select 
@@ -483,6 +500,9 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                 </select>
               </div>
             </div>
+            {priceInvalid && (
+              <p className="text-[11px] text-decision-red font-medium" role="alert">{t('describe.price_invalid')}</p>
+            )}
           </div>
 
           <div className="space-y-2">

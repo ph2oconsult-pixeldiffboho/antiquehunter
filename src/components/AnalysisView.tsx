@@ -6,7 +6,7 @@ import { BuyGaugeScore } from './BuyGaugeScore';
 import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { allInCost, basisFromScore, clampToBand, type PriceBasis } from '../services/appraisalMath';
+import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis } from '../services/appraisalMath';
 
 interface AnalysisViewProps {
   result: any; // Can be a single object or an array of objects
@@ -21,6 +21,228 @@ interface AnalysisViewProps {
   onAddMoreDetails: () => void;
   iterationCount: number;
 }
+
+// Defined at module level (not inside AnalysisView): as an inline component it was re-created on every
+// AnalysisView render, which remounted it and wiped what the user was typing (e.g. the price paid).
+const FeedbackSection = ({ currentItem, onBack }: { currentItem: any; onBack: () => void }) => {
+  const { t } = useTranslation();
+  const [outcome, setOutcome] = useState<'bought' | 'not_bought' | 'still_deciding' | null>(null);
+  const [pricePaid, setPricePaid] = useState('');
+  const [reason, setReason] = useState<string | null>(null);
+  const [helpful, setHelpful] = useState<boolean | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (submitted) {
+      const timer = setTimeout(() => {
+        onBack();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [submitted]);
+
+  const handleSubmit = async () => {
+    if (outcome === null || helpful === null) return;
+    if (outcome === 'not_bought' && !reason) return;
+    
+    setLoading(true);
+    try {
+      const feedbackData = {
+        userId: auth.currentUser?.uid || 'anonymous',
+        itemCategory: currentItem.item_summary.category,
+        predictedPriceRange: {
+          low: currentItem.price_guidance.estimated_market_range_low,
+          high: currentItem.price_guidance.estimated_market_range_high
+        },
+        confidenceLevel: currentItem.item_summary.confidence,
+        confidenceScore: currentItem.item_summary.confidence_score,
+        userAction: outcome,
+        pricePaid: outcome === 'bought' ? parseFloat(pricePaid) || null : null,
+        notBoughtReason: outcome === 'not_bought' ? reason : null,
+        isHelpful: helpful,
+        timestamp: serverTimestamp(),
+        itemId: String(currentItem.item_summary.title || '').slice(0, 250)
+        // (no extra fields: the Firestore rules only accept the fields listed in isValidFeedback)
+      };
+
+      await addDoc(collection(db, 'analysis_feedback'), feedbackData);
+      setSubmitted(true);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'analysis_feedback');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-8 bg-decision-green/5 border border-decision-green/20 rounded-[44px] text-center space-y-2"
+      >
+        <CheckCircle className="w-8 h-8 text-decision-green mx-auto" />
+        <p className="text-sm font-bold text-decision-green">{t('feedback.thanks')}</p>
+      </motion.div>
+    );
+  }
+
+  return (
+    <section className="p-8 bg-white border border-border-custom rounded-[44px] shadow-sm space-y-8">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-muted">
+          <Info className="w-4 h-4" />
+          <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('feedback.title')}</h3>
+        </div>
+        <p className="text-sm text-muted font-medium">{t('feedback.subtitle')}</p>
+      </div>
+
+      <div className="space-y-6">
+        {/* Question 1: What happened? */}
+        <div className="space-y-3">
+          <p className="text-sm font-bold text-ink">{t('feedback.outcome_question')}</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'bought', label: t('feedback.bought') },
+              { id: 'not_bought', label: t('feedback.not_bought') },
+              { id: 'still_deciding', label: t('feedback.still_deciding') }
+            ].map((opt) => (
+              <button 
+                key={opt.id}
+                onClick={() => {
+                  setOutcome(opt.id as any);
+                  setReason(null);
+                  setHelpful(null);
+                }}
+                className={`px-4 py-2.5 rounded-2xl border text-xs font-bold transition-all ${outcome === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted hover:border-gold/30'}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Conditional: Bought it */}
+        {outcome === 'bought' && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="space-y-6 pt-2"
+          >
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-ink">{t('feedback.price_paid_label')}</p>
+              <input 
+                type="number"
+                value={pricePaid}
+                onChange={(e) => setPricePaid(e.target.value)}
+                placeholder={t('feedback.price_paid_placeholder')}
+                className="w-full px-5 py-3 bg-paper border border-border-custom rounded-2xl text-sm font-medium focus:outline-none focus:border-gold transition-colors"
+              />
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-ink">{t('feedback.helpful_question')}</p>
+              <div className="flex gap-2">
+                {[
+                  { id: true, label: t('feedback.yes') },
+                  { id: false, label: t('feedback.no') }
+                ].map((opt) => (
+                  <button 
+                    key={String(opt.id)}
+                    onClick={() => setHelpful(opt.id)}
+                    className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Conditional: Didn't buy */}
+        {outcome === 'not_bought' && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="space-y-6 pt-2"
+          >
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-ink">{t('feedback.why_not_bought_question')}</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'too_expensive', label: t('feedback.reason_expensive') },
+                  { id: 'no_trust', label: t('feedback.reason_trust') },
+                  { id: 'condition_issue', label: t('feedback.reason_condition') },
+                  { id: 'seller_issue', label: t('feedback.reason_seller') },
+                  { id: 'other', label: t('feedback.reason_other') }
+                ].map((opt) => (
+                  <button 
+                    key={opt.id}
+                    onClick={() => setReason(opt.id)}
+                    className={`px-4 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${reason === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-ink">{t('feedback.helpful_question')}</p>
+              <div className="flex gap-2">
+                {[
+                  { id: true, label: t('feedback.yes') },
+                  { id: false, label: t('feedback.no') }
+                ].map((opt) => (
+                  <button 
+                    key={String(opt.id)}
+                    onClick={() => setHelpful(opt.id)}
+                    className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Conditional: Still deciding */}
+        {outcome === 'still_deciding' && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="space-y-3 pt-2"
+          >
+            <p className="text-sm font-bold text-ink">{t('feedback.helpful_so_far_question')}</p>
+            <div className="flex gap-2">
+              {[
+                { id: true, label: t('feedback.yes') },
+                { id: false, label: t('feedback.no') }
+              ].map((opt) => (
+                <button 
+                  key={String(opt.id)}
+                  onClick={() => setHelpful(opt.id)}
+                  className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        <button 
+          onClick={handleSubmit}
+          disabled={outcome === null || helpful === null || (outcome === 'not_bought' && !reason) || loading}
+          className="w-full py-4 bg-ink text-white rounded-2xl font-bold text-sm disabled:opacity-30 transition-all hover:opacity-95 shadow-2xl shadow-ink/20"
+        >
+          {loading ? t('common.loading') : t('feedback.submit')}
+        </button>
+      </div>
+    </section>
+  );
+};
 
 export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onNewAppraisal, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, iterationCount }) => {
   const { t, i18n } = useTranslation();
@@ -84,13 +306,19 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const effective = Number(originalDecision.effective_price || rawItem.seller_context?.allInPrice) || 0;
     const low = Number(pg.estimated_market_range_low) || 0;
     const high = Number(pg.estimated_market_range_high) || 0;
+    // Smart-buy / walk-away in the same (all-in) units as the effective price
+    const ns = rawItem.negotiation_strategy || {};
+    const smartAllIn = Number(originalDecision.smart_buy_all_in) || allInCost(Number(pg.good_buy_below) || 0, pct, isAuction);
+    const walkAllIn = Number(originalDecision.walk_away_all_in) || allInCost(Number(ns.walk_away_price) || 0, pct, isAuction);
     const reason = (effective > 0 || basis === 'high_risk' || basis === 'no_price')
-      ? t(`analysis.reason_${basis}`, {
+      ? t(`analysis.${reasonKeyFor(basis, originalDecision.price_cap || undefined)}`, {
           price: formatMoney(effective, pg.currency),
           premium: isAuction && pct > 0 ? t('analysis.reason_premium_suffix', { pct }) : '',
           low: formatMoney(low, pg.currency),
           high: formatMoney(high, pg.currency),
           retailHigh: formatMoney(Number(pg.fair_price_high) || 0, pg.currency),
+          smartBuy: formatMoney(smartAllIn, pg.currency) + (isAuction && pct > 0 ? ' all-in' : ''),
+          walkAway: formatMoney(walkAllIn, pg.currency) + (isAuction && pct > 0 ? ' all-in' : ''),
         })
       : (score >= 65 ? t('analysis.buy_strong_desc') : score >= 45 ? t('analysis.buy_risky_desc') : t('analysis.buy_avoid_desc'));
 
@@ -519,225 +747,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     </div>
   );
 
-  const FeedbackSection = ({ currentItem }: { currentItem: any }) => {
-    const { t } = useTranslation();
-    const [outcome, setOutcome] = useState<'bought' | 'not_bought' | 'still_deciding' | null>(null);
-    const [pricePaid, setPricePaid] = useState('');
-    const [reason, setReason] = useState<string | null>(null);
-    const [helpful, setHelpful] = useState<boolean | null>(null);
-    const [submitted, setSubmitted] = useState(false);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-      if (submitted) {
-        const timer = setTimeout(() => {
-          onBack();
-        }, 3000);
-        return () => clearTimeout(timer);
-      }
-    }, [submitted]);
-
-    const handleSubmit = async () => {
-      if (outcome === null || helpful === null) return;
-      if (outcome === 'not_bought' && !reason) return;
-      
-      setLoading(true);
-      try {
-        const feedbackData = {
-          userId: auth.currentUser?.uid || 'anonymous',
-          itemCategory: currentItem.item_summary.category,
-          predictedPriceRange: {
-            low: currentItem.price_guidance.estimated_market_range_low,
-            high: currentItem.price_guidance.estimated_market_range_high
-          },
-          confidenceLevel: currentItem.item_summary.confidence,
-          confidenceScore: currentItem.item_summary.confidence_score,
-          userAction: outcome,
-          pricePaid: outcome === 'bought' ? parseFloat(pricePaid) || null : null,
-          notBoughtReason: outcome === 'not_bought' ? reason : null,
-          isHelpful: helpful,
-          timestamp: serverTimestamp(),
-          itemId: String(currentItem.item_summary.title || '').slice(0, 250)
-          // (no extra fields: the Firestore rules only accept the fields listed in isValidFeedback)
-        };
-
-        await addDoc(collection(db, 'analysis_feedback'), feedbackData);
-        setSubmitted(true);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.CREATE, 'analysis_feedback');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (submitted) {
-      return (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-8 bg-decision-green/5 border border-decision-green/20 rounded-[44px] text-center space-y-2"
-        >
-          <CheckCircle className="w-8 h-8 text-decision-green mx-auto" />
-          <p className="text-sm font-bold text-decision-green">{t('feedback.thanks')}</p>
-        </motion.div>
-      );
-    }
-
-    return (
-      <section className="p-8 bg-white border border-border-custom rounded-[44px] shadow-sm space-y-8">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-muted">
-            <Info className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('feedback.title')}</h3>
-          </div>
-          <p className="text-sm text-muted font-medium">{t('feedback.subtitle')}</p>
-        </div>
-
-        <div className="space-y-6">
-          {/* Question 1: What happened? */}
-          <div className="space-y-3">
-            <p className="text-sm font-bold text-ink">{t('feedback.outcome_question')}</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'bought', label: t('feedback.bought') },
-                { id: 'not_bought', label: t('feedback.not_bought') },
-                { id: 'still_deciding', label: t('feedback.still_deciding') }
-              ].map((opt) => (
-                <button 
-                  key={opt.id}
-                  onClick={() => {
-                    setOutcome(opt.id as any);
-                    setReason(null);
-                    setHelpful(null);
-                  }}
-                  className={`px-4 py-2.5 rounded-2xl border text-xs font-bold transition-all ${outcome === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted hover:border-gold/30'}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Conditional: Bought it */}
-          {outcome === 'bought' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-6 pt-2"
-            >
-              <div className="space-y-3">
-                <p className="text-sm font-bold text-ink">{t('feedback.price_paid_label')}</p>
-                <input 
-                  type="number"
-                  value={pricePaid}
-                  onChange={(e) => setPricePaid(e.target.value)}
-                  placeholder={t('feedback.price_paid_placeholder')}
-                  className="w-full px-5 py-3 bg-paper border border-border-custom rounded-2xl text-sm font-medium focus:outline-none focus:border-gold transition-colors"
-                />
-              </div>
-              <div className="space-y-3">
-                <p className="text-sm font-bold text-ink">{t('feedback.helpful_question')}</p>
-                <div className="flex gap-2">
-                  {[
-                    { id: true, label: t('feedback.yes') },
-                    { id: false, label: t('feedback.no') }
-                  ].map((opt) => (
-                    <button 
-                      key={String(opt.id)}
-                      onClick={() => setHelpful(opt.id)}
-                      className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Conditional: Didn't buy */}
-          {outcome === 'not_bought' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-6 pt-2"
-            >
-              <div className="space-y-3">
-                <p className="text-sm font-bold text-ink">{t('feedback.why_not_bought_question')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'too_expensive', label: t('feedback.reason_expensive') },
-                    { id: 'no_trust', label: t('feedback.reason_trust') },
-                    { id: 'condition_issue', label: t('feedback.reason_condition') },
-                    { id: 'seller_issue', label: t('feedback.reason_seller') },
-                    { id: 'other', label: t('feedback.reason_other') }
-                  ].map((opt) => (
-                    <button 
-                      key={opt.id}
-                      onClick={() => setReason(opt.id)}
-                      className={`px-4 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${reason === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-3">
-                <p className="text-sm font-bold text-ink">{t('feedback.helpful_question')}</p>
-                <div className="flex gap-2">
-                  {[
-                    { id: true, label: t('feedback.yes') },
-                    { id: false, label: t('feedback.no') }
-                  ].map((opt) => (
-                    <button 
-                      key={String(opt.id)}
-                      onClick={() => setHelpful(opt.id)}
-                      className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Conditional: Still deciding */}
-          {outcome === 'still_deciding' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="space-y-3 pt-2"
-            >
-              <p className="text-sm font-bold text-ink">{t('feedback.helpful_so_far_question')}</p>
-              <div className="flex gap-2">
-                {[
-                  { id: true, label: t('feedback.yes') },
-                  { id: false, label: t('feedback.no') }
-                ].map((opt) => (
-                  <button 
-                    key={String(opt.id)}
-                    onClick={() => setHelpful(opt.id)}
-                    className={`flex-1 py-2.5 rounded-2xl border text-xs font-bold transition-all ${helpful === opt.id ? 'bg-gold border-gold text-ink' : 'bg-paper border-border-custom text-muted'}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          <button 
-            onClick={handleSubmit}
-            disabled={outcome === null || helpful === null || (outcome === 'not_bought' && !reason) || loading}
-            className="w-full py-4 bg-ink text-white rounded-2xl font-bold text-sm disabled:opacity-30 transition-all hover:opacity-95 shadow-2xl shadow-ink/20"
-          >
-            {loading ? t('common.loading') : t('feedback.submit')}
-          </button>
-        </div>
-      </section>
-    );
-  };
 
   return (
     <div
@@ -978,10 +987,13 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">{t('analysis.overpaying', 'Overpaying')}</p>
+              {/* Overpaying starts at the walk-away price, so the bands are contiguous: smart buy / walk-away / overpaying */}
               <p className="text-lg font-medium text-decision-red">
-                {formatPrice(currentItem.price_guidance.overpaying_above)}
+                {t('analysis.overpaying_value', { price: formatPrice(walkAway || currentItem.price_guidance.overpaying_above) })}
               </p>
-              <p className="text-[9px] text-decision-red/60 mt-1 italic">{t('analysis.overpaying_desc', 'This is where buyers go wrong')}</p>
+              <p className="text-[9px] text-decision-red/60 mt-1 italic">
+                {isAuctionItem ? t('analysis.overpaying_all_in', { allIn: formatPrice(walkAwayAllIn) }) + ' ' : ''}{t('analysis.overpaying_desc')}
+              </p>
             </div>
           </div>
 
@@ -1327,7 +1339,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 <div className="scale-125 origin-right">
                   <BuyGaugeScore 
                     score={currentItem.buy_decision.score} 
-                    confidence={currentItem.buy_decision.confidence}
+                    confidence={currentItem.item_summary.confidence || currentItem.buy_decision.confidence}
                     goal={buyingGoal}
                   />
                 </div>
@@ -1364,7 +1376,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
     {/* 13. Feedback System */}
       {!showPaywall && (
-        <FeedbackSection currentItem={currentItem} />
+        <FeedbackSection currentItem={currentItem} onBack={onBack} />
       )}
 
       {/* Locked Features Row and Paywall at the bottom */}
