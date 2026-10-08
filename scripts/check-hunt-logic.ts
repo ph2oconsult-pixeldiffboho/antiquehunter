@@ -14,7 +14,7 @@ import { checkGeography, itemTypesInQuery, matchesItemType, regionsFor, regionsI
 import { CURRENCY_STORAGE_KEY, loadCurrency, saveCurrency } from "../src/services/currencyPref.ts";
 import {
   UNVERIFIED_PRICE, validateMatch, GEMINI_TIMEOUT_MS, VALIDATION_BUDGET_MS, FUNCTION_BUDGET_MS, AUCTIONET_BUDGET_MS,
-  auctionetToMatch, budgetMax, planHunt, withinBudget,
+  auctionetToMatch, budgetMax, pageShowsLot, planHunt, withinBudget,
 } from "../src/services/hunting.ts";
 import { analysisItems } from "../src/services/localFinds.ts";
 
@@ -353,6 +353,12 @@ check("relevance: results must be the requested type of piece (EN/FR/SV)", () =>
   assert.equal(matchesItemType(c, "SKRIVBYRÅ med marmorskiva"), false);
   assert.equal(matchesItemType(c, "Console d'applique en bois doré"), false);
   assert.equal(matchesItemType([], "anything"), true);
+});
+
+check("a 200 page only counts as checked when it shows the lot (not a bot-check page)", () => {
+  assert.equal(pageShowsLot("<html><title>Just a moment...</title><script>challenge</script></html>", "19th century Swedish painted commode", {}), false);
+  assert.equal(pageShowsLot("<html><h1>19th Century Swedish Painted Commode, three drawers</h1></html>", "19TH CENTURY SWEDISH PAINTED COMMODE three drawers", {}), true);
+  assert.equal(pageShowsLot("<html>bot check</html>", "anything", { estimateLow: 100 }), true);
 });
 
 check("period rule: modern years in titles, IKEA", () => {

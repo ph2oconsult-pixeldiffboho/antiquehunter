@@ -298,6 +298,17 @@ const applyFacts = (result: HuntMatch, facts: PageFacts, params: HuntParams, pla
 };
 
 // Validate one AI result against the live web. Returns null (+reason) if it must be dropped.
+/** Does a fetched page actually show this lot (not a bot-check, consent or search page)? */
+export const pageShowsLot = (html: string, title: string | undefined, facts: PageFacts): boolean => {
+  if (facts.estimateLow || facts.estimateHigh || facts.saleDate || facts.soldOrEnded) return true;
+  const norm = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const text = norm(String(html).replace(/&[a-z]+;|&#\d+;/gi, " "));
+  const words = Array.from(new Set(norm(String(title || '')).split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !/^\d+$/.test(w))));
+  if (!words.length) return text.length > 2000;
+  const found = words.filter(w => text.includes(w)).length;
+  return found >= Math.min(2, words.length);
+};
+
 export const validateMatch = async (
   match: any,
   params: HuntParams,
@@ -360,9 +371,15 @@ export const validateMatch = async (
   result.url = finalUrl;
   result.platform = platformLabelForUrl(finalUrl) || result.platform;
 
+  let shownLot = false;
   if (page.status >= 200 && page.status < 300 && page.html) {
     if (!isSpecificListingUrl(finalUrl)) return { dropReason: 'not_a_listing' };
     const facts = parsePage(finalUrl, page.html);
+    // A 200 can still be a bot-check / consent page: only trust it if it shows this lot
+    shownLot = pageShowsLot(page.html, result.title, facts);
+  }
+  if (shownLot) {
+    const facts = parsePage(finalUrl, page.html!);
     const drop = applyFacts(result, facts, params, plan);
     if (drop) return { dropReason: drop };
     // multi-country site whose page gave no location: the search result's location must match
@@ -378,7 +395,7 @@ export const validateMatch = async (
   // for a lot estimated €50–60): never show it, not even as a hint. The user opens the listing to check.
   result.price = UNVERIFIED_PRICE;
   result.date = undefined;
-  result.verificationNote = page.status === 403 || page.status === 429 || page.status === 202
+  result.verificationNote = page.status === 403 || page.status === 429 || page.status === 202 || (page.status >= 200 && page.status < 300)
     ? 'Site blocks automated checks: estimate, sale date and availability are not confirmed – open the listing to check.'
     : 'Page did not load in time: estimate, sale date and availability are not confirmed – open the listing to check.';
   return { match: result };
