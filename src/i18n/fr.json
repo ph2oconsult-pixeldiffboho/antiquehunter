@@ -408,7 +408,7 @@
   },
   "toast": {
     "saved": "Enregistré dans votre journal.",
-    "saved_local": "Enregistré sur cet appareil (non connecté). Connectez-vous depuis le Profil pour le synchroniser.",
+    "saved_local": "Enregistré dans votre journal sur cet appareil (non connecté).",
     "save_failed": "Échec de l'enregistrement : {{reason}}",
     "signin_needed": "Connectez-vous avec Google pour enregistrer dans votre compte…",
     "save_failed_local": "Impossible d'enregistrer dans votre compte ({{reason}}). Enregistré sur cet appareil à la place."

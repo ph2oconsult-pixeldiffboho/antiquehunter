@@ -408,7 +408,7 @@
   },
   "toast": {
     "saved": "Saved to your log.",
-    "saved_local": "Saved on this device (not signed in). Sign in from Profile to sync it to your account.",
+    "saved_local": "Saved to your log on this device (not signed in).",
     "save_failed": "Could not save: {{reason}}",
     "signin_needed": "Sign in with Google to save to your account…",
     "save_failed_local": "Couldn't save to your account ({{reason}}). Saved on this device instead."
