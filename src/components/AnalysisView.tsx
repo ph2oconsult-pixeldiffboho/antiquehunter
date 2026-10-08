@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen, Sparkles } from 'lucide-react';
 import { BuyGaugeScore } from './BuyGaugeScore';
 import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { allInCost, clampToBand } from '../services/appraisalMath';
 
 interface AnalysisViewProps {
   result: any; // Can be a single object or an array of objects
   images?: string[];
   onSave?: (status: string) => void;
   onBack: () => void;
+  onNewAppraisal?: () => void;
   onUpgrade?: (packId: string) => void;
   isSaved?: boolean;
   plan?: 'free' | 'pro' | 'dealer' | string;
@@ -19,7 +21,7 @@ interface AnalysisViewProps {
   iterationCount: number;
 }
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, iterationCount }) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onNewAppraisal, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, iterationCount }) => {
   const { t, i18n } = useTranslation();
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [localResult, setLocalResult] = useState(result);
@@ -29,17 +31,20 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   }, [result]);
 
   const formatPrice = (amount: number) => {
-    const displayCurrency = currentItem?.price_guidance?.currency || currency;
+    const displayCurrency = currentItem?.price_guidance?.currency || currency || 'EUR';
+    // Whole amounts only: €50, not €50.00 (all appraisal figures are rounded to whole units)
+    const num = Math.round(Number(amount) || 0);
     try {
-      const formatted = new Intl.NumberFormat(i18n.language, {
+      return new Intl.NumberFormat(i18n.language, {
         style: 'currency',
         currency: displayCurrency,
-        currencyDisplay: 'narrowSymbol'
-      }).format(amount);
-      return `${displayCurrency} ${formatted}`;
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0
+      }).format(num);
     } catch (e) {
       const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€', AUD: 'A$', JPY: '¥', CNY: '¥' };
-      return `${displayCurrency} ${symbols[displayCurrency] || '$'}${amount}`;
+      const sym = symbols[displayCurrency] || '€';
+      return `${sym}${num.toLocaleString()}`;
     }
   };
 
@@ -55,14 +60,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     let score = originalDecision.score;
     let label = originalDecision.label;
 
-    // Logic to adjust score based on goal
+    // Small goal-based nudge, kept inside the price band computed on the server
+    // (so e.g. a price at or below market low always stays in the 80-95 band)
     if (buyingGoal === 'investment') {
-        score = Math.max(0, score - 10);
+        score = score - 5;
     } else if (buyingGoal === 'must_have') {
-        score = Math.min(100, score + 15);
+        score = score + 5;
     } else if (buyingGoal === 'resale') {
-        score = Math.max(0, score - 5);
+        score = score - 3;
     }
+    score = Math.round(clampToBand(score, originalDecision.score_band));
 
     // Update label based on new score
     if (score >= 80) label = t('analysis.buy_strong');
@@ -74,10 +81,25 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     return { ...rawItem, buy_decision: { ...originalDecision, score, label } };
   }, [rawItem, buyingGoal, t]);
 
+  // Keep the floating action bar from covering the end of the page (bar height + safe area)
+  const [actionBarHeight, setActionBarHeight] = useState(88);
+  const actionBarObserver = React.useRef<ResizeObserver | null>(null);
+  const actionBarRef = React.useCallback((el: HTMLDivElement | null) => {
+    actionBarObserver.current?.disconnect();
+    actionBarObserver.current = null;
+    if (!el) return;
+    setActionBarHeight(el.offsetHeight);
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => setActionBarHeight(el.offsetHeight));
+      ro.observe(el);
+      actionBarObserver.current = ro;
+    }
+  }, []);
+
   if (!currentItem) return null;
 
   const isPro = plan === 'pro' || plan === 'dealer';
-  const isDealer = plan === 'dealer';
+  const isDealer = plan === 'dealer' || plan === 'pro'; // Unlocking reveals all stored dealer guidance
   const isFree = plan === 'free';
 
   // Value Tier logic: Tier D (Utility) items bypass paywall
@@ -196,6 +218,23 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   const decisionStyles = getDecisionStyles(currentItem.buy_decision.score);
 
+  // Category label: use the translated category name when it is a known key, otherwise capitalise ("furniture" -> "Furniture")
+  const rawCategory = String(currentItem.item_summary?.category || '').trim();
+  const categoryKey = rawCategory.toLowerCase().replace(/[\s/&-]+/g, '_');
+  const categoryLabel = i18n.exists(`categories.${categoryKey}`)
+    ? t(`categories.${categoryKey}`)
+    : rawCategory.charAt(0).toLocaleUpperCase(i18n.language) + rawCategory.slice(1);
+
+  // Buyer's premium figures: computed once and reused everywhere so totals always match
+  const isAuctionItem = !!(currentItem.seller_context?.isAuction || currentItem.seller_context?.sellerType?.toLowerCase().includes('auction'));
+  const premiumPct = Number(currentItem.seller_context?.buyerPremiumRate) > 0 ? Number(currentItem.seller_context.buyerPremiumRate) : 25;
+  const marketLow = Math.round(Number(currentItem.price_guidance?.estimated_market_range_low) || 0);
+  const marketHigh = Math.round(Number(currentItem.price_guidance?.estimated_market_range_high) || 0);
+  const walkAway = Math.round(Number(currentItem.negotiation_strategy?.walk_away_price) || 0);
+  const allInLow = allInCost(marketLow, premiumPct, true);
+  const allInHigh = allInCost(marketHigh, premiumPct, true);
+  const walkAwayAllIn = allInCost(walkAway, premiumPct, true);
+
   const getContextualPaywallMessage = () => {
     const category = currentItem.item_summary?.category?.toLowerCase() || '';
     const score = currentItem.buy_decision?.score || 50;
@@ -258,70 +297,71 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const getPackPrices = (currencyCode: string) => {
     const prices: Record<string, any> = {
       GBP: { 
-        single: 'GBP £4.99', 
-        pack3: 'GBP £9.99', 
-        pack10: 'GBP £29.99', 
-        singlePer: `GBP £4.99${t('analysis.per_item')}`, 
-        pack3Per: `GBP £3.33${t('analysis.per_item')}`, 
-        pack10Per: `GBP £2.99${t('analysis.per_item')}`,
+        single: '£4.99', 
+        pack3: '£9.99', 
+        pack10: '£29.99', 
+        singlePer: `£4.99${t('analysis.per_item')}`, 
+        pack3Per: `£3.33${t('analysis.per_item')}`, 
+        pack10Per: `£2.99${t('analysis.per_item')}`,
         pack3Label: t('paywall.most_popular'),
         pack10Label: t('paywall.best_value')
       },
       USD: { 
-        single: 'USD $6.99', 
-        pack3: 'USD $13.99', 
-        pack10: 'USD $39.99', 
-        singlePer: `USD $6.99${t('analysis.per_item')}`, 
-        pack3Per: `USD $4.66${t('analysis.per_item')}`, 
-        pack10Per: `USD $3.99${t('analysis.per_item')}`,
+        single: '$6.99', 
+        pack3: '$13.99', 
+        pack10: '$39.99', 
+        singlePer: `$6.99${t('analysis.per_item')}`, 
+        pack3Per: `$4.66${t('analysis.per_item')}`, 
+        pack10Per: `$3.99${t('analysis.per_item')}`,
         pack3Label: t('analysis.best_value'),
         pack10Label: t('analysis.regular_buyers')
       },
       EUR: { 
-        single: 'EUR €5.99', 
-        pack3: 'EUR €11.99', 
-        pack10: 'EUR €34.99', 
-        singlePer: `EUR €5.99${t('analysis.per_item')}`, 
-        pack3Per: `EUR €3.99${t('analysis.per_item')}`, 
-        pack10Per: `EUR €3.49${t('analysis.per_item')}`,
+        single: '€5.99', 
+        pack3: '€11.99', 
+        pack10: '€34.99', 
+        singlePer: `€5.99${t('analysis.per_item')}`, 
+        pack3Per: `€3.99${t('analysis.per_item')}`, 
+        pack10Per: `€3.49${t('analysis.per_item')}`,
         pack3Label: t('analysis.best_value'),
         pack10Label: t('analysis.regular_buyers')
       },
       AUD: { 
-        single: 'AUD $9.99', 
-        pack3: 'AUD $19.99', 
-        pack10: 'AUD $59.99', 
-        singlePer: `AUD $9.99${t('analysis.per_item')}`, 
-        pack3Per: `AUD $6.66${t('analysis.per_item')}`, 
-        pack10Per: `AUD $5.99${t('analysis.per_item')}`,
+        single: 'A$9.99', 
+        pack3: 'A$19.99', 
+        pack10: 'A$59.99', 
+        singlePer: `A$9.99${t('analysis.per_item')}`, 
+        pack3Per: `A$6.66${t('analysis.per_item')}`, 
+        pack10Per: `A$5.99${t('analysis.per_item')}`,
         pack3Label: t('analysis.best_value'),
         pack10Label: t('analysis.regular_buyers')
       },
       CNY: { 
-        single: 'CNY ¥45.00', 
-        pack3: 'CNY ¥88.00', 
-        pack10: 'CNY ¥258.00', 
-        singlePer: `CNY ¥45.00${t('analysis.per_item')}`, 
-        pack3Per: `CNY ¥29.33${t('analysis.per_item')}`, 
-        pack10Per: `CNY ¥25.80${t('analysis.per_item')}`,
+        single: '¥45', 
+        pack3: '¥88', 
+        pack10: '¥258', 
+        singlePer: `¥45${t('analysis.per_item')}`, 
+        pack3Per: `¥29.33${t('analysis.per_item')}`, 
+        pack10Per: `¥25.80${t('analysis.per_item')}`,
         pack3Label: t('analysis.best_value'),
         pack10Label: t('analysis.regular_buyers')
       },
       JPY: { 
-        single: 'JPY ¥980', 
-        pack3: 'JPY ¥1,980', 
-        pack10: 'JPY ¥5,800', 
-        singlePer: `JPY ¥980${t('analysis.per_item')}`, 
-        pack3Per: `JPY ¥660${t('analysis.per_item')}`, 
-        pack10Per: `JPY ¥580${t('analysis.per_item')}`,
+        single: '¥980', 
+        pack3: '¥1,980', 
+        pack10: '¥5,800', 
+        singlePer: `¥980${t('analysis.per_item')}`, 
+        pack3Per: `¥660${t('analysis.per_item')}`, 
+        pack10Per: `¥580${t('analysis.per_item')}`,
         pack3Label: t('analysis.best_value'),
         pack10Label: t('analysis.regular_buyers')
       }
     };
-    return prices[currencyCode] || prices.USD;
+    const code = (currencyCode || 'USD').toUpperCase();
+    return prices[code] || prices.EUR || prices.USD;
   };
 
-  const currentPackPrices = getPackPrices(currency);
+  const currentPackPrices = getPackPrices(currentItem?.price_guidance?.currency || currency);
 
   const packs = [
     { 
@@ -450,7 +490,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       <div className="space-y-1">
         <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted">{title}</h3>
         <p className="text-sm font-medium text-ink leading-tight">{description}</p>
-        <p className={`text-[10px] ${decisionStyles.text} font-bold pt-1 uppercase tracking-tighter`}>{t('analysis.unlock', { title })}</p>
+        <p className={`text-[10px] ${decisionStyles.text} font-bold pt-1 uppercase tracking-tighter`}>{t('analysis.unlock', 'Unlock {{title}}', { title })}</p>
       </div>
     </div>
   );
@@ -676,15 +716,31 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8 space-y-4 pb-32">
+    <div
+      className="max-w-2xl mx-auto px-6 py-8 space-y-4"
+      style={{ paddingBottom: `calc(${actionBarHeight + 40}px + env(safe-area-inset-bottom, 0px))` }}
+    >
       {/* 1. Header & Navigation */}
       <header className="flex items-center justify-between">
-        <button 
-          onClick={onBack}
-          className="p-2 hover:bg-paper rounded-full transition-colors text-ink"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={onBack}
+            className="p-2 hover:bg-paper rounded-full transition-colors text-ink"
+            aria-label="Back to home"
+            title="Back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          {onNewAppraisal && (
+            <button
+              onClick={onNewAppraisal}
+              className="px-3 py-1 bg-gold/10 hover:bg-gold/20 text-gold rounded-full text-[11px] font-bold uppercase tracking-wider border border-gold/20 transition-all flex items-center gap-1.5"
+              aria-label="Start a new appraisal"
+            >
+              <span>+ {t('analysis.new_appraisal', 'New Appraisal')}</span>
+            </button>
+          )}
+        </div>
         
         <div className="flex items-center gap-3">
           <span className="px-2 py-0.5 bg-gold/10 text-gold text-[8px] font-bold uppercase tracking-widest rounded-full">{plan}</span>
@@ -694,6 +750,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
                 disabled={currentIndex === 0}
                 className="disabled:opacity-30 text-ink"
+                aria-label="Previous item"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
@@ -704,6 +761,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 onClick={() => setCurrentIndex(prev => Math.min(items.length - 1, prev + 1))}
                 disabled={currentIndex === items.length - 1}
                 className="disabled:opacity-30 text-ink"
+                aria-label="Next item"
               >
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -761,7 +819,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         <div className="grid grid-cols-2 gap-y-3 gap-x-4">
           <div>
             <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('describe.category')}</p>
-            <p className="text-sm font-medium text-ink">{currentItem.item_summary.category}</p>
+            <p className="text-sm font-medium text-ink">{categoryLabel}</p>
           </div>
           <div>
             <p className="text-[9px] uppercase tracking-widest font-bold text-muted mb-0.5">{t('analysis.origin')}</p>
@@ -865,36 +923,36 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         <section className="p-6 bg-white border border-border-custom rounded-[32px] shadow-sm space-y-6">
           <div className="flex items-center gap-2 text-muted">
             <Info className="w-4 h-4" />
-            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.price_guidance')}</h3>
+            <h3 className="text-[10px] uppercase tracking-widest font-bold">{t('analysis.price_guidance', 'Price Guidance')}</h3>
           </div>
           
-          <h3 className="serif text-xl font-light text-ink">{t('analysis.what_it_is_worth')}</h3>
+          <h3 className="serif text-xl font-light text-ink">{t('analysis.what_it_is_worth', 'What this is actually worth')}</h3>
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.value_insight')}</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.value_insight', 'Market Range')}</p>
               <p className="text-xl font-medium text-ink">
                 {formatPrice(currentItem.price_guidance.estimated_market_range_low)} - {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">{t('analysis.smart_buy')}</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">{t('analysis.smart_buy', 'Smart Buy')}</p>
               <p className="text-xl font-medium text-decision-green">
                 {formatPrice(currentItem.price_guidance.good_buy_below)}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.retail_range')}</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.retail_range', 'Retail Range')}</p>
               <p className="text-lg font-medium text-muted">
                 {formatPrice(currentItem.price_guidance.fair_price_low)} - {formatPrice(currentItem.price_guidance.fair_price_high)}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">{t('analysis.overpaying')}</p>
+              <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">{t('analysis.overpaying', 'Overpaying')}</p>
               <p className="text-lg font-medium text-decision-red">
                 {formatPrice(currentItem.price_guidance.overpaying_above)}
               </p>
-              <p className="text-[9px] text-decision-red/60 mt-1 italic">{t('analysis.overpaying_desc')}</p>
+              <p className="text-[9px] text-decision-red/60 mt-1 italic">{t('analysis.overpaying_desc', 'This is where buyers go wrong')}</p>
             </div>
           </div>
 
@@ -902,10 +960,72 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             {currentItem.price_guidance.pricing_reasoning}
           </p>
           <p className="text-[10px] text-muted/60 mt-4 pt-4 border-t border-border-custom/50 italic">
-            {t('analysis.valuation_trust_line')}
+            {t('analysis.valuation_trust_line', 'Real value depends heavily on condition and authenticity — always inspect in person.')}
           </p>
         </section>
       )}
+
+      {/* 5b. Auction House Buyer's Premium & True Out-of-Pocket Cost */}
+      {!showPaywall && isAuctionItem && (() => {
+        const totalMultiplier = 1 + premiumPct / 100;
+        return (
+          <section className="p-6 bg-amber-50/50 border border-amber-200/80 rounded-[32px] space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 text-amber-900">
+                <Gavel className="w-4 h-4 text-amber-700" />
+                <h3 className="text-[10px] uppercase tracking-widest font-bold">
+                  {t('analysis.auction_premium_title', "Auction House Fees & Buyer's Premium (Frais de Vente)")}
+                </h3>
+              </div>
+              <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full border border-amber-200">
+                +{premiumPct}% Premium
+              </span>
+            </div>
+
+            <p className="text-xs text-stone-700 leading-relaxed font-light">
+              {t('analysis.auction_premium_desc', "Auction houses charge a mandatory buyer's premium on top of the winning hammer price, plus potential 1.5%–3% online live bidding fees (Drouot Digital, Saleroom, LiveAuctioneers). Factor this into your maximum paddle bid.")}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
+              <div className="bg-white p-3.5 rounded-2xl border border-amber-200/60 shadow-sm space-y-1">
+                <span className="text-[9px] uppercase tracking-wider font-bold text-stone-500 block">Hammer Price Range</span>
+                <p className="font-semibold text-stone-900 text-sm">
+                  {formatPrice(marketLow)} – {formatPrice(marketHigh)}
+                </p>
+                <span className="text-[9px] text-stone-400 block">Winning bid in the room</span>
+              </div>
+
+              <div className="bg-white p-3.5 rounded-2xl border border-amber-200/60 shadow-sm space-y-1">
+                <span className="text-[9px] uppercase tracking-wider font-bold text-amber-800 block">Buyer's Premium (+{premiumPct}%)</span>
+                <p className="font-semibold text-amber-800 text-sm">
+                  +{formatPrice(allInLow - marketLow)} – +{formatPrice(allInHigh - marketHigh)}
+                </p>
+                <span className="text-[9px] text-amber-600/70 block">Auction fees & VAT</span>
+              </div>
+
+              <div className="bg-white p-3.5 rounded-2xl border border-amber-300 shadow-sm space-y-1 bg-gradient-to-br from-white to-amber-50">
+                <span className="text-[9px] uppercase tracking-wider font-bold text-stone-800 block">Total Acquisition Cost</span>
+                <p className="font-bold text-stone-900 text-sm">
+                  {formatPrice(allInLow)} – {formatPrice(allInHigh)}
+                </p>
+                <span className="text-[9px] text-stone-500 block">True all-in payment (Hammer × {(totalMultiplier).toFixed(2)})</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-white/80 rounded-xl border border-amber-200/50 flex items-start gap-2.5 text-[11px] text-stone-700">
+              <span className="font-bold text-amber-800 shrink-0">{t('analysis.paddle_rule_label', 'Dealer Paddle Rule:')}</span>
+              <span>
+                {t('analysis.paddle_rule', {
+                  hammer: formatPrice(walkAway),
+                  pct: premiumPct,
+                  allIn: formatPrice(walkAwayAllIn),
+                  mult: totalMultiplier.toFixed(2)
+                })}
+              </span>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* 6. Dealer Take Card */}
       {showDealerContent && (
@@ -988,7 +1108,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h3 className="text-[10px] uppercase tracking-widest font-bold opacity-80">{t('analysis.when_to_walk_away')}</h3>
           </div>
           <div className="space-y-3">
-            <p className="text-sm font-bold text-decision-red">{t('analysis.walk_away_price_label')} {formatPrice(currentItem.negotiation_strategy.walk_away_price)}</p>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <p className="text-sm font-bold text-decision-red">
+                {t('analysis.walk_away_price_label')} {formatPrice(walkAway)}
+                {isAuctionItem && (
+                  <span className="text-xs font-normal text-decision-red/80 ml-1.5">
+                    (Max Hammer Bid — Total all-in: {formatPrice(walkAwayAllIn)})
+                  </span>
+                )}
+              </p>
+            </div>
             <div className="space-y-2">
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.walk_away_desc')}</p>
               <div className="space-y-2">
@@ -1236,15 +1365,19 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   <h3 className="text-sm font-bold text-ink">{t('paywall.pre_tension_title')}</h3>
                   <p className="text-xs text-muted leading-relaxed">{t('paywall.pre_tension_subtitle')}</p>
                 </div>
-                <div className="p-6 bg-gold/5 border border-gold/20 rounded-[32px] flex items-center gap-4">
-                  <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-gold" />
+                {(currentItem.teaser_insight || currentItem.price_guidance?.good_buy_below) && (
+                  <div className="p-6 bg-gold/5 border border-gold/20 rounded-[32px] flex items-center gap-4">
+                    <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-gold" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold mb-1">{t('paywall.market_signal', 'Market Signal')}</h3>
+                      <p className="text-sm font-bold text-ink leading-tight">
+                        {currentItem.teaser_insight || `Dealers would typically buy below ${formatPrice(currentItem.price_guidance.good_buy_below)}. Above this, margin disappears.`}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold mb-1">{t('paywall.market_signal')}</h3>
-                    <p className="text-sm font-bold text-ink leading-tight">{t('paywall.teaser_insight')}</p>
-                  </div>
-                </div>
+                )}
                 <PaywallCard />
               </div>
           )}
@@ -1256,24 +1389,40 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         {currentItem.disclaimer}
       </p>
 
-      {/* 12. Sticky Bottom Action Bar */}
-      {!isSaved && onSave && (
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-border-custom flex gap-4 z-50">
+      {/* 13. Sleek Floating Action Bar */}
+      <div
+        ref={actionBarRef}
+        className="fixed left-4 right-4 max-w-2xl mx-auto p-3 bg-white/95 backdrop-blur-md border border-border-custom rounded-3xl shadow-2xl flex items-center gap-3 z-40"
+        style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <button
+          onClick={onBack}
+          className="flex-1 py-3 px-4 bg-paper text-ink rounded-2xl font-semibold text-xs hover:bg-border-custom transition-colors text-center border border-border-custom"
+          aria-label="Return to previous screen"
+        >
+          {t('common.back', 'Back')}
+        </button>
+        {onNewAppraisal && (
           <button
-            onClick={onBack}
-            className="flex-1 py-4 bg-paper text-ink rounded-full font-medium hover:bg-border-custom transition-colors"
+            onClick={onNewAppraisal}
+            className="flex-1 py-3 px-4 bg-paper border border-gold/40 hover:bg-gold/10 text-ink rounded-2xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
+            aria-label="Start a new antique appraisal"
           >
-            {t('common.back')}
+            <Sparkles className="w-3.5 h-3.5 text-gold" />
+            <span>{t('analysis.new_appraisal', 'New Appraisal')}</span>
           </button>
+        )}
+        {!isSaved && onSave && (
           <button
             onClick={() => onSave('watching')}
-            className="flex-1 py-4 bg-ink text-paper rounded-full font-medium hover:opacity-90 transition-colors flex items-center justify-center gap-2 shadow-2xl shadow-ink/30"
+            className="flex-1 py-3 px-4 bg-ink text-paper rounded-2xl font-semibold text-xs hover:opacity-90 transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-ink/20"
+            aria-label="Save this appraisal to collection"
           >
-            <Save className="w-5 h-5" />
-            {t('common.save')}
+            <Save className="w-3.5 h-3.5" />
+            <span>{t('common.save', 'Save')}</span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

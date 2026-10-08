@@ -211,6 +211,7 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
                 <button 
                   onClick={() => setShowAllTips(false)}
                   className="w-10 h-10 bg-paper rounded-full flex items-center justify-center hover:bg-border-custom transition-colors"
+                  aria-label="Close field tips dialog"
                 >
                   <X className="w-5 h-5 text-ink" />
                 </button>
@@ -261,6 +262,7 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
               <button 
                 onClick={() => setSelectedTip(null)}
                 className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm shadow-xl shadow-ink/20"
+                aria-label="Got it, close tip"
               >
                 {t('describe.got_it')}
               </button>
@@ -271,9 +273,9 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
 
       {/* Bottom Nav Placeholder */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-border-custom flex items-center justify-around">
-        <button onClick={() => {}} className="p-3 text-ink"><Camera className="w-6 h-6" /></button>
-        <button onClick={onViewCollection} className="p-3 text-muted/40 hover:text-ink transition-colors"><History className="w-6 h-6" /></button>
-        <button onClick={onViewSettings} className="p-3 text-muted/40 hover:text-ink transition-colors"><Settings className="w-6 h-6" /></button>
+        <button onClick={onScan} className="p-3 text-ink" aria-label="Scan or Photograph Antique"><Camera className="w-6 h-6" /></button>
+        <button onClick={onViewCollection} className="p-3 text-muted/40 hover:text-ink transition-colors" aria-label="View Saved History and Collection"><History className="w-6 h-6" /></button>
+        <button onClick={onViewSettings} className="p-3 text-muted/40 hover:text-ink transition-colors" aria-label="Settings and Preferences"><Settings className="w-6 h-6" /></button>
       </div>
     </div>
   );

@@ -19,7 +19,11 @@
     "status_bought": "Acheté",
     "status_passed": "Passé",
     "status_sold": "Vendu",
-    "score": "Score"
+    "score": "Score",
+    "home": "Accueil",
+    "hunt": "Chiner",
+    "collection": "Collection",
+    "profile": "Profil"
   },
   "home": {
     "hero_badge": "Outil de terrain professionnel",
@@ -61,17 +65,17 @@
     "red_flags": "Drapeaux rouges",
     "market_insight": "Facteurs de valeur",
     "price_guidance": "Guide des prix",
-    "buy_score": "Score d'achat",
+    "buy_score": "Score d'Achat",
     "value_range": "Gamme de l'antiquaire",
     "resale_potential": "Liquidité",
     "price_assessment": "Évaluation du prix",
-    "dealer_perspective": "La vision de l'antiquaire",
-    "negotiation_strategy": "Stratégie d'achat",
-    "when_to_walk_away": "Le prix de retrait",
+    "dealer_perspective": "Perspective de l'Antiquaire",
+    "negotiation_strategy": "Stratégie de Négociation",
+    "when_to_walk_away": "Quand s'abstenir",
     "price_guidance_desc": "Des prix comme celui-ci reflètent souvent les annonces de détail — l'achat réel se fait en dessous.",
-    "dealer_perspective_desc": "Les antiquaires n'achèteront cela que si le prix laisse une marge pour la revente — sinon, ça reste là.",
-    "negotiation_strategy_desc": "Gamme d'offre exacte et stratégie",
-    "when_to_walk_away_desc": "Au-delà de cela, retirez-vous.",
+    "dealer_perspective_desc": "Comment les marchands évaluent la marge et le risque",
+    "negotiation_strategy_desc": "Leviers et tactiques de négociation",
+    "when_to_walk_away_desc": "Signes d'alerte critiques qui détruisent la valeur de revente",
     "market_insight_desc": "Demande et facteurs de valeur",
     "confidence_high_desc": "Forte correspondance entre la forme, le matériau et le marché",
     "confidence_medium_desc": "Bonne correspondance — détails clés manquants",
@@ -101,7 +105,7 @@
     "leverage_points": "Utilisez ceci pour négocier :",
     "walk_away_price_label": "Prix de retrait :",
     "walk_away_desc": "Au-delà de cela, vous surpayez.",
-    "appetite": "Demande",
+    "appetite": "Appétit du Marché",
     "liquidity": "Liquidité",
     "what_sells_this": "Ce qui vend cela",
     "risk_increases": "À ce niveau, le profit dépend de l'état et du prix d'achat.",
@@ -125,7 +129,27 @@
     "buy_pass_desc": "Le prix est déjà au niveau ou au-dessus du détail — pas de marge pour l'antiquaire.",
     "dealer_buy_rule": "Les antiquaires achètent généralement 30 à 60 % en dessous du prix de détail.",
     "valuation_trust_line": "La valeur réelle dépend fortement de l'état et de l'authenticité — inspectez toujours en personne.",
-    "disclaimer": "Basé sur le comportement observé du marché. Un antiquaire avisé vérifie toujours en personne avant d'engager son capital."
+    "disclaimer": "Basé sur le comportement observé du marché. Un antiquaire avisé vérifie toujours en personne avant d'engager son capital.",
+    "auction_premium_title": "Frais de vente aux enchères & Frais acheteur",
+    "auction_premium_desc": "Les maisons de ventes facturent 20 % à 30 % de frais acheteur en sus du prix marteau d'adjudication. Tenez-en compte dans votre ordre d'achat maximal.",
+    "new_appraisal": "Nouvelle estimation",
+    "unlock": "Débloquer {{title}}",
+    "per_item": "/pièce",
+    "best_value": "Meilleure valeur",
+    "regular_buyers": "Idéal pour acheteurs réguliers",
+    "copied": "Copié !",
+    "share_hard_pass": "Alerte Antiquaire : Cet objet est à Éviter (Score : {{score}}). {{judgement}}",
+    "share_tier_d": "Alerte : Cet objet {{title}} est un utilitaire de catégorie D. {{judgement}}",
+    "share_title": "Évaluation Antique Hunter",
+    "rating": "Note",
+    "investment_insight_fallback": "Ne vaut la peine d'être acheté qu'à prix très réduit — ce n'est pas une pièce de placement.",
+    "must_have_insight_fallback": "Un bel achat coup de cœur pour un usage personnel. Prévoir un budget restauration.",
+    "resale_insight_fallback": "La marge dépend totalement d'un achat très en-dessous du cours marchand.",
+    "walk_away_points": "• Ver à bois actif — risque structurel\n• Réparations visibles réduisant la cote\n• Prix dépassant déjà le cours marchand",
+    "market_insight_points": "• Qualité des sculptures et assemblages\n• Surface d'origine vs décapée\n• Époque authentique vs réédition",
+    "market_pulse": "Tendance du Marché",
+    "paddle_rule_label": "Règle d'enchère du marchand :",
+    "paddle_rule": "Votre enchère maximale au marteau (prix plafond) est de {{hammer}}. Avec {{pct}} % de frais acheteur, cela fait {{allIn}} frais compris. Règle simple : enchère maximale = budget total ÷ {{mult}}."
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",
@@ -189,7 +213,11 @@
     "most_popular": "LE PLUS POPULAIRE",
     "dealer_logic": "Basé sur le comportement réel des prix des antiquaires",
     "founder_note": "Conçu par un acheteur actif — pas seulement par l'IA.",
-    "market_signal": "Signal du marché"
+    "market_signal": "Signal du Marché",
+    "description": "Débloquez l'analyse complète de l'antiquaire, les stratégies d'enchères et les comparables du marché.",
+    "dealer_buy_signal": "Les marchands achèteraient généralement en dessous de {{price}}.",
+    "pre_tension_title": "À ce niveau de prix, les erreurs coûtent cher.",
+    "pre_tension_subtitle": "La plupart des acheteurs surpaient ici — faute d'informations de professionnels."
   },
   "collection": {
     "title": "Journal de chasse de l'antiquaire",
@@ -231,7 +259,8 @@
     "got_it": "Compris",
     "try_item": "Essayez un objet — même quelque chose à proximité",
     "upload_photo_hint": "Une photo est le point de départ. Les détails affinent le prix.",
-    "simple_start_hint": "« Commencez par quelque chose de simple — même un verre ou un petit objet »"
+    "simple_start_hint": "« Commencez par quelque chose de simple — même un verre ou un petit objet »",
+    "lot_url_label": "Lien de la vente ou de l'annonce (Lot Link)"
   },
   "categories": {
     "furniture": "Meubles",
@@ -313,5 +342,43 @@
     "desc": "Vous avez une évaluation active qui n'a pas été enregistrée. Commencer une nouvelle vérification annulera ces détails.",
     "back": "Retourner pour enregistrer",
     "discard": "Ignorer et continuer"
+  },
+  "intro": {
+    "welcome_badge": "Expertise & Moteur de Sourcing d'Antiquités",
+    "welcome_title": "Quelle est votre quête aujourd'hui ?",
+    "welcome_desc": "Choisissez votre parcours pour débuter avec une expertise de terrain.",
+    "path_value_title": "Estimer une Antiquité",
+    "path_value_desc": "Estimez la valeur marchande, détectez les reproductions et obtenez un rapport immédiat.",
+    "path_value_action": "Lancer l'Expertise",
+    "path_hunt_title": "Chiner une Antiquité",
+    "path_hunt_desc": "Parcourez les salles des ventes, Drouot, LeBonCoin et les catalogues européens.",
+    "path_hunt_action": "Lancer la Recherche",
+    "footer_assurance": "Expertise de terrain pour collectionneurs et professionnels."
+  },
+  "profile": {
+    "title": "Profil",
+    "subscription": "Abonnement",
+    "current_plan": "Formule Actuelle"
+  },
+  "legal": {
+    "title": "Mentions Légales"
+  },
+  "hunter": {
+    "intro": "Dites à notre moteur de recherche de marchand ce que vous cherchez. Nous parcourons **Interencheres**, **Drouot**, **LeBonCoin**, **Auctionet**, **Bukowskis** et les grandes maisons internationales en temps réel, et nous vérifions chaque lien avant de l'afficher.",
+    "budget_placeholder": "ex. 1500, ou 500 – 2000",
+    "currency": "Devise",
+    "period_only": "Pièces d'époque uniquement",
+    "period_only_desc": "Masquer les pièces « de style », copies, reproductions et objets du XXe siècle.",
+    "error_title": "Recherche interrompue",
+    "error_timeout": "La recherche en direct a pris trop de temps et a été arrêtée. Nous n'affichons jamais d'annonces inventées, donc rien n'est affiché. Réessayez ou affinez la recherche.",
+    "error_generic": "La recherche en direct n'a pas pu aboutir. Aucune annonce n'a été inventée. Réessayez dans un instant.",
+    "error_network": "Impossible de joindre le service de recherche. Vérifiez votre connexion et réessayez.",
+    "retry": "Relancer la recherche",
+    "edit_search": "Modifier la recherche",
+    "no_verified": "Aucune annonce en ligne vérifiée – élargissez le budget ou les sources.",
+    "verified": "Lien vérifié",
+    "unverified": "Non vérifié",
+    "unverified_desc": "Ce site bloque les vérifications automatiques : le prix, la date de vente et la disponibilité proviennent des résultats de recherche et ne sont pas confirmés – ouvrez le lien pour vérifier.",
+    "checked_summary": "Liens vérifiés : {{verified}} confirmés, {{unverified}} non vérifiés, {{dropped}} écartés (morts, terminés, génériques ou hors filtre)."
   }
 }

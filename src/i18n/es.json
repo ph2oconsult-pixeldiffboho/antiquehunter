@@ -19,7 +19,11 @@
     "status_bought": "Comprado",
     "status_passed": "Pasado",
     "status_sold": "Vendido",
-    "score": "Puntuación"
+    "score": "Puntuación",
+    "home": "Inicio",
+    "hunt": "Buscar",
+    "collection": "Colección",
+    "profile": "Perfil"
   },
   "home": {
     "hero_badge": "Herramienta profesional de campo",
@@ -61,17 +65,17 @@
     "red_flags": "Banderas rojas",
     "market_insight": "Factores de valor",
     "price_guidance": "Guía de precios",
-    "buy_score": "Puntuación de compra",
+    "buy_score": "Puntuación de Compra",
     "value_range": "Rango del anticuario",
     "resale_potential": "Liquidez",
     "price_assessment": "Tasación de precio",
-    "dealer_perspective": "La visión del anticuario",
-    "negotiation_strategy": "Estrategia de compra",
-    "when_to_walk_away": "El precio de retirada",
+    "dealer_perspective": "Perspectiva del Anticuario",
+    "negotiation_strategy": "Estrategia de Negociación",
+    "when_to_walk_away": "Cuándo retirarse",
     "price_guidance_desc": "Precios como este suelen reflejar listados minoristas — la compra real ocurre por debajo.",
-    "dealer_perspective_desc": "Los anticuarios solo comprarán esto si el precio deja margen para la reventa — de lo contrario, se queda ahí.",
-    "negotiation_strategy_desc": "Rango de oferta exacto y estrategia",
-    "when_to_walk_away_desc": "Por encima de esto, retírate.",
+    "dealer_perspective_desc": "Cómo evalúan el margen comercial los profesionales",
+    "negotiation_strategy_desc": "Tácticas de negociación y puntos de apoyo",
+    "when_to_walk_away_desc": "Señales de advertencia críticas que destruyen el valor",
     "market_insight_desc": "Demanda y factores de valor",
     "confidence_high_desc": "Fuerte coincidencia entre forma, material y mercado",
     "confidence_medium_desc": "Buena coincidencia — faltan detalles clave",
@@ -101,7 +105,7 @@
     "leverage_points": "Usa esto para negociar:",
     "walk_away_price_label": "Precio de retirada:",
     "walk_away_desc": "Por encima de esto, estás pagando de más.",
-    "appetite": "Demanda",
+    "appetite": "Demanda del Mercado",
     "liquidity": "Liquidez",
     "what_sells_this": "Qué vende esto",
     "risk_increases": "A este nivel, el beneficio depende del estado y del precio de compra.",
@@ -125,7 +129,27 @@
     "buy_pass_desc": "El precio ya está en o por encima del minorista — no hay margen para el anticuario.",
     "dealer_buy_rule": "Los anticuarios suelen comprar entre un 30% y un 60% por debajo del precio minorista.",
     "valuation_trust_line": "El valor real depende mucho del estado y la autenticidad — inspecciona siempre en persona.",
-    "disclaimer": "Basado en el comportamiento observado del mercado. Un anticuario inteligente siempre verifica en persona antes de comprometer su capital."
+    "disclaimer": "Basado en el comportamiento observado del mercado. Un anticuario inteligente siempre verifica en persona antes de comprometer su capital.",
+    "auction_premium_title": "Comisión de Subasta & Gastos de Comprador",
+    "auction_premium_desc": "Las casas de subastas cobran un 20%–30% de prima sobre el precio de martillo.",
+    "new_appraisal": "Nueva tasación",
+    "unlock": "Desbloquear {{title}}",
+    "per_item": "/ud",
+    "best_value": "Mejor valor",
+    "regular_buyers": "Ideal para compradores habituales",
+    "copied": "¡Copiado!",
+    "share_hard_pass": "Alerta de Anticuario: No comprar (Puntuación: {{score}}). {{judgement}}",
+    "share_tier_d": "Alerta: Este objeto {{title}} es un artículo utilitario de Categoría D.",
+    "share_title": "Tasación de Antique Hunter",
+    "rating": "Calificación",
+    "investment_insight_fallback": "Solo vale la pena comprar con un gran descuento.",
+    "must_have_insight_fallback": "Buena compra para disfrute personal.",
+    "resale_insight_fallback": "El margen depende de comprar por debajo del nivel comercial.",
+    "walk_away_points": "• Carcoma activa — riesgo estructural\n• Reparaciones visibles que reducen el valor\n• Precio por encima del nivel de anticuario",
+    "market_insight_points": "• Nitidez de tallas y ensambles\n• Superficie original vs restaurada\n• Época auténtica vs reproducción posterior",
+    "market_pulse": "Pulso del Mercado",
+    "paddle_rule_label": "Regla de puja del anticuario:",
+    "paddle_rule": "Su puja máxima a martillo (precio límite) es {{hammer}}. Con la prima del comprador del {{pct}} % son {{allIn}} en total. Regla práctica: puja máxima = presupuesto total ÷ {{mult}}."
   },
   "results": {
     "title": "Hallazgos del anticuario",
@@ -189,7 +213,11 @@
     "most_popular": "MÁS POPULAR",
     "dealer_logic": "Basado en el comportamiento real de precios de los distribuidores",
     "founder_note": "Creado por un comprador activo, no solo por IA.",
-    "market_signal": "Señal del mercado"
+    "market_signal": "Señal de Mercado",
+    "description": "Desbloquea la tasación comercial completa y la estrategia de puja.",
+    "dealer_buy_signal": "Los anticuarios suelen comprar por debajo de {{price}}.",
+    "pre_tension_title": "A este nivel de precio, los errores resultan costosos.",
+    "pre_tension_subtitle": "La mayoría de compradores pagan de más aquí — porque los riesgos pasan desapercibidos."
   },
   "collection": {
     "title": "Registro de caza del anticuario",
@@ -231,7 +259,8 @@
     "got_it": "Entendido",
     "try_item": "Prueba con un artículo — incluso algo cercano",
     "upload_photo_hint": "Una foto es el punto de partida. Los detalles afinan el precio.",
-    "simple_start_hint": "“Empieza con algo sencillo — incluso un vaso o un objeto pequeño”"
+    "simple_start_hint": "“Empieza con algo sencillo — incluso un vaso o un objeto pequeño”",
+    "lot_url_label": "Pegar enlace de subasta o listado (Lote)"
   },
   "categories": {
     "furniture": "Muebles",
@@ -313,5 +342,43 @@
     "desc": "Tienes una valoración activa que no ha sido registrada. Comenzar una nueva comprobación descartará estos datos.",
     "back": "Volver para guardar",
     "discard": "Descartar y continuar"
+  },
+  "intro": {
+    "welcome_badge": "Tasador Profesional & Motor de Búsqueda",
+    "welcome_title": "¿Cuál es tu búsqueda de antigüedades hoy?",
+    "welcome_desc": "Elige tu camino para comenzar con criterio profesional.",
+    "path_value_title": "Tasar una Antigüedad",
+    "path_value_desc": "Calcula el valor real, detecta imitaciones y genera informes.",
+    "path_value_action": "Iniciar Tasación",
+    "path_hunt_title": "Encontrar Antigüedades",
+    "path_hunt_desc": "Explora subastas y mercados en tiempo real.",
+    "path_hunt_action": "Iniciar Búsqueda",
+    "footer_assurance": "Información de mercado para coleccionistas y compradores."
+  },
+  "profile": {
+    "title": "Perfil",
+    "subscription": "Suscripción",
+    "current_plan": "Plan Actual"
+  },
+  "legal": {
+    "title": "Aviso Legal"
+  },
+  "hunter": {
+    "intro": "Dígale a nuestro motor de búsqueda de anticuario lo que quiere. Buscamos en **Interencheres**, **Drouot**, **LeBonCoin**, **Auctionet**, **Bukowskis** y grandes casas internacionales en tiempo real, y comprobamos cada enlace antes de mostrarlo.",
+    "budget_placeholder": "p. ej. 1500, o 500 – 2000",
+    "currency": "Moneda",
+    "period_only": "Solo piezas de época",
+    "period_only_desc": "Ocultar piezas «de estilo», copias, reproducciones y objetos del siglo XX.",
+    "error_title": "Búsqueda interrumpida",
+    "error_timeout": "La búsqueda en vivo tardó demasiado y se detuvo. Nunca mostramos anuncios inventados, así que no se muestra nada. Vuelva a intentarlo o acote la búsqueda.",
+    "error_generic": "No se pudo completar la búsqueda en vivo. No se ha inventado ningún anuncio. Vuelva a intentarlo en un momento.",
+    "error_network": "No se pudo contactar con el servicio de búsqueda. Compruebe su conexión y vuelva a intentarlo.",
+    "retry": "Reintentar búsqueda",
+    "edit_search": "Editar búsqueda",
+    "no_verified": "No se encontraron anuncios activos verificados – amplíe el presupuesto o las fuentes.",
+    "verified": "Enlace comprobado",
+    "unverified": "No verificado",
+    "unverified_desc": "Este sitio bloquea las comprobaciones automáticas: el precio, la fecha de venta y la disponibilidad proceden de los resultados de búsqueda y no están confirmados – abra el enlace para comprobarlo.",
+    "checked_summary": "Enlaces comprobados: {{verified}} verificados, {{unverified}} sin verificar, {{dropped}} descartados (caídos, cerrados, genéricos o fuera de filtro)."
   }
 }

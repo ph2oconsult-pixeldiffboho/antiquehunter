@@ -26,24 +26,13 @@ export default function Main() {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [plan, setPlan] = useState<'free' | 'pro' | 'dealer'>('free');
+  // Default currency is EUR; the user's last choice (Settings or appraisal form) is kept in localStorage
   const [currency, setCurrency] = useState<string>(() => {
-    const saved = localStorage.getItem('user_currency');
-    if (saved) return saved;
-    
     try {
-      const locale = navigator.language.toLowerCase();
-      if (locale.includes('gb')) return 'GBP';
-      if (locale.includes('us')) return 'USD';
-      if (locale.includes('au')) return 'AUD';
-      if (locale.includes('zh') || locale.includes('cn')) return 'CNY';
-      if (locale.includes('ja') || locale.includes('jp')) return 'JPY';
-      if (locale.includes('de') || locale.includes('fr') || locale.includes('es') || locale.includes('it')) return 'EUR';
-      
-      const inferred = new Intl.NumberFormat().resolvedOptions().currency;
-      if (inferred && ['GBP', 'USD', 'EUR', 'AUD', 'CNY', 'JPY'].includes(inferred)) return inferred;
+      const saved = localStorage.getItem('user_currency');
+      if (saved && ['GBP', 'USD', 'EUR', 'AUD', 'CNY', 'JPY'].includes(saved)) return saved;
     } catch (e) {}
-    
-    return 'USD';
+    return 'EUR';
   });
 
   useEffect(() => {
@@ -54,7 +43,9 @@ export default function Main() {
     return localStorage.getItem('onboarding_complete') !== 'true';
   });
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<Screen>('intro-choice');
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    return localStorage.getItem('onboarding_complete') === 'true' ? 'home' : 'intro-choice';
+  });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDetailedScan, setIsDetailedScan] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
@@ -135,7 +126,9 @@ export default function Main() {
         i18n.language,
         details.priceType,
         details.category,
-        details.location
+        details.location,
+        details.lotUrl,
+        details.buyerPremiumRate
       );
       
       if (result) {
@@ -344,6 +337,7 @@ export default function Main() {
             onRemoveImage={(index) => setCapturedImages(prev => prev.filter((_, i) => i !== index))}
             autoStartListening={autoStartListening}
             currency={currency}
+            onCurrencyChange={setCurrency}
           />
         );
       case 'analysis':
@@ -394,6 +388,11 @@ export default function Main() {
                 images={capturedImages}
                 onSave={handleSaveFind}
                 onBack={() => setCurrentScreen('home')}
+                onNewAppraisal={() => {
+                  setAnalysisResult(null);
+                  setCapturedImages([]);
+                  setCurrentScreen('describe');
+                }}
                 onUpgrade={handleCheckout}
                 plan={plan}
                 currency={currency}

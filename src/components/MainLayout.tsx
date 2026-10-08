@@ -28,6 +28,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 hover:bg-white/50 rounded-full transition-colors"
+              aria-label="Toggle navigation menu"
+              title="Menu"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -53,6 +55,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
           <div className="absolute left-1/2 -translate-x-1/2">
             <button 
               onClick={() => onViewChange?.('intro-choice')}
+              aria-label="Return to Antique Hunter Home"
+              title="Antique Hunter"
             >
               <Logo variant="centered" className="text-xl" />
             </button>
@@ -62,12 +66,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
             <button 
               onClick={() => onViewChange?.('settings')}
               className="p-2 hover:bg-white/50 rounded-full transition-colors"
+              aria-label="Settings and Preferences"
+              title="Settings"
             >
               <Settings className="w-5 h-5" />
             </button>
             <button 
               onClick={() => onViewChange?.('profile')}
               className="p-2 hover:bg-white/50 rounded-full transition-colors"
+              aria-label="User Account Profile"
+              title="Profile"
             >
               <User className="w-5 h-5" />
             </button>

@@ -41,7 +41,9 @@ export const FeedbackHistory: React.FC<FeedbackHistoryProps> = ({ onBack, curren
       const formatted = new Intl.NumberFormat(i18n.language, {
         style: 'currency',
         currency: displayCurrency,
-        currencyDisplay: 'narrowSymbol'
+        currencyDisplay: 'narrowSymbol',
+        minimumFractionDigits: Number.isInteger(Number(amount)) ? 0 : 2,
+        maximumFractionDigits: Number.isInteger(Number(amount)) ? 0 : 2
       }).format(amount);
       return `${displayCurrency} ${formatted}`;
     } catch (e) {
