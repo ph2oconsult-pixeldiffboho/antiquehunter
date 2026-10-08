@@ -23,7 +23,8 @@
     "home": "Accueil",
     "hunt": "Chiner",
     "collection": "Collection",
-    "profile": "Profil"
+    "profile": "Profil",
+    "saving": "Enregistrement…"
   },
   "home": {
     "hero_badge": "Outil de terrain professionnel",
@@ -149,7 +150,29 @@
     "market_insight_points": "• Qualité des sculptures et assemblages\n• Surface d'origine vs décapée\n• Époque authentique vs réédition",
     "market_pulse": "Tendance du Marché",
     "paddle_rule_label": "Règle d'enchère du marchand :",
-    "paddle_rule": "Votre enchère maximale au marteau (prix plafond) est de {{hammer}}. Avec {{pct}} % de frais acheteur, cela fait {{allIn}} frais compris. Règle simple : enchère maximale = budget total ÷ {{mult}}."
+    "paddle_rule": "Votre enchère maximale au marteau (prix plafond) est de {{hammer}}. Avec {{pct}} % de frais acheteur, cela fait {{allIn}} frais compris. Règle simple : enchère maximale = budget total ÷ {{mult}}.",
+    "verdict_strong_buy": "Excellent achat",
+    "verdict_good_buy": "Bon achat",
+    "verdict_fair": "Prix correct",
+    "verdict_overpriced": "Trop cher",
+    "verdict_walk_away": "À éviter",
+    "verdict_high_risk": "Risque élevé",
+    "verdict_no_price": "Prix requis",
+    "reason_strong_buy": "{{price}}{{premium}} est au niveau ou en dessous du bas de la fourchette de marché ({{low}}) – une vraie marge de marchand.",
+    "reason_good_buy": "{{price}}{{premium}} se situe dans la moitié basse de la fourchette de marché ({{low}}–{{high}}) – bon achat si l'état se confirme.",
+    "reason_fair": "{{price}}{{premium}} se situe dans la moitié haute de la fourchette de marché ({{low}}–{{high}}) – correct, mais peu de marge.",
+    "reason_overpriced": "{{price}}{{premium}} dépasse le haut de la fourchette de marché ({{high}}) – c'est un prix de détail.",
+    "reason_walk_away": "{{price}}{{premium}} dépasse le haut de la fourchette de détail ({{retailHigh}}) – aucune marge à ce prix.",
+    "reason_high_risk": "Les photos montrent un risque sérieux d'authenticité ou d'état : le prix seul ne suffit pas.",
+    "reason_no_price": "Indiquez le prix demandé ou l'estimation pour obtenir un verdict.",
+    "reason_premium_suffix": " frais compris ({{pct}} % de frais acheteur)",
+    "smart_buy_hammer": "Enchère max · {{allIn}} frais compris",
+    "gauge_label": "Score d'achat",
+    "gauge_confidence": "Confiance : {{level}}",
+    "conf_level_high": "élevée",
+    "conf_level_medium": "moyenne",
+    "conf_level_low": "faible",
+    "conf_level_very_low": "très faible"
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",
@@ -378,7 +401,16 @@
     "no_verified": "Aucune annonce en ligne vérifiée – élargissez le budget ou les sources.",
     "verified": "Lien vérifié",
     "unverified": "Non vérifié",
-    "unverified_desc": "Ce site bloque les vérifications automatiques : le prix, la date de vente et la disponibilité proviennent des résultats de recherche et ne sont pas confirmés – ouvrez le lien pour vérifier.",
-    "checked_summary": "Liens vérifiés : {{verified}} confirmés, {{unverified}} non vérifiés, {{dropped}} écartés (morts, terminés, génériques ou hors filtre)."
+    "unverified_desc": "Ce site bloque les vérifications automatiques : estimation, date de vente et disponibilité non confirmées – ouvrez l'annonce pour vérifier.",
+    "checked_summary": "Liens vérifiés : {{verified}} confirmés, {{unverified}} non vérifiés, {{dropped}} écartés (morts, terminés, génériques ou hors filtre).",
+    "check_listing": "Estimation : voir l'annonce",
+    "search_hint": "Résultat de recherche : {{hint}}"
+  },
+  "toast": {
+    "saved": "Enregistré dans votre journal.",
+    "saved_local": "Enregistré dans votre journal sur cet appareil (non connecté).",
+    "save_failed": "Échec de l'enregistrement : {{reason}}",
+    "signin_needed": "Connectez-vous avec Google pour enregistrer dans votre compte…",
+    "save_failed_local": "Impossible d'enregistrer dans votre compte ({{reason}}). Enregistré sur cet appareil à la place."
   }
 }

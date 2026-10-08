@@ -5,11 +5,14 @@ import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { FindCard } from './FindCard';
 import { Loader2, Search, Filter, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { analysisItems, deleteLocalFind, loadLocalFinds } from '../services/localFinds';
 
 interface CollectionProps {
   onViewFind: (find: any) => void;
   onBack: () => void;
 }
+
+const toMillis = (v: any): number => v?.toMillis ? v.toMillis() : v ? new Date(v).getTime() || 0 : 0;
 
 export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) => {
   const { t } = useTranslation();
@@ -18,8 +21,11 @@ export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) =>
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
 
+  const [localFinds, setLocalFinds] = useState<any[]>(() => loadLocalFinds());
+
   useEffect(() => {
-    if (!auth.currentUser) return;
+    // Not signed in: only finds saved on this device
+    if (!auth.currentUser) { setLoading(false); return; }
 
     const q = query(
       collection(db, 'finds'),
@@ -32,7 +38,8 @@ export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) =>
       setFinds(data);
       setLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'finds');
+      setLoading(false);
+      try { handleFirestoreError(error, OperationType.LIST, 'finds'); } catch { /* logged */ }
     });
 
     return () => unsubscribe();
@@ -40,6 +47,13 @@ export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) =>
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (id.startsWith('local-')) {
+      if (window.confirm(t('collection.delete_confirm'))) {
+        deleteLocalFind(id);
+        setLocalFinds(loadLocalFinds());
+      }
+      return;
+    }
     if (window.confirm(t('collection.delete_confirm'))) {
       try {
         await deleteDoc(doc(db, 'finds', id));
@@ -49,9 +63,13 @@ export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) =>
     }
   };
 
-  const filteredFinds = finds.filter(find => {
-    const matchesSearch = find.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         find.analysis.identification.toLowerCase().includes(searchTerm.toLowerCase());
+  const allFinds = [...finds, ...localFinds].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+  const filteredFinds = allFinds.filter(find => {
+    const term = searchTerm.toLowerCase();
+    const firstItem = analysisItems(find.analysis)[0] || {};
+    const matchesSearch = String(find.title || '').toLowerCase().includes(term) ||
+                         String(firstItem.item_summary?.title || '').toLowerCase().includes(term) ||
+                         String(firstItem.item_summary?.category || '').toLowerCase().includes(term);
     const matchesFilter = filter === 'all' || find.status === filter;
     return matchesSearch && matchesFilter;
   });
@@ -61,7 +79,7 @@ export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) =>
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="serif text-4xl font-light tracking-tight text-ink">{t('collection.title')}</h1>
-          <p className="text-[10px] uppercase tracking-widest font-bold text-muted">{finds.length} {t('common.history')}</p>
+          <p className="text-[10px] uppercase tracking-widest font-bold text-muted">{allFinds.length} {t('common.history')}</p>
         </div>
         <button
           onClick={onBack}

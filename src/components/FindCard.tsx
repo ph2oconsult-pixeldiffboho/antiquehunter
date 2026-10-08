@@ -2,6 +2,8 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { MapPin, Calendar, ArrowRight, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { analysisItems } from '../services/localFinds';
+import { basisFromScore } from '../services/appraisalMath';
 
 interface FindCardProps {
   find: {
@@ -21,21 +23,14 @@ interface FindCardProps {
 
 export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) => {
   const { t } = useTranslation();
-  const date = find.createdAt?.toDate ? find.createdAt.toDate().toLocaleDateString() : new Date(find.createdAt).toLocaleDateString();
+  const date = find.createdAt?.toDate ? find.createdAt.toDate().toLocaleDateString() : find.createdAt ? new Date(find.createdAt).toLocaleDateString() : '';
   const displayImage = find.images?.[0] || find.image;
   
-  const items = Array.isArray(find.analysis) ? find.analysis : [find.analysis];
-  const mainItem = items[0];
-  const score = mainItem.buy_decision.score;
-  
-  const getLabel = (s: number) => {
-    if (s >= 80) return t('analysis.buy_strong');
-    if (s >= 65) return t('analysis.buy_normal');
-    if (s >= 45) return t('analysis.buy_risky');
-    if (s >= 25) return t('analysis.buy_avoid');
-    return t('analysis.buy_pass');
-  };
-  const label = getLabel(score);
+  const items = analysisItems(find.analysis);
+  const mainItem = items[0] || {};
+  const score = Number(mainItem.buy_decision?.score) || 0;
+  // Same verdict as the appraisal screen: from the price band, falling back to the score for old saves
+  const label = t(`analysis.verdict_${mainItem.buy_decision?.price_basis || basisFromScore(score)}`);
 
   const getScoreColor = (s: number) => {
     if (s >= 65) return 'bg-decision-green';
@@ -78,7 +73,7 @@ export const FindCard: React.FC<FindCardProps> = ({ find, onClick, onDelete }) =
         <div className="space-y-1">
           <h3 className="serif text-xl font-light tracking-tight group-hover:text-muted transition-colors line-clamp-1">{find.title}</h3>
           <div className="flex items-center gap-2">
-            <p className="text-[10px] text-muted uppercase tracking-widest font-bold">{find.category || mainItem.item_summary.category}</p>
+            <p className="text-[10px] text-muted uppercase tracking-widest font-bold">{find.category || mainItem.item_summary?.category}</p>
             <span className="w-1 h-1 rounded-full bg-border-custom" />
             <p className={`text-[10px] uppercase tracking-widest font-bold ${getScoreTextColor(score)}`}>{label}</p>
           </div>

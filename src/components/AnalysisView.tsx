@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen, Sparkles } from 'lucide-react';
 import { BuyGaugeScore } from './BuyGaugeScore';
 import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { allInCost, clampToBand } from '../services/appraisalMath';
+import { allInCost, basisFromScore, clampToBand, type PriceBasis } from '../services/appraisalMath';
 
 interface AnalysisViewProps {
   result: any; // Can be a single object or an array of objects
   images?: string[];
-  onSave?: (status: string) => void;
+  onSave?: (status: string) => void | Promise<unknown>;
   onBack: () => void;
   onNewAppraisal?: () => void;
   onUpgrade?: (packId: string) => void;
@@ -30,8 +31,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     setLocalResult(result);
   }, [result]);
 
-  const formatPrice = (amount: number) => {
-    const displayCurrency = currentItem?.price_guidance?.currency || currency || 'EUR';
+  const formatPrice = (amount: number) => formatMoney(amount, currentItem?.price_guidance?.currency);
+  const formatMoney = (amount: number, itemCurrency?: string) => {
+    const displayCurrency = itemCurrency || currency || 'EUR';
     // Whole amounts only: €50, not €50.00 (all appraisal figures are rounded to whole units)
     const num = Math.round(Number(amount) || 0);
     try {
@@ -71,17 +73,39 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     }
     score = Math.round(clampToBand(score, originalDecision.score_band));
 
-    // Update label based on new score
-    if (score >= 80) label = t('analysis.buy_strong');
-    else if (score >= 65) label = t('analysis.buy_normal');
-    else if (score >= 45) label = t('analysis.buy_risky');
-    else if (score >= 25) label = t('analysis.buy_avoid');
-    else label = t('analysis.buy_pass');
+    // Verdict label + reason come from the price band computed in gemini.ts (never from the score alone),
+    // so the label, the reason and the score always agree. Older saved appraisals fall back to the score.
+    const basis: PriceBasis = originalDecision.price_basis || basisFromScore(score);
+    label = t(`analysis.verdict_${basis}`);
 
-    return { ...rawItem, buy_decision: { ...originalDecision, score, label } };
+    const pg = rawItem.price_guidance || {};
+    const isAuction = !!rawItem.seller_context?.isAuction;
+    const pct = Number(rawItem.seller_context?.buyerPremiumRate) || 0;
+    const effective = Number(originalDecision.effective_price || rawItem.seller_context?.allInPrice) || 0;
+    const low = Number(pg.estimated_market_range_low) || 0;
+    const high = Number(pg.estimated_market_range_high) || 0;
+    const reason = (effective > 0 || basis === 'high_risk' || basis === 'no_price')
+      ? t(`analysis.reason_${basis}`, {
+          price: formatMoney(effective, pg.currency),
+          premium: isAuction && pct > 0 ? t('analysis.reason_premium_suffix', { pct }) : '',
+          low: formatMoney(low, pg.currency),
+          high: formatMoney(high, pg.currency),
+          retailHigh: formatMoney(Number(pg.fair_price_high) || 0, pg.currency),
+        })
+      : (score >= 65 ? t('analysis.buy_strong_desc') : score >= 45 ? t('analysis.buy_risky_desc') : t('analysis.buy_avoid_desc'));
+
+    return { ...rawItem, buy_decision: { ...originalDecision, score, label, price_basis: basis, reason } };
   }, [rawItem, buyingGoal, t]);
 
-  // Keep the floating action bar from covering the end of the page (bar height + safe area)
+  // Keep the floating action bar from covering the end of the page (bar height + safe area).
+  // On short screens (e.g. 500px tall, landscape phones) the bar is not fixed at all: it sits at the end of the page.
+  const [isShortScreen, setIsShortScreen] = useState(() => typeof window !== 'undefined' && window.innerHeight < 600);
+  useEffect(() => {
+    const onResize = () => setIsShortScreen(window.innerHeight < 600);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const [saveState, setSaveState] = useState<'idle' | 'saving'>('idle');
   const [actionBarHeight, setActionBarHeight] = useState(88);
   const actionBarObserver = React.useRef<ResizeObserver | null>(null);
   const actionBarRef = React.useCallback((el: HTMLDivElement | null) => {
@@ -533,8 +557,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           notBoughtReason: outcome === 'not_bought' ? reason : null,
           isHelpful: helpful,
           timestamp: serverTimestamp(),
-          itemId: currentItem.item_summary.title,
-          currency: currentItem.price_guidance.currency || currency
+          itemId: String(currentItem.item_summary.title || '').slice(0, 250)
+          // (no extra fields: the Firestore rules only accept the fields listed in isValidFeedback)
         };
 
         await addDoc(collection(db, 'analysis_feedback'), feedbackData);
@@ -718,7 +742,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   return (
     <div
       className="max-w-2xl mx-auto px-6 py-8 space-y-4"
-      style={{ paddingBottom: `calc(${actionBarHeight + 40}px + env(safe-area-inset-bottom, 0px))` }}
+      style={{ paddingBottom: isShortScreen ? '2rem' : `calc(${actionBarHeight + 48}px + 1rem + env(safe-area-inset-bottom, 0px))` }}
     >
       {/* 1. Header & Navigation */}
       <header className="flex items-center justify-between">
@@ -940,6 +964,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               <p className="text-xl font-medium text-decision-green">
                 {formatPrice(currentItem.price_guidance.good_buy_below)}
               </p>
+              {isAuctionItem && (
+                <p className="text-[9px] text-decision-green/70 italic">
+                  {t('analysis.smart_buy_hammer', { allIn: formatPrice(allInCost(currentItem.price_guidance.good_buy_below, premiumPct, true)) })}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.retail_range', 'Retail Range')}</p>
@@ -1289,9 +1318,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                   <p className="text-[11px] text-muted uppercase tracking-[0.3em] font-bold">{t('analysis.buy_score')}</p>
                   <h2 className={`serif text-5xl font-light tracking-tight ${decisionStyles.text}`}>{currentItem.buy_decision.label}</h2>
                   <p className="text-[11px] text-muted italic mt-2">
-                    {currentItem.buy_decision.score >= 65 ? t('analysis.buy_strong_desc') : 
-                     currentItem.buy_decision.score >= 45 ? t('analysis.buy_risky_desc') : 
-                     t('analysis.buy_avoid_desc')}
+                    {currentItem.buy_decision.reason}
                   </p>
                   <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">
                     {t('analysis.dealer_buy_rule')}
@@ -1389,40 +1416,55 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         {currentItem.disclaimer}
       </p>
 
-      {/* 13. Sleek Floating Action Bar */}
-      <div
-        ref={actionBarRef}
-        className="fixed left-4 right-4 max-w-2xl mx-auto p-3 bg-white/95 backdrop-blur-md border border-border-custom rounded-3xl shadow-2xl flex items-center gap-3 z-40"
-        style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
-      >
-        <button
-          onClick={onBack}
-          className="flex-1 py-3 px-4 bg-paper text-ink rounded-2xl font-semibold text-xs hover:bg-border-custom transition-colors text-center border border-border-custom"
-          aria-label="Return to previous screen"
-        >
-          {t('common.back', 'Back')}
-        </button>
-        {onNewAppraisal && (
-          <button
-            onClick={onNewAppraisal}
-            className="flex-1 py-3 px-4 bg-paper border border-gold/40 hover:bg-gold/10 text-ink rounded-2xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
-            aria-label="Start a new antique appraisal"
+      {/* 13. Sleek Floating Action Bar (rendered in <body> so no transformed parent can shift it; in-flow on short screens) */}
+      {(() => {
+        const bar = (
+          <div
+            ref={actionBarRef}
+            className={`${isShortScreen ? 'relative mt-6' : 'fixed left-4 right-4 z-40'} max-w-2xl mx-auto p-3 bg-white/95 backdrop-blur-md border border-border-custom rounded-3xl shadow-2xl flex items-center gap-3`}
+            style={isShortScreen ? undefined : { bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
           >
-            <Sparkles className="w-3.5 h-3.5 text-gold" />
-            <span>{t('analysis.new_appraisal', 'New Appraisal')}</span>
-          </button>
-        )}
-        {!isSaved && onSave && (
-          <button
-            onClick={() => onSave('watching')}
-            className="flex-1 py-3 px-4 bg-ink text-paper rounded-2xl font-semibold text-xs hover:opacity-90 transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-ink/20"
-            aria-label="Save this appraisal to collection"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>{t('common.save', 'Save')}</span>
-          </button>
-        )}
-      </div>
+            <button
+              onClick={onBack}
+              className="flex-1 py-3 px-4 bg-paper text-ink rounded-2xl font-semibold text-xs hover:bg-border-custom transition-colors text-center border border-border-custom"
+              aria-label="Return to previous screen"
+            >
+              {t('common.back', 'Back')}
+            </button>
+            {onNewAppraisal && (
+              <button
+                onClick={onNewAppraisal}
+                className="flex-1 py-3 px-4 bg-paper border border-gold/40 hover:bg-gold/10 text-ink rounded-2xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
+                aria-label="Start a new antique appraisal"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-gold" />
+                <span>{t('analysis.new_appraisal', 'New Appraisal')}</span>
+              </button>
+            )}
+            {onSave && (isSaved ? (
+              <span className="flex-1 py-3 px-4 bg-decision-green/10 text-decision-green rounded-2xl font-semibold text-xs flex items-center justify-center gap-1.5 border border-decision-green/20">
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>{t('common.saved', 'Saved')}</span>
+              </span>
+            ) : (
+              <button
+                onClick={async () => {
+                  if (saveState === 'saving') return;
+                  setSaveState('saving');
+                  try { await onSave('watching'); } finally { setSaveState('idle'); }
+                }}
+                disabled={saveState === 'saving'}
+                className="flex-1 py-3 px-4 bg-ink text-paper rounded-2xl font-semibold text-xs hover:opacity-90 transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-ink/20 disabled:opacity-60"
+                aria-label="Save this appraisal to your log"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{saveState === 'saving' ? t('common.saving', 'Saving…') : t('common.save', 'Save')}</span>
+              </button>
+            ))}
+          </div>
+        );
+        return isShortScreen || typeof document === 'undefined' ? bar : createPortal(bar, document.body);
+      })()}
     </div>
   );
 };

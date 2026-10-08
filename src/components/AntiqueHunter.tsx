@@ -7,6 +7,7 @@ import { Search, MapPin, Globe, Sparkles, ExternalLink, Loader2, ArrowRight, Shi
 interface AntiqueHunterProps {
   onBack: () => void;
   currency: string;
+  onCurrencyChange?: (currency: string) => void;
 }
 
 interface SourcingMatch {
@@ -21,6 +22,7 @@ interface SourcingMatch {
   imageUrl?: string;
   verification?: 'verified' | 'unverified';
   verificationNote?: string;
+  searchHint?: string;
 }
 
 interface SourcingResults {
@@ -43,9 +45,10 @@ interface HuntRequest {
 
 const HUNT_CURRENCIES = ['EUR', 'GBP', 'USD', 'SEK'];
 const SWEDISH_PLATFORMS = ['Auctionet', 'Bukowskis'];
-const CLIENT_TIMEOUT_MS = 70_000;
+// Server answers within ~50 s (Gemini 40 s + link checks 10 s); Vercel cuts the function at 60 s (504 -> timeout message)
+const CLIENT_TIMEOUT_MS = 58_000;
 
-export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }) => {
+export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, onCurrencyChange }) => {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [targetBudget, setTargetBudget] = useState('');
@@ -53,11 +56,8 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
   const [results, setResults] = useState<SourcingResults | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastRequest, setLastRequest] = useState<HuntRequest | null>(null);
-  const [huntCurrency, setHuntCurrency] = useState<string>(() => {
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('hunt_currency') : null;
-    if (saved && HUNT_CURRENCIES.includes(saved)) return saved;
-    return HUNT_CURRENCIES.includes(currency) ? currency : 'EUR';
-  });
+  // Shared app-wide currency setting (EUR by default); currencies the hunt doesn't offer fall back to EUR
+  const huntCurrency = HUNT_CURRENCIES.includes(currency) ? currency : 'EUR';
   const [periodOnly, setPeriodOnly] = useState(true);
   const [expandedVerifyId, setExpandedVerifyId] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -95,8 +95,7 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
   };
 
   const handleCurrencyChange = (value: string) => {
-    setHuntCurrency(value);
-    try { localStorage.setItem('hunt_currency', value); } catch { /* ignore */ }
+    onCurrencyChange?.(value);
   };
 
   const handlePlatformToggle = (plat: string) => {
@@ -415,14 +414,16 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
           animate={{ opacity: 1, y: 0 }}
           className="space-y-8"
         >
-          {/* Market Brief Card */}
-          <div className="bg-white border border-border-custom rounded-[32px] p-8 shadow-sm space-y-4">
-            <div className="space-y-1">
-              <span className="text-[9px] uppercase tracking-widest font-bold text-gold">Dealer Market Brief</span>
-              <h2 className="serif text-2xl font-light text-ink">Active Market Climate</h2>
+          {/* Market Brief Card (only alongside real listings: an empty search has no "market climate" to report) */}
+          {results.matches?.length > 0 && results.marketBrief && (
+            <div className="bg-white border border-border-custom rounded-[32px] p-8 shadow-sm space-y-4">
+              <div className="space-y-1">
+                <span className="text-[9px] uppercase tracking-widest font-bold text-gold">Dealer Market Brief</span>
+                <h2 className="serif text-2xl font-light text-ink">Active Market Climate</h2>
+              </div>
+              <p className="text-sm text-ink leading-relaxed font-light">{results.marketBrief}</p>
             </div>
-            <p className="text-sm text-ink leading-relaxed font-light">{results.marketBrief}</p>
-          </div>
+          )}
 
           {/* Sourcing Listings List */}
           <div className="space-y-6">
@@ -497,9 +498,14 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency }
                           
                           {/* Price Display */}
                           <div className="text-right whitespace-nowrap">
-                            <p className="font-mono text-xs font-semibold text-ink bg-paper px-3 py-1.5 border border-border-custom rounded-xl shadow-inner inline-block">
-                              {item.price || 'Market Rate'}
+                            <p className={`font-mono text-xs font-semibold px-3 py-1.5 border rounded-xl shadow-inner inline-block ${item.verification === 'unverified' ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-ink bg-paper border-border-custom'}`}>
+                              {item.verification === 'unverified' ? t('hunter.check_listing') : (item.price || t('hunter.check_listing'))}
                             </p>
+                            {item.verification === 'unverified' && item.searchHint && (
+                              <p className="text-[9px] text-amber-700/80 font-sans mt-1 max-w-[12rem] whitespace-normal">
+                                {t('hunter.search_hint', { hint: item.searchHint })}
+                              </p>
+                            )}
                             {item.date && (
                               <p className="text-[9px] text-muted font-sans font-bold uppercase tracking-wider mt-1 text-amber-600">
                                 {item.date}
