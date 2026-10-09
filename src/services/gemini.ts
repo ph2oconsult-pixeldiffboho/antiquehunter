@@ -1,7 +1,20 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
-import { alignProseRanges, decideBuy, reconcileNegotiation, sanitizeDeep, type PriceBasis, type ScoreBand } from "./appraisalMath";
+import {
+  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, normaliseConfidence, reconcileNegotiation, sanitizeDeep,
+  type PriceBasis, type ScoreBand,
+} from "./appraisalMath";
+import { lotFactsPrompt, type LotFacts } from "./lotFetch";
+import { convertApprox } from "./budget";
+
+/** Fixed seed + temperature 0: the same input gives the same appraisal (fix 9). */
+export const APPRAISAL_SEED = 20261009;
+
+export interface AppraisalExtra {
+  /** What was read from the pasted lot link (server-side, /api/lot); null = a link was given but could not be read */
+  lotFacts?: LotFacts | null;
+}
 
 // Antique assessment service using Gemini 3.1 Flash Lite
 const API_KEY = process.env.GEMINI_API_KEY || "";
@@ -33,7 +46,8 @@ export const searchAntiques = async (
   category: AntiqueCategory = 'unknown',
   location?: string,
   lotUrl?: string,
-  buyerPremiumRate?: number
+  buyerPremiumRate?: number,
+  extra: AppraisalExtra = {}
 ) => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
   const model = "gemini-3.1-flash-lite-preview";
@@ -57,7 +71,15 @@ export const searchAntiques = async (
 
   const targetCurrency = currency || 'EUR';
   const currencySymbol = currencySymbolFor(targetCurrency);
-  const isAuction = (sellerType || '').toLowerCase().includes('auction') || !!(lotUrl && (lotUrl.includes('drouot') || lotUrl.includes('interencheres') || lotUrl.includes('saleroom') || lotUrl.includes('liveauctioneers') || lotUrl.includes('sothebys') || lotUrl.includes('christies') || lotUrl.includes('bonhams')));
+  const isAuction = (sellerType || '').toLowerCase().includes('auction') || !!(lotUrl && /drouot|interencheres|saleroom|liveauctioneers|sothebys|christies|bonhams|auctionet|catawiki|easyliveauction|bukowskis/.test(lotUrl));
+  const lotFacts = extra.lotFacts !== undefined ? extra.lotFacts : (lotUrl ? { ok: false, url: lotUrl, site: 'other', imageUrls: [] } as LotFacts : undefined);
+  const fetchedEstimate = !!(lotFacts?.ok && (lotFacts.estimateLow || lotFacts.estimateHigh));
+
+  const eurTo = (eur: number) => convertApprox(eur, 'EUR', currency || 'EUR') ?? eur;
+  const fmtCur = (n: number, cur: string = currency || 'EUR') => {
+    try { return new Intl.NumberFormat('en-GB', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(Math.round(n)); }
+    catch { return `${Math.round(n)} ${cur}`; }
+  };
   const hasPhotos = !!(imagesBase64 && imagesBase64.length > 0);
   const premiumPct = isAuction ? (buyerPremiumRate !== undefined && !isNaN(Number(buyerPremiumRate)) ? Number(buyerPremiumRate) : 25) : 0;
 
@@ -84,21 +106,19 @@ You must speak with the authority of an expert who has seen thousands of pieces.
   * 20th c. reproductions: €50–€300 (or equivalent in ${targetCurrency})
 - NEVER multiply value because the user claims a stamp or "18th century" in their typed text. A user's text claim is unverified. Only raise value for a stamp when a photograph of the stamp is provided and it is clearly legible.
 - Reduce value for replaced marble, replaced/later bronzes, veneer losses, woodworm, restorations, and "partly period" or marriage pieces.
-- If a listing or auction estimate is given by the user, treat it as a strong anchor: your market range should normally sit within 0.7x–2.0x of that estimate unless you give a specific, documented reason.
+- If a listing or auction estimate is given (typed by the user, or read from the lot page below), treat it as a strong anchor: your market range should normally sit within 0.7x–2.0x of that estimate unless you give a specific, documented reason.
 
-### AUCTION & LISTING LINK PRIORITY (CRITICAL)
-${lotUrl ? `A SPECIFIC LOT / LISTING LINK HAS BEEN PROVIDED: ${lotUrl}
-- **PRIMARY EVIDENCE SOURCE**: You MUST treat this link as the primary reference for this appraisal. Prioritize extracting, analyzing, and referencing any estimates (low/high auction estimate), starting bids, catalog descriptions, dimensions, condition reports, and provenance details associated with this specific lot or listing URL (e.g. from Drouot, Interencheres, Sotheby's, Christie's, Bonhams, The Saleroom, LiveAuctioneers, eBay, 1stDibs, etc.).
-- **PRICE ANCHORING**: Use the auction house's printed catalog estimate or listing price found at this URL as the authoritative anchor. Your estimated_market_range hammer price MUST directly align with this estimate (normally within 0.7x–1.5x) unless visible physical condition defects or unverified attribution justify a divergence.
-- **CATALOG ATTRIBUTION CITATION**: In item_summary.confidence_reason and pricing_reasoning, explicitly cite the catalog estimate and listing context from the provided link (e.g. "Anchored to auction house catalog estimate for this lot at ${lotUrl}...").` : '- When an auction or listing URL is provided, prioritize fetching and using its official catalog estimate, lot dimensions, and descriptions as the primary anchor.'}
+### LOT LINK (CRITICAL)
+${lotFacts ? lotFactsPrompt(lotFacts, fmtCur) : '- No lot link was given.'}
+- Only cite an auction estimate, catalogue text, dimensions or condition report that is written in this prompt. NEVER write that you "anchored to the catalogue estimate" unless an estimate is given above. Never invent one.
 
 ### PRICE RELATIONSHIP CONSTRAINTS (MANDATORY MATHEMATICAL RULES)
 All prices MUST be in ${targetCurrency} and respect these strict inequalities:
 1. opening_offer <= target_price_low <= target_price_high <= walk_away_price
-2. walk_away_price <= estimated_market_range_high (never bid/pay above what the item is worth)${isAuction ? `
-   For this auction lot: walk_away_price is the MAXIMUM HAMMER BID and walk_away_price x ${(1 + premiumPct / 100).toFixed(2)} (hammer + ${premiumPct}% buyer's premium) MUST be <= estimated_market_range_high.` : ''}
+2. walk_away_price = estimated_market_range_high (never bid/pay above what the item is worth)${isAuction ? `
+   For this auction lot: estimated_market_range is in HAMMER prices, so walk_away_price is the MAXIMUM HAMMER BID = estimated_market_range_high. The all-in cost (hammer x ${(1 + premiumPct / 100).toFixed(2)}, i.e. + ${premiumPct}% buyer's premium) is shown separately by the app.` : ''}
 3. estimated_market_range_low <= estimated_market_range_high
-4. good_buy_below (the smart-buy price) lies between estimated_market_range_low and the midpoint of the market range${isAuction ? ' (as a hammer price: hammer x ' + (1 + premiumPct / 100).toFixed(2) + ' must stay within that window)' : ''}, and opening_offer <= good_buy_below <= walk_away_price
+4. good_buy_below (the smart-buy price) lies between estimated_market_range_low and the midpoint of the market range${isAuction ? ' (as a hammer price)' : ''}, and opening_offer <= good_buy_below <= walk_away_price
 5. overpaying_above = walk_away_price (paying more than the walk-away price is overpaying)
 6. fair_price_low <= fair_price_high (retail market tier)
 7. fair_price_low >= estimated_market_range_low and fair_price_high >= estimated_market_range_high (retail is never below auction/market level)
@@ -126,6 +146,8 @@ The final buy score is calculated by the app from the asking price versus your p
 - **SNAP-JUDGEMENT CONSISTENCY:**
   - Snap judgement MUST match confidence level. NEVER use "authenticated", "verified masterwork", or "five-figure investment" when confidence is Low or Medium.
 
+- **CONFIDENCE BREAKDOWN SCALES (fixed):** evidence_quality 0–40 (photos, catalogue, estimate), identification_certainty 0–30 (type, period, origin, maker), risk_factors 0–30 (30 = no risk of reproduction / marriage / damage; 0 = serious risk). Whole numbers on exactly these scales.
+
 ### VALUE TIER CLASSIFICATION & CONSISTENCY
 All qualitative commentary MUST match the exact numerical range in price_guidance:
 - Tier A: Investment (${currencySymbol}5000+) - Museum-quality or rare investment pieces.
@@ -138,14 +160,14 @@ All qualitative commentary MUST match the exact numerical range in price_guidanc
 ${isAuction ? `- AUCTION LOT DETECTED: In antique auctions, buyers pay a mandatory Buyer's Premium (frais d'adjudication) of typically 20% to 30% (average ~25% incl. VAT) plus online bidding platform fees (~1.5–3%).
 - estimated_market_range must reflect the anticipated HAMMER PRICE (marteau).
 - The buyer's premium for this lot is ${premiumPct}%.
-- In pricing_reasoning, dealer_take, and negotiation_strategy, explicitly highlight the Buyer's Premium surcharge and warn that maximum paddle bids must be calculated as: Maximum Hammer Bid = Total Budget ÷ ${(1 + premiumPct / 100).toFixed(2)}. Walk-away price MUST be framed as the maximum hammer bid.` : ''}
+- All price figures you give (market range, smart buy, walk-away, negotiation) are HAMMER prices. Mention that the buyer's premium (${premiumPct}%) comes on top: all-in = hammer x ${(1 + premiumPct / 100).toFixed(2)}. Walk-away price MUST be framed as the maximum hammer bid.` : ''}
 
 ### PRICING LOGIC & CURRENCY
 All monetary numbers in price_guidance, dealer_take, and negotiation_strategy MUST be denominated in ${targetCurrency} (${currencySymbol}).
-- estimated_market_range: Realistic dealer shop or auction hammer range in ${targetCurrency}.
+- estimated_market_range: Realistic auction hammer range in ${targetCurrency}.
 - good_buy_below: The Smart Buy threshold for dealers.
 - fair_price: Standard market price (retail tier, typically 2x to 4x hammer).
-- overpaying_above: Walk-away price above which profit disappears.
+- overpaying_above: = walk-away price = top of the market range.
 - teaser_insight: A commercially sharp, dynamic dealer warning tailored specifically to THIS piece and currency. e.g. "Dealers would typically buy below ${currencySymbol}X. Above this, margin disappears." where X is calculated for this piece (or a reproduction alert). NEVER output a generic £450 figure.
 
 ### SPECIALIST KNOWLEDGE
@@ -161,8 +183,7 @@ ${getGlossaryPrompt(language)}`;
 
   const prompt = `
     Item Description: ${query}
-    ${lotUrl ? `PRIMARY SOURCE - Auction / Listing URL: ${lotUrl}
-    (IMPORTANT: Prioritize fetching official auction catalog estimates, starting bid, description, measurements, and lot details from this link as the primary benchmark for this appraisal.)` : ''}
+    ${lotFacts?.ok ? `Lot page read: ${lotFacts.url} (catalogue and estimate are in the instructions above)` : lotUrl ? `Lot link given but NOT readable: ${lotUrl} (no estimate known)` : ''}
     Price: ${askingPrice || 'Not provided'} ${targetCurrency} (${priceType === 'paid' ? 'Paid' : 'Offered/Asking'})
     Seller Type: ${sellerType || 'Not provided'} ${isAuction ? '(AUCTION SALE - 20-30% BUYER PREMIUM APPLIES)' : ''}
     Location: ${location || 'Not provided'}
@@ -195,6 +216,8 @@ ${getGlossaryPrompt(language)}`;
       systemInstruction,
       responseMimeType: "application/json",
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      temperature: 0,
+      seed: APPRAISAL_SEED,
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -218,9 +241,9 @@ ${getGlossaryPrompt(language)}`;
                     confidence_breakdown: {
                       type: Type.OBJECT,
                       properties: {
-                        evidence_quality: { type: Type.NUMBER },
-                        identification_certainty: { type: Type.NUMBER },
-                        risk_factors: { type: Type.NUMBER }
+                        evidence_quality: { type: Type.NUMBER, description: "0 to 40" },
+                        identification_certainty: { type: Type.NUMBER, description: "0 to 30" },
+                        risk_factors: { type: Type.NUMBER, description: "0 to 30 (30 = no risk)" }
                       },
                       required: ["evidence_quality", "identification_certainty", "risk_factors"]
                     },
@@ -331,6 +354,24 @@ ${getGlossaryPrompt(language)}`;
   });
 
   const result = JSON.parse(response.text);
+  return postProcessAppraisal(result, {
+    query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
+    lotFacts, fetchedEstimate, eurTo,
+  });
+};
+
+export interface PostProcessContext {
+  query: string; hasPhotos: boolean; askingPrice?: number; isAuction: boolean; premiumPct: number; targetCurrency: string;
+  currencySymbol: string; language: string; sellerType?: string; lotUrl?: string;
+  lotFacts?: LotFacts | null; fetchedEstimate: boolean; eurTo: (eur: number) => number;
+}
+
+/**
+ * Everything the app does to the model's JSON (exported so the accuracy harness can re-apply it to a captured answer):
+ * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
+ */
+export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
@@ -344,27 +385,27 @@ ${getGlossaryPrompt(language)}`;
     no_price: "Needs a Price",
   } as Record<PriceBasis, string>)[basis];
 
-  // One source of truth for confidence: this label (from the capped score) is used for item_summary.confidence AND
-  // buy_decision.confidence, and the UI renders both through the same analysis.confidence_* labels.
-  const getConfidenceLabel = (score: number) => {
-    if (score >= 80) return "high";
-    if (score >= 60) return "medium";
-    if (score >= 40) return "low";
-    return "very_low";
-  };
+  // One source of truth for confidence: confidenceLabel() (appraisalMath.ts) from the calibrated score is used for
+  // item_summary.confidence AND buy_decision.confidence, and the UI renders both through the same analysis.confidence_* labels.
 
   // Calculate Buy Score in code based on scoring_inputs
   const items = result.items.map((item: any) => {
     const s = item.scoring_inputs;
     const c = item.item_summary.confidence_breakdown;
     
-    // Calculate confidence score from breakdown
-    let confScore = (c.evidence_quality || 0) + (c.identification_certainty || 0) + (c.risk_factors || 0);
+    // Confidence (fix 6): the breakdown back on its fixed scales, then calibrated with what the app knows about the
+    // evidence (real estimate read from the lot page, photos)
+    const nb = normaliseConfidence(c);
+    Object.assign(c, nb);
+    const words = query.trim().split(/\s+/).length;
+    let confScore = calibratedConfidence(nb, {
+      hasPhotos, fetchedEstimate, closeComparables: 0,
+      vague: words <= 3 && !hasPhotos && !lotFacts?.ok,
+    });
     
     // Strict Evidence Grounding:
     // If NO photos were provided, confidence can NEVER be high, and evidence quality must be capped.
     if (!hasPhotos) {
-      confScore = Math.min(confScore, 50);
       c.evidence_quality = Math.min(c.evidence_quality || 12, 14);
       if (!item.item_summary.confidence_reason.includes('photographic') && !item.item_summary.confidence_reason.includes('photos')) {
         item.item_summary.confidence_reason = `Unverified: Evaluated without physical photographs. Stamped marks, joinery, and authenticity cannot be confirmed without visual inspection. ${item.item_summary.confidence_reason}`;
@@ -375,15 +416,13 @@ ${getGlossaryPrompt(language)}`;
     }
 
     // Vague queries (e.g. "old table", "chair") with no details
-    const words = query.trim().split(/\s+/).length;
-    if (words <= 3 && !hasPhotos) {
-      confScore = Math.min(confScore, 35);
+    if (words <= 3 && !hasPhotos && !lotFacts?.ok) {
       item.item_summary.confidence_reason = `Speculative estimate: Query '${query}' is too generic with no images or provenance. ${item.item_summary.confidence_reason}`;
       item.price_guidance.pricing_reasoning = `Speculative valuation: A generic '${query}' can range from a modern utility piece to fine period antique. Inspect construction before relying on numbers. ${item.price_guidance.pricing_reasoning}`;
     }
 
     const finalConfScore = Math.max(1, Math.min(100, Math.round(confScore)));
-    const confLabel = getConfidenceLabel(finalConfScore);
+    const confLabel = confidenceLabel(finalConfScore);
 
     // Value Tier Consistency Check:
     // If estimated market range is under 5000, it cannot be Tier A ("Investment")
@@ -414,14 +453,15 @@ ${getGlossaryPrompt(language)}`;
     // Ensure positive numbers
     pg.estimated_market_range_low = Math.max(0, Number(pg.estimated_market_range_low) || 0);
     pg.estimated_market_range_high = Math.max(pg.estimated_market_range_low, Number(pg.estimated_market_range_high) || pg.estimated_market_range_low * 1.5);
+    const rawMidEur = convertApprox((pg.estimated_market_range_low + pg.estimated_market_range_high) / 2, targetCurrency, 'EUR') ?? 0;
     
     // Retail bounds: fair_price_low <= fair_price_high
     pg.fair_price_low = Math.max(pg.estimated_market_range_low, Number(pg.fair_price_low) || Math.round(pg.estimated_market_range_low * 1.5));
     pg.fair_price_high = Math.max(pg.fair_price_low, pg.estimated_market_range_high, Number(pg.fair_price_high) || Math.round(pg.estimated_market_range_high * 2));
 
     // Smart buy + negotiation figures, consistent with the buy-score bands:
-    // smart buy (all-in) within [market low, market mid]; opening <= smart buy <= walk-away;
-    // opening <= target low <= target high <= walk-away; walk-away all-in <= market high (auction: max hammer bid)
+    // smart buy within [market low, market mid]; opening <= smart buy <= walk-away;
+    // opening <= target low <= target high <= walk-away; walk-away = market high (auction: max hammer bid)
     const nf = reconcileNegotiation(
       { good_buy_below: pg.good_buy_below, ...(ns || {}) },
       pg.estimated_market_range_low, pg.estimated_market_range_high, premiumPct, isAuction
@@ -466,7 +506,7 @@ ${getGlossaryPrompt(language)}`;
       (s.liquidity || 0) +
       (s.risk_penalty || 0);
 
-    // Buy score is driven by the price actually paid (incl. buyer's premium) vs the ranges,
+    // Buy score is driven by the price compared like with like (hammer vs the hammer range at auction; all-in shown separately),
     // not by the model's self-scored inputs (which tended to sum to 100 -> a constant 90 in the UI).
     const decision = decideBuy({
       askingPrice: Number(askingPrice),
@@ -509,6 +549,9 @@ ${getGlossaryPrompt(language)}`;
 
     return {
       ...item,
+      appraisal_inputs: {
+        lot_page_read: !!lotFacts?.ok, estimate_read: fetchedEstimate, band_factor: 1, raw_mid_eur: Math.round(rawMidEur),
+      },
       seller_context: {
         sellerType: sellerType || 'Market/Fair',
         isAuction,
@@ -530,6 +573,7 @@ ${getGlossaryPrompt(language)}`;
         smart_buy_all_in: decision.smartBuyAllIn || null,
         walk_away_all_in: decision.walkAwayAllIn || null,
         effective_price: allIn || null,
+        compare_price: decision.comparePrice || null,
         label: getBuyLabel(basis),
         confidence: confLabel
       }

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { frenchSiteQuery, pieceProblem } from "./pieceWords.js";
 import {
   allowedDomainsFor,
   auctionetFacts,
@@ -36,6 +37,7 @@ import {
   type Region,
 } from "./huntGeo.js";
 import {
+  periodProblemFor,
   candidateToMatch, DIRECT_ENRICH_BUDGET_MS, DIRECT_SEARCH_BUDGET_MS, directSitesFor, finishDirect, MAX_DIRECT_RESULTS,
   searchDirectSites, SITE_DOMAIN, type DirectCandidate, type DirectSearchResult, type DirectSourceStat,
 } from "./directSearch.js";
@@ -119,7 +121,9 @@ export const AUCTIONET_BUDGET_MS = 8_000;
 const FETCH_TIMEOUT_MS = 5_000;
 const REDIRECT_TIMEOUT_MS = 2_500;
 const MAX_RESULTS = 4;
-const MAX_AUCTIONET_DIRECT = 3;
+const MAX_AUCTIONET_DIRECT = 6;
+/** Typical Auctionet buyer's fee incl. VAT (Swedish houses 25%; UK houses about 25–30%). Shown as "assumed". */
+export const AUCTIONET_PREMIUM_PCT = 25;
 
 const BROWSER_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
@@ -212,10 +216,16 @@ export const planHunt = (params: HuntParams): HuntPlan => {
     const r = domainRegions('https://' + d + '/');
     return r === 'multi' || r === null || r.some(x => regions.has(x));
   });
-  const useAuctionet = allowedDomains.includes('auctionet.com') && (!regions || regions.has('Sweden') || regions.has('Europe'));
+  // Auctionet also hosts UK houses (Lawrences, Bishop & Miller, Lots Road…): a UK search uses it too (fix 8)
+  const useAuctionet = (allowedDomains.includes('auctionet.com') && (!regions || regions.has('Sweden') || regions.has('Europe')))
+    || !!regions?.has('United Kingdom');
   const itemTypes = itemTypesInQuery(params.query);
   const directSites = directSitesFor({ regions, itemTypes, allowedDomains });
-  return { regions, platforms, ignoredPlatforms: ignored, allowedDomains, itemTypes, local: localQueries(params.query), useAuctionet, directSites };
+  const local = localQueries(params.query);
+  // The user's own piece words first ("secretaire a abattant", not "bureau")
+  const own = frenchSiteQuery(params.query);
+  if (own && itemTypes.length) local.fr = Array.from(new Set([own, ...local.fr])).slice(0, 3);
+  return { regions, platforms, ignoredPlatforms: ignored, allowedDomains, itemTypes, local, useAuctionet, directSites };
 };
 
 const buildPrompts = (params: HuntParams, plan: HuntPlan) => {
@@ -290,16 +300,17 @@ const responseSchema = {
   required: ["marketBrief", "matches", "dealerClosingTip"]
 };
 
-const periodProblem = (title?: string, description?: string): string | null =>
-  failsPeriodRule(title, description) || modernYearInTitle(title);
+const periodProblem = (query: string, title?: string, description?: string): string | null => periodProblemFor(query, title, description);
 
 /** Apply facts read from the lot page / API to a result. Returns a drop reason when the facts rule it out. */
 const applyFacts = (result: HuntMatch, facts: PageFacts, params: HuntParams, plan: HuntPlan): string | null => {
   if (facts.soldOrEnded) return 'sold_or_ended';
   if (facts.saleDate && facts.saleDate.getTime() < Date.now()) return 'past_sale';
-  if (params.periodOnly !== false && periodProblem(facts.title, facts.description)) return 'not_period';
+  if (params.periodOnly !== false && periodProblem(params.query, facts.title, facts.description)) return 'not_period';
   if (facts.title || facts.description) {
     if (!matchesItemType(plan.itemTypes, facts.title, facts.description)) return 'not_requested_type';
+    const piece = pieceProblem(params.query, plan.itemTypes, facts.title, facts.description);
+    if (piece) return piece;
   }
   if (facts.location) {
     const geo = checkGeography(result.url, [facts.location], plan.regions);
@@ -358,8 +369,9 @@ export const validateMatch = async (
   const title = cleanText(match.title);
   const description = cleanText(match.description);
   const modelLocation = cleanText(match.location);
-  if (params.periodOnly !== false && periodProblem(title, description)) return { dropReason: 'not_period' };
+  if (params.periodOnly !== false && periodProblem(params.query, title, description)) return { dropReason: 'not_period' };
   if (!matchesItemType(plan.itemTypes, title, description)) return { dropReason: 'not_requested_type' };
+  { const piece = pieceProblem(params.query, plan.itemTypes, title, description); if (piece) return { dropReason: piece }; }
   // Geography: country-specific sites are checked on the URL alone; multi-country sites need a matching location
   const siteGeo = checkGeography(url, [modelLocation], plan.regions);
   if (!siteGeo.ok && siteGeo.reason !== 'geo_location_unknown') return { dropReason: siteGeo.reason };
@@ -434,26 +446,40 @@ export const validateMatch = async (
 
 // Budget helpers live in budget.ts (shared with the direct auction-site search); re-exported for existing callers.
 export { budgetMax, budgetMin, withinBudget } from "./budget.js";
-import { budgetMax, withinBudget } from "./budget.js";
+import { allIn, budgetMax, convertApprox, withinBudget } from "./budget.js";
 
 export const auctionetToMatch = (it: AuctionetItem, params: HuntParams, plan: HuntPlan, now = Date.now()): { match?: HuntMatch; dropReason?: string } => {
   const f = auctionetFacts(it, now);
   if (!it.url || !/^https:\/\/auctionet\.com\//.test(it.url)) return { dropReason: 'no_url' };
   if (!f.live) return { dropReason: 'sold_or_ended' };
-  if (params.periodOnly !== false && periodProblem(f.title, f.description)) return { dropReason: 'not_period' };
+  if (params.periodOnly !== false && periodProblem(params.query, f.title, f.description)) return { dropReason: 'not_period' };
   if (!matchesItemType(plan.itemTypes, f.title, f.description)) return { dropReason: 'not_requested_type' };
+  { const piece = pieceProblem(params.query, plan.itemTypes, f.title, f.description); if (piece) return { dropReason: piece }; }
   const currencyRegion = auctionetCurrencyRegion(it.currency);
-  const geo = checkGeography(it.url, [f.location, currencyRegion === 'Sweden' ? 'Sweden' : ''], plan.regions);
+  const geo = checkGeography(it.url, [f.location, currencyRegion === 'Sweden' || currencyRegion === 'United Kingdom' ? currencyRegion : ''], plan.regions);
   if (!geo.ok) return { dropReason: geo.reason };
-  if (!withinBudget(f.estimateLow, f.estimateCurrency, budgetMax(params.priceRange), params.currency)) return { dropReason: 'over_budget' };
   const est = formatEstimate(f.estimateLow, f.estimateHigh, f.estimateCurrency || 'SEK');
+  const country = currencyRegion === 'Sweden' || currencyRegion === 'United Kingdom' ? currencyRegion : '';
+  // All-in in the user's currency (fix 9): Auctionet does not publish each house's fee in the API, so a typical
+  // rate is assumed and labelled as such
+  const userCur = params.currency || 'EUR';
+  const conv = (n?: number) => (n ? convertApprox(allIn(n, AUCTIONET_PREMIUM_PCT), f.estimateCurrency || 'SEK', userCur) ?? undefined : undefined);
+  const allInLow = conv(f.estimateLow);
+  const allInHigh = conv(f.estimateHigh) ?? allInLow;
+  const fmt = (n: number) => { try { return new Intl.NumberFormat('en-GB', { style: 'currency', currency: userCur, maximumFractionDigits: 0 }).format(n); } catch { return `${Math.round(n)} ${userCur}`; } };
+  const max = budgetMax(params.priceRange);
+  if (max && (allInLow ? allInLow > max : !withinBudget(f.estimateLow, f.estimateCurrency, max, params.currency))) return { dropReason: 'over_budget' };
+  const allInEstimate = allInLow
+    ? `All-in ≈ ${allInHigh && allInHigh !== allInLow ? `${fmt(allInLow)} – ${fmt(allInHigh)}` : fmt(allInLow)} ~${AUCTIONET_PREMIUM_PCT}% fees assumed`
+    : undefined;
   return {
     match: {
+      allInLow, allInHigh, allInEstimate, premiumAssumed: true, premiumPct: AUCTIONET_PREMIUM_PCT, house: it.house,
       title: f.title || 'Auctionet lot',
       url: it.url,
       platform: 'Auctionet',
       price: est || 'No estimate published',
-      location: [it.location, currencyRegion === 'Sweden' ? 'Sweden' : ''].filter(Boolean).join(', '),
+      location: [it.location, country].filter(Boolean).join(', '),
       date: f.saleDate ? formatSaleDate(f.saleDate) : undefined,
       description: f.description || undefined,
       dealerAnalysis: `Found directly on Auctionet (${it.house || 'auction house'}). Estimate and closing time are from the auction house; ask for a condition report and photos of the back, drawers and any stamp before bidding.`,
@@ -465,7 +491,9 @@ export const auctionetToMatch = (it: AuctionetItem, params: HuntParams, plan: Hu
 };
 
 export const searchAuctionet = async (params: HuntParams, plan: HuntPlan, deadline: number): Promise<{ matches: HuntMatch[]; dropped: Record<string, number> }> => {
-  const queries = Array.from(new Set([...plan.local.sv.slice(0, 2), params.query.trim()])).filter(Boolean).slice(0, 3);
+  const ukOnly = !!plan.regions && plan.regions.has('United Kingdom') && !plan.regions.has('Sweden') && !plan.regions.has('Europe');
+  const local = ukOnly ? plan.local.en.slice(0, 2) : plan.local.sv.slice(0, 2);
+  const queries = Array.from(new Set([...local, params.query.trim()])).filter(Boolean).slice(0, 3);
   const seen = new Set<number>();
   const items: AuctionetItem[] = [];
   await Promise.all(queries.map(async q => {
@@ -493,7 +521,7 @@ export const searchAuctionet = async (params: HuntParams, plan: HuntPlan, deadli
 // ---------------------------------------------------------------------------
 
 export const RANKER_TIMEOUT_MS = 15_000;
-const MAX_RANKER_CANDIDATES = 14;
+const MAX_RANKER_CANDIDATES = 20;
 
 const rankerSchema = {
   type: Type.OBJECT,
@@ -593,7 +621,7 @@ const lotKey = (u: string): string => {
   return u.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '');
 };
 
-const MAX_TOTAL_RESULTS = 8;
+const MAX_TOTAL_RESULTS = 18;
 
 export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults> => {
   const startedAt = Date.now();
@@ -695,7 +723,9 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
   const directRanked = direct.result ? applyRanking(direct.result.candidates, direct.ranking) : { kept: [], rejected: 0 };
   const directMatches: HuntMatch[] = directRanked.kept.slice(0, MAX_DIRECT_RESULTS).map(({ c, analysis }) => candidateToMatch(c, params, analysis));
 
-  if (geminiError && auctionet.matches.length === 0 && directMatches.length === 0) throw geminiError;
+  // A web-search error with nothing else found still fails; a web-search TIMEOUT returns what the direct sources
+  // found (possibly nothing) with a notice instead of failing the whole request (fix 8)
+  if (geminiError && !(geminiError instanceof HuntTimeoutError) && auctionet.matches.length === 0 && directMatches.length === 0) throw geminiError;
 
   // Validation of web-search results gets at most VALIDATION_BUDGET_MS, never past the overall budget
   const deadline = Math.min(geminiDone + VALIDATION_BUDGET_MS, startedAt + FUNCTION_BUDGET_MS);
@@ -754,9 +784,11 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
       ...(rankerError ? { rankerError } : {}),
     },
   };
-  if (geminiError) results.notice = directMatches.length
-    ? 'The web search took too long, so only lots found directly on the auction sites are shown.'
-    : 'The web search took too long, so only lots found directly on Auctionet are shown.';
+  if (geminiError) results.notice = finalMatches.length === 0
+    ? 'The web search took too long and the auction sites searched directly had no matching live lots. Try again, or widen the budget or regions.'
+    : directMatches.length
+      ? 'The web search took too long, so only lots found directly on the auction sites are shown.'
+      : 'The web search took too long, so only lots found directly on Auctionet are shown.';
   if (finalMatches.length === 0) results.message = NO_VERIFIED_MESSAGE;
   return results;
 };

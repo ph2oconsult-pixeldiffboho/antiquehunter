@@ -46,6 +46,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const [currency, setCurrency] = useState(globalCurrency);
   const [sellerType, setSellerType] = useState('Market/Fair');
   const [buyersPremium, setBuyersPremium] = useState('25');
+  // Fix 5/9: decimal fees (28.8%) are accepted; a fee read from the lot page is used unless the user typed one
+  const [premiumTouched, setPremiumTouched] = useState(false);
   const [category, setCategory] = useState<AntiqueCategory>('unknown');
   const [location, setLocation] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -157,7 +159,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       category,
       location,
       lotUrl: effectiveLotUrl,
-      buyerPremiumRate: sellerType === 'Auction' && buyersPremium ? parseFloat(buyersPremium) : undefined
+      buyerPremiumRate: sellerType === 'Auction' && buyersPremium ? parseFloat(buyersPremium) : undefined,
+      premiumTouched,
     });
   };
 
@@ -534,23 +537,24 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
                 type="number"
                 min="0"
                 max="50"
-                step="0.5"
+                step="0.01"
+                inputMode="decimal"
                 value={buyersPremium}
-                onChange={(e) => setBuyersPremium(e.target.value)}
+                onChange={(e) => { setBuyersPremium(e.target.value.replace(',', '.')); setPremiumTouched(true); }}
                 placeholder="25"
                 className="w-full p-3.5 pr-8 bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm font-semibold text-stone-900"
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-sm">%</span>
             </div>
             <p className="text-[11px] text-amber-800/80 leading-tight">
-              Includes auction house surcharge + VAT. Total out-of-pocket cost = Hammer Price × (1 + {parseFloat(buyersPremium || '25') / 100}).
+              Includes auction house surcharge + VAT. Total out-of-pocket cost = Hammer Price × (1 + {Number((parseFloat(buyersPremium || '25') / 100).toFixed(4))}).
             </p>
           </div>
         )}
 
         <button
           type="submit"
-          disabled={isAnalyzing || !description.trim()}
+          disabled={isAnalyzing || (!description.trim() && !/^https?:\/\/\S+/i.test(lotUrl.trim()))}
           className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-2xl shadow-ink/20"
         >
           {isAnalyzing ? (

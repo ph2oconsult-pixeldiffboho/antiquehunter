@@ -100,33 +100,30 @@ export interface NegotiationFigures {
 
 /**
  * Make the smart-buy / negotiation figures consistent with each other and with the buy-score bands.
- * Market range is compared with the effective (all-in) price, so at auction the hammer figures are
- * the effective figure divided by (1 + premium).
- *  - smart buy: effective cost within [market low, market mid] (i.e. a "good buy" or better)
- *  - walk-away: effective cost <= market high, and >= smart buy
+ * Like with like (fix 3): the market range is in the units the user pays at the fall of the hammer (hammer prices at
+ * auction, the asking price otherwise), so the figures are compared directly; the all-in cost is shown separately.
+ *  - smart buy: within [market low, market mid] (i.e. a "good buy" or better)
+ *  - walk-away: the top of the market range (the most a well-informed buyer pays); never below the smart buy
  *  - opening offer <= smart buy <= walk-away; opening <= target low <= target high <= walk-away
+ * `premiumPct` / `isAuction` are kept for callers; they no longer change the figures.
  */
 export const reconcileNegotiation = (
   model: Partial<Record<keyof NegotiationFigures, unknown>>,
   marketLow: number,
   marketHigh: number,
-  premiumPct: number,
-  isAuction: boolean
+  _premiumPct: number,
+  _isAuction: boolean
 ): NegotiationFigures => {
-  const f = premiumFactor(premiumPct, isAuction);
   const low = Math.max(0, num(marketLow));
   const high = Math.max(low, num(marketHigh));
   const mid = (low + high) / 2;
-  const toPaid = (effective: number) => Math.floor(effective / f);
 
-  const smartMin = Math.ceil(low / f);
-  const smartMax = toPaid(mid);
+  const smartMin = Math.ceil(low);
+  const smartMax = Math.floor(mid);
   const modelSmart = num(model.good_buy_below);
-  const smart = Math.round(clamp(modelSmart > 0 ? modelSmart : low / f, smartMin, Math.max(smartMin, smartMax)));
+  const smart = Math.round(clamp(modelSmart > 0 ? modelSmart : low, smartMin, Math.max(smartMin, smartMax)));
 
-  const walkCap = toPaid(high);
-  const modelWalk = num(model.walk_away_price);
-  const walk = Math.max(smart, Math.round(Math.min(walkCap, modelWalk > 0 ? modelWalk : walkCap)));
+  const walk = Math.max(smart, Math.round(high));
 
   const modelOpen = num(model.opening_offer);
   const opening = Math.round(Math.min(smart, modelOpen > 0 ? modelOpen : smart * 0.8));
@@ -253,6 +250,8 @@ export interface BuyDecision {
   cap?: VerdictCap;
   smartBuyAllIn?: number;
   walkAwayAllIn?: number;
+  /** The price compared with the market range: hammer at auction, asking price otherwise */
+  comparePrice?: number;
 }
 
 /**
@@ -267,26 +266,30 @@ export interface BuyDecision {
  */
 export const decideBuy = (i: BuyDecisionInput): BuyDecision => {
   const asking = num(i.askingPrice);
+  // Shown to the user (all-in at auction) …
   const effective = asking > 0 ? allInCost(asking, i.premiumPct, i.isAuction) : 0;
   const smartAllIn = num(i.smartBuy) > 0 ? allInCost(num(i.smartBuy), i.premiumPct, i.isAuction) : 0;
   const walkAllIn = num(i.walkAway) > 0 ? allInCost(num(i.walkAway), i.premiumPct, i.isAuction) : 0;
-  const extra = { smartBuyAllIn: smartAllIn || undefined, walkAwayAllIn: walkAllIn || undefined };
-  let ps = effective > 0 ? priceBandScore(effective, i.marketLow, i.marketHigh, i.retailHigh) : null;
+  const extra = { smartBuyAllIn: smartAllIn || undefined, walkAwayAllIn: walkAllIn || undefined, comparePrice: asking || undefined };
+  // … but compared like with like (fix 3): the hammer / asking price against the hammer / asking-price market range
+  const smartCmp = num(i.smartBuy);
+  const walkCmp = num(i.walkAway);
+  let ps = asking > 0 ? priceBandScore(asking, i.marketLow, i.marketHigh, i.retailHigh) : null;
   let cap: VerdictCap | undefined;
   if (ps) {
     const retail = Math.max(num(i.marketHigh), num(i.retailHigh) || num(i.marketHigh) * 2);
     // Above the walk-away: never Fair or better. Scores use min() with the market-band score so the
     // score never rises as the price rises.
-    if (walkAllIn > 0 && effective > walkAllIn && ps.basis !== 'walk_away') {
-      const r = retail > walkAllIn ? clamp((effective - walkAllIn) / (retail - walkAllIn), 0, 1) : 0;
+    if (walkCmp > 0 && asking > walkCmp && ps.basis !== 'walk_away') {
+      const r = retail > walkCmp ? clamp((asking - walkCmp) / (retail - walkCmp), 0, 1) : 0;
       const capped = Math.round(34 - 19 * r);
       const score = ps.basis === 'overpriced' ? Math.min(capped, ps.score) : capped;
       ps = { score: clamp(score, PRICE_BANDS.overpriced.min, PRICE_BANDS.overpriced.max), band: PRICE_BANDS.overpriced, basis: 'overpriced' };
       cap = 'above_walk_away';
     // Above the smart buy (but within the walk-away): never Good Buy or better
-    } else if (smartAllIn > 0 && effective > smartAllIn && ['strong_buy', 'good_buy', 'fair'].includes(ps.basis)) {
-      const top = walkAllIn > smartAllIn ? walkAllIn : Math.max(smartAllIn, num(i.marketHigh));
-      const r = top > smartAllIn ? clamp((effective - smartAllIn) / (top - smartAllIn), 0, 1) : 0;
+    } else if (smartCmp > 0 && asking > smartCmp && ['strong_buy', 'good_buy', 'fair'].includes(ps.basis)) {
+      const top = walkCmp > smartCmp ? walkCmp : Math.max(smartCmp, num(i.marketHigh));
+      const r = top > smartCmp ? clamp((asking - smartCmp) / (top - smartCmp), 0, 1) : 0;
       const capped = Math.round(64 - 19 * r);
       if (ps.basis !== 'fair') cap = 'above_smart_buy';
       const score = ps.basis === 'fair' ? Math.min(capped, ps.score) : capped;
@@ -344,3 +347,63 @@ export const parseBudget = (raw: string): number[] | null => {
   const nums = parts.map(p => parsePriceInput(p));
   return nums.every((n): n is number => n !== null) ? nums : null;
 };
+
+
+// ---------------------------------------------------------------------------
+// Fix 6: confidence on fixed scales. The model is asked for evidence 0–40, identification 0–30, risk 0–30 (30 = no
+// risk), but used to answer on 0–1, 0–10 or 0–100 scales; the app summed them, so 0.9+0.9+0.8 showed "very low"
+// and 80+85+90 "high". Values are put back on the fixed scales before they are used.
+// ---------------------------------------------------------------------------
+
+export const CONFIDENCE_SCALES = { evidence_quality: 40, identification_certainty: 30, risk_factors: 30 } as const;
+export type ConfidenceBreakdown = Record<keyof typeof CONFIDENCE_SCALES, number>;
+
+export const normaliseConfidence = (raw: Partial<Record<keyof typeof CONFIDENCE_SCALES, unknown>> | null | undefined): ConfidenceBreakdown => {
+  const keys = Object.keys(CONFIDENCE_SCALES) as Array<keyof typeof CONFIDENCE_SCALES>;
+  const v = keys.map(k => Math.abs(num(raw?.[k])));
+  const maxV = Math.max(0, ...v);
+  // Two or more values above their scale = the model used another scale for all three; a single one = just clamp it
+  const over = keys.filter((k, i) => v[i] > CONFIDENCE_SCALES[k]).length >= 2;
+  const out = {} as ConfidenceBreakdown;
+  keys.forEach((k, i) => {
+    const max = CONFIDENCE_SCALES[k];
+    let x = v[i];
+    if (maxV > 0 && maxV <= 1) x = x * max;                          // fractions
+    else if (over && maxV <= 10) x = (x / 10) * max;                  // 0–10 scale
+    else if (over && maxV <= 100) x = (x / 100) * max;                // percentages
+    out[k] = Math.round(clamp(x, 0, max));
+  });
+  return out;
+};
+
+export interface ConfidenceEvidence {
+  hasPhotos: boolean;
+  /** The auction house estimate was read from the lot page */
+  fetchedEstimate: boolean;
+  /** Comparable sales of the same type and region */
+  closeComparables: number;
+  /** max ÷ min hammer of the comparables shown (narrow = the market for this kind of piece is consistent) */
+  comparableSpread?: number;
+  /** Text-only query of very few words */
+  vague: boolean;
+}
+
+/**
+ * Calibrated confidence 1–100: half the model's own (normalised) breakdown, half what the app knows about the
+ * evidence behind the price (a real estimate, close comparable sales with consistent prices, photos).
+ */
+export const calibratedConfidence = (b: ConfidenceBreakdown, e: ConfidenceEvidence): number => {
+  const model = b.evidence_quality + b.identification_certainty + b.risk_factors;
+  let ev = 20;
+  if (e.fetchedEstimate) ev += 35;
+  ev += 25 * Math.min(1, e.closeComparables / 3);
+  if (e.comparableSpread && e.closeComparables >= 2) ev += e.comparableSpread <= 2.5 ? 10 : e.comparableSpread <= 5 ? 4 : -6;
+  if (e.hasPhotos) ev += 10;
+  let score = 0.5 * model + 0.5 * clamp(ev, 0, 100);
+  if (!e.hasPhotos) score = Math.min(score, 59);
+  if (e.vague) score = Math.min(score, 35);
+  return Math.round(clamp(score, 1, 100));
+};
+
+export const confidenceLabel = (score: number): 'high' | 'medium' | 'low' | 'very_low' =>
+  score >= 75 ? 'high' : score >= 55 ? 'medium' : score >= 35 ? 'low' : 'very_low';

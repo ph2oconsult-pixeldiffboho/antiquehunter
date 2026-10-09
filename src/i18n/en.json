@@ -176,7 +176,9 @@
     "reason_above_walk_away": "{{price}}{{premium}} is above your walk-away price ({{walkAway}}) – overpriced, no margin left. Don't go above {{walkAway}}.",
     "reason_above_smart_buy": "{{price}}{{premium}} is above the smart-buy price ({{smartBuy}}) but within your walk-away ({{walkAway}}) – fair, but little margin left.",
     "overpaying_value": "Above {{price}}",
-    "overpaying_all_in": "{{allIn}} all-in"
+    "overpaying_all_in": "{{allIn}} all-in",
+    "reason_hammer_suffix": " hammer (≈ {{allIn}} all-in incl. {{pct}}% buyer's premium)",
+    "hammer_word": "hammer"
   },
   "results": {
     "title": "Dealer's Findings",

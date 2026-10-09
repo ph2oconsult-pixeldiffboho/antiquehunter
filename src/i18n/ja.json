@@ -149,7 +149,9 @@
     "must_have_insight_fallback": "個人で楽しむための購入に適しています。",
     "resale_insight_fallback": "利益はディーラー価格以下で購入できるかにかかっています。",
     "paddle_rule_label": "ディーラーの入札ルール：",
-    "paddle_rule": "最高落札入札額（撤退価格）は {{hammer}} です。{{pct}}% の買い手手数料を含めると総額 {{allIn}} になります。目安：最高入札額 = 総予算 ÷ {{mult}}。"
+    "paddle_rule": "最高落札入札額（撤退価格）は {{hammer}} です。{{pct}}% の買い手手数料を含めると総額 {{allIn}} になります。目安：最高入札額 = 総予算 ÷ {{mult}}。",
+    "reason_hammer_suffix": " 落札価格（手数料{{pct}}%込みで約{{allIn}}）",
+    "hammer_word": "落札価格"
   },
   "results": {
     "title": "ディーラーの所見",

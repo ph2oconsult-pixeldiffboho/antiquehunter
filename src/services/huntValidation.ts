@@ -145,6 +145,9 @@ const NON_PERIOD_PATTERNS: RegExp[] = [
   /\bstil\b/i,           // Swedish: "gustaviansk stil"
   /\b19\d0-tal\w*/i,       // Swedish: "1900-tal", "1900-talets mitt"
   /\bikea\b/i,            // e.g. IKEA "1700-talsserie" reproductions
+  // UK titles that open with the date: "AN EARLY TWENTIETH CENTURY GLAZED DISPLAY CABINET", "PAIR OF MODERN PINE CORNER CUPBOARDS"
+  // (only at the start of a title/text, so "with modern handles" in a condition note does not reject a period piece)
+  /^\W*(an?\s+|pair of\s+|two\s+|a pair of\s+)?(early\s+|mid\s+|late\s+)?(modern|twentieth[\s-]century|contemporary|art d[eé]co)\b/i,
 ];
 
 // French catalogues often say "de style Louis XV, époque Napoléon III": a period (19th-century) piece made in an
