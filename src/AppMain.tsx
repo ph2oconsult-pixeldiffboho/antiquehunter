@@ -1,4 +1,6 @@
 import type { LotFacts } from "./services/lotFetch";
+import type { CheckAnswers } from './services/checklist';
+import type { ChecklistBase } from './services/gemini';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
@@ -121,7 +123,7 @@ export default function Main() {
     }
   };
 
-  const handleAnalyze = async (input: string, details: any, inputIsImage = false, additionalImages: string[] = []) => {
+  const handleAnalyze = async (input: string, details: any, inputIsImage = false, additionalImages: string[] = [], checkAnswers?: CheckAnswers, previousBase?: ChecklistBase | null) => {
     setIsAnalyzing(true);
     setLastDetails(details);
     setLastTyped(inputIsImage || input === t('upload_choice.default_prompt', "Analyze this antique from the images provided.") ? '' : String(input || ''));
@@ -167,7 +169,7 @@ export default function Main() {
         details.location || (lotFacts?.ok ? [lotFacts.city].filter(Boolean).join(', ') : undefined),
         details.lotUrl,
         premium,
-        { lotFacts }
+        { lotFacts, checkAnswers, previousBase }
       );
       
       if (result) {
@@ -506,6 +508,8 @@ export default function Main() {
                 plan={plan}
                 currency={currency}
                 onAddMoreDetails={() => setCurrentScreen('upload-choice')}
+                onRerunWithChecks={(answers) => handleAnalyze(lastTyped || t('upload_choice.default_prompt', "Analyze this antique from the images provided."), lastDetails || {}, false, [], answers,
+                  analysisItems(analysisResult)[0]?.checklist?.base || null)}
                 onAddEvidence={() => {
                   // keep the photos (capturedImages) and the last inputs; the form opens pre-filled with the checklist
                   const items = analysisItems(analysisResult);

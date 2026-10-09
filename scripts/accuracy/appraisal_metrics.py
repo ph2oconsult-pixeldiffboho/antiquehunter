@@ -4,7 +4,7 @@ import json, statistics as st, math, csv, sys
 from collections import Counter
 R = json.load(open(sys.argv[1])); TAG = sys.argv[2] if len(sys.argv) > 2 else 'photos'
 base = sys.argv[1].rsplit('.', 1)[0]
-P = [r for r in R if r['tag'] == TAG and 'error' not in r]
+P = [r for r in R if r['tag'] == TAG and 'error' not in r and r.get('hammer_eur')]  # asking-price-only references (no sale) are not scored
 BANDS = {'<=300': (0, 300), '300-1000': (300, 1000), '1000-3000': (1000, 3000), '>3000': (3000, 1e12)}
 CONF = ['high', 'medium', 'low', 'very_low']
 def row(r):

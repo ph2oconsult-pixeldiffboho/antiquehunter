@@ -39,8 +39,10 @@ for (const f of readdirSync(runsDir).filter(f => f.endsWith('.json')).sort()) {
   const oldConfLabel = oldConfScore >= 80 ? 'high' : oldConfScore >= 60 ? 'medium' : oldConfScore >= 40 ? 'low' : 'very_low';
   const fetchedEstimate = !!(lf && (lf.estimateLow || lf.estimateHigh));
   const pp = postProcessAppraisal(result, {
-    query, hasPhotos, askingPrice: r.hammer ?? lot.hammer_eur, isAuction: true, premiumPct, targetCurrency: 'EUR', currencySymbol: '€',
-    language: 'en', sellerType: 'Auction', lotUrl: mode === 'url' ? lot.url : undefined, lotFacts: lf,
+    query, hasPhotos, askingPrice: r.hammer ?? lot.hammer_eur, isAuction: r.dealer ? false : true, premiumPct: r.dealer ? 0 : premiumPct, targetCurrency: 'EUR', currencySymbol: '€',
+    language: 'en', sellerType: r.dealer ? 'Antique Shop' : 'Auction',
+    // maker comparables captured from /api/comps by appraise_ui.py (undefined when the app did not search)
+    comps: r.comps !== undefined ? r.comps : r.raw.comps, checkAnswers: r.checkAnswers, lotUrl: mode === 'url' ? lot.url : undefined, lotFacts: lf,
     fetchedEstimate, eurTo: (e: number) => e, category: r.category !== undefined ? r.category : lot.category,
   });
   const item: any = pp[0], pg = item.price_guidance, ns = item.negotiation_strategy, bd = item.buy_decision;
@@ -60,6 +62,9 @@ for (const f of readdirSync(runsDir).filter(f => f.endsWith('.json')).sort()) {
     construction_evidence: item.item_summary.construction_evidence ?? null,
     evidence_required: !!item.evidence_check?.required, evidence_reasons: item.evidence_check?.reasons || [], evidence_asks: item.evidence_check?.asks || [],
     price_basis: bd.price_basis, provisional: !!pg.provisional,
+    maker_attribution: item.maker_attribution ?? null,
+    comps_status: item.comparables?.status ?? null, comps_reason: item.comparables?.reason ?? null, comps_n: item.comparables?.list?.length ?? 0, comps_used: item.comparables?.used_urls?.length ?? 0,
+    comps_stats: r.raw.comps?.stats ?? null, checklist_ids: (item.checklist?.items || []).map((c: any) => c.id), checklist_effect: item.checklist?.effect ?? null,
   });
 }
 writeFileSync(outFile, JSON.stringify(out, null, 1));

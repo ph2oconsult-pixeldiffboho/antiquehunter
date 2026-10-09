@@ -461,5 +461,89 @@
     "provisional_note": "Provisoire tant que l'époque n'est pas confirmée.",
     "describe_banner": "Ajoutez les éléments demandés : les nouvelles photos s'ajoutent à celles déjà fournies.",
     "construction_seen": "Construction observée"
+  },
+  "checklist": {
+    "title": "Avant d'acheter",
+    "title_embedded": "Vérifiez ces points, puis relancez",
+    "intro": "Vérifiez chaque point sur la pièce elle-même, puis touchez Oui, Non ou Je ne sais pas. Relancer avec vos réponses affine la fourchette et la confiance (confirmations) ou les abaisse (démentis).",
+    "yes": "Oui",
+    "no": "Non",
+    "unsure": "Je ne sais pas",
+    "rerun": "Relancer avec mes réponses ({{count}})",
+    "where": {
+      "seat_rail": "sur la ceinture (sous l'assise, traverse avant ou arrière)",
+      "carcass": "sur le bâti (haut des montants, dos ou intérieur)"
+    },
+    "invoice_with_maker": "« estampillé {{maker}}, époque {{period}} »",
+    "invoice_no_maker": "« époque {{period}} » (et non « style »)",
+    "items": {
+      "stamp_every_piece": "L'estampille {{maker}} est présente et lisible sur chacune des {{n}} pièces, {{where}}.",
+      "stamp_present": "L'estampille {{maker}} est présente et lisible {{where}}.",
+      "label_is_not_stamp": "Au-delà de l'étiquette du marchand : y a-t-il une vraie estampille {{maker}} sur la pièce ? Une étiquette ne prouve rien.",
+      "matching_set": "Les {{n}} pièces sont identiques : même bois, sculpture, dimensions et construction (pas une série complétée ou mariée).",
+      "joints_underneath": "Dessous : assemblages chevillés, coupes et traits de scie à la main, bois ancien oxydé — pas de coupes mécaniques, vis ni agrafes.",
+      "seat_rails_webbing": "Bâti de l'assise et traverses d'origine sous le tissu (pas de traverses neuves, sangles saines).",
+      "mirror_glass_original": "La glace est d'origine (tain au mercure ou ancien, légères ondulations et piqûres — pas une glace moderne).",
+      "mirror_back_original": "Le dos est d'origine : planches anciennes, clous forgés, oxydation homogène.",
+      "crest_original": "Le fronton est d'origine : même bois, même sculpture et dorure, fixations anciennes.",
+      "gilding_original": "La dorure est ancienne (à la feuille, usée sur les reliefs), pas une redorure récente ni de la peinture dorée.",
+      "marble_original": "Le plateau de marbre est d'origine (ajustement exact, dessous ancien, pas de coupe moderne).",
+      "hardware_original": "Poignées, bronzes et entrées de serrure d'origine (fixations anciennes, pas de trous en plus).",
+      "veneer_sound": "Placage et marqueterie en bon état (pas de manques importants, soulèvements ni pièces modernes).",
+      "no_major_restoration": "Pas de restauration lourde : pieds ou traverses remplacés, éléments neufs, revernissage complet.",
+      "invoice_wording": "La facture mentionnera {{wording}}, avec la description de la pièce et des restaurations.",
+      "provenance_condition_report": "Demandez au vendeur la provenance et un rapport d'état écrit (restaurations, remplacements)."
+    }
+  },
+  "comps": {
+    "title": "Ébéniste et résultats de ventes",
+    "status": {
+      "stamped_confirmed": "Estampillé · confirmé par vous",
+      "stamped_stated": "Estampillé (déclaré)",
+      "stamp_in_photo": "Estampille visible sur photo",
+      "attributed": "Attribué",
+      "dealer_label": "Étiquette du marchand seulement",
+      "mentioned": "Nom cité, sans estampille"
+    },
+    "status_note": {
+      "stamped_confirmed": "Estimé comme une pièce estampillée de cet ébéniste.",
+      "stamped_stated": "Estimé comme estampillé, comme indiqué — vérifiez vous-même.",
+      "stamp_in_photo": "Une estampille est visible sur vos photos — vérifiez qu'elle est lisible sur chaque pièce.",
+      "attributed": "Une attribution, pas une estampille : estimé entre une pièce anonyme et une pièce estampillée.",
+      "dealer_label": "Une étiquette de marchand n'est pas une estampille : estimé comme une pièce d'époque anonyme.",
+      "mentioned": "Aucune estampille confirmée : estimé comme une pièce d'époque anonyme."
+    },
+    "stamp_warning": "Vérifiez vous-même l'estampille {{maker}} sur CHAQUE pièce, et faites-la écrire sur la facture (« estampillé {{maker}} »). Sans elle, la plus-value de l'ébéniste ne s'applique pas.",
+    "anchored_all_in": "Fourchette fondée sur {{n}} résultats de ventes vérifiés : médiane {{median}} par pièce frais compris, × {{pieces}}.",
+    "anchored_hammer": "Fourchette fondée sur {{n}} résultats de ventes vérifiés : médiane {{median}} par pièce (marteau), × {{pieces}}.",
+    "fallback": {
+      "too_few": "Trop peu de résultats vérifiés du même type pour fonder la fourchette — c'est l'estimation de l'expert.",
+      "not_stamped": "À titre indicatif : sans estampille ni attribution, ces résultats ne fixent pas la fourchette.",
+      "none_verified": "Aucun résultat de vente vérifié pour {{maker}} — la fourchette est l'estimation de l'expert.",
+      "error": "La recherche de résultats de ventes a échoué — la fourchette est l'estimation de l'expert.",
+      "not_searched": "Les résultats de ventes n'ont pas été recherchés.",
+      "no_maker": ""
+    },
+    "pieces_one": "{{count}} pièce",
+    "pieces_other": "{{count}} pièces",
+    "stamp": {
+      "stamped": "estampillé",
+      "by": "par (attribution de la maison)",
+      "attributed": "attribué"
+    },
+    "material": {
+      "mahogany": "acajou",
+      "giltwood": "bois doré",
+      "walnut": "noyer",
+      "beech": "hêtre",
+      "veneer": "placage",
+      "painted": "peint"
+    },
+    "with_fees": "frais compris",
+    "hammer": "marteau",
+    "per_piece_all_in": "par pièce frais compris",
+    "not_used": "non retenu (autre type)",
+    "unreachable": "Non consultable : {{list}}.",
+    "verified_note": "Chaque résultat a été ouvert et vérifié sur la page de la maison de ventes (ébéniste, pièce, prix d'adjudication). Rien de non vérifié n'est affiché."
   }
 }

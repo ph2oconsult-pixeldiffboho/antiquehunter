@@ -31,6 +31,12 @@ import { applyRanking } from "../src/services/hunting.ts";
 import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
 import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceCheck, evidenceAsks, pieceKindOf, isBriefInput, periodStatedIn, centuryStatedIn, laterSignIn } from "../src/services/appraisalMath.ts";
 
+import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker } from "../src/services/makers.ts";
+import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
+import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS } from "../src/services/compsSearch.ts";
+import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
+import { COMPS_CLIENT_TIMEOUT_MS } from "../src/services/gemini.ts";
+
 let passed = 0;
 const check = (name: string, fn: () => void) => { fn(); passed++; console.log("ok -", name); };
 
@@ -1145,5 +1151,231 @@ check("step 1: Napoleon III with periodOnly needs Napoléon III / Second Empire 
   const m = candidateToMatch({ lot, score: 1, region: "United Kingdom" } as any, { query: "armoire", currency: "EUR" } as any);
   assert.equal(m.location, "London, United Kingdom");
 });
+
+// ---------------------------------------------------------------------------
+// Maker attribution + verified auction comparables; "Before you buy" checklist
+// ---------------------------------------------------------------------------
+const BELL_CONF = "Set of four mahogany armchairs, Empire period, stamped P. Bellangé (Pierre-Antoine Bellangé, reçu maître 1788), stamp confirmed.";
+const BELL_LABEL = "Set of four mahogany armchairs, Empire period; dealer label says Pierre-Antoine Bellangé, reçu maître 1788.";
+
+check("makers: stamped (confirmed / stated), attributed and dealer's label are told apart", () => {
+  assert.deepEqual([detectMaker(BELL_CONF)?.key, detectMaker(BELL_CONF)?.status], ["bellange", "stamped_confirmed"]);
+  assert.equal(detectMaker(BELL_LABEL)?.status, "dealer_label");
+  assert.equal(detectMaker("PAIRE DE FAUTEUILS D'EPOQUE EMPIRE ESTAMPILLE DE PIERRE-ANTOINE BELLANGE")?.status, "stamped_stated");
+  assert.equal(detectMaker("Paire de fauteuils attribués à Jacob, époque Louis XVI")?.status, "attributed");
+  assert.equal(detectMaker("Commode attribuée à Pierre Migeon")?.key, "migeon");
+  assert.equal(detectMaker("Hache à Grenoble, commode. Traces d'une ancienne étiquette. Modèle répertorié de Jean-François Hache")?.status, "attributed");
+  assert.equal(detectMaker("Secrétaire. Estampillé à deux reprises François-Gaspard TEUNÉ")?.status, "stamped_stated");
+  assert.equal(detectMaker("Commode Louis XV, estampille de Lebesgue")?.key, "lebesgue");
+  assert.equal(detectMaker("Four 19th century armchairs"), null);
+  assert.equal(makerStatusFromText("Empire fauteuil attributed to Bellangé, trace of a stamp"), "attributed");
+  // the model reads a stamp in a photo: used when the text named no maker, never over a dealer's label
+  assert.equal(combineMakerStatus(null, { name: "P. Bellangé", status: "stamp_visible_in_photo" })?.status, "stamp_in_photo");
+  assert.equal(combineMakerStatus(detectMaker(BELL_LABEL), { name: "Bellangé", status: "stamp_visible_in_photo" })?.status, "dealer_label");
+  assert.equal(combineMakerStatus(null, { name: "", status: "none" }), null);
+  assert.equal(countPieces(BELL_CONF), 4);
+  assert.equal(countPieces("PAIRE DE FAUTEUILS"), 2);
+  assert.equal(countPieces("A SET OF FOUR EMPIRE GILTWOOD FAUTEUILS"), 4);
+  assert.equal(countPieces("Suite de six chaises"), 6);
+  assert.equal(countPieces("Fauteuil d'époque Empire"), 1);
+  assert.equal(materialOf(BELL_CONF), "mahogany");
+  assert.equal(materialOf("en acajou, ornementation de bronze ciselé et doré"), "mahogany");
+  assert.equal(materialOf("in carved and gilded beech"), "giltwood");
+  assert.equal(pieceOf(BELL_CONF)?.key, "armchair");
+});
+
+const christiesHtml = (id: string, other: string) => `<html><script>{"lots":[{"object_id":"${other}","title_primary_txt":"A COMMODE","title_secondary_txt":"BY RIESENER","price_realised":8750.0,"price_realised_txt":"EUR 8,750","end_date":"2021-04-27T00:00Z"},{"object_id":"${id}","title_primary_txt":"FAUTEUIL D'EPOQUE EMPIRE","title_secondary_txt":"ESTAMPILLE DE PIERRE-ANTOINE BELLANGE, DEBUT DU XIXe SIECLE","estimate_low":2000.0,"price_realised":2250.0,"price_realised_txt":"EUR 2,250","end_date":"2021-04-27T00:00Z"}]}</script><span class="chr-lot-section__accordion--text">FAUTEUIL<br>En acajou mouluré et sculpté, estampillé sur la traverse avant BELLANGE</span></html>`;
+const bonhamsHtml = `<html><head><meta property="og:title" content="Bonhams : Empire Fauteuil a Chassis Attributed to Pierre-Antoine Bellangé,"></head><body><h1>Empire Fauteuil a Chassis Attributed to Pierre-Antoine Bellangé,</h1><p>Sold for US$4,096 inc. premium</p><p>in carved and gilded beech, trace of a stamp</p><div>Other lot: Commode stamped Dussautoy Sold for US$9,000 inc. premium</div></body></html>`;
+
+check("comparables: Christie's lot data (the page's own lot, not a neighbour), Bonhams 'Sold for … inc. premium', a price printed next to a result word", () => {
+  const p = parseChristiesLot(christiesHtml("6314500", "6314499"), "https://www.christies.com/en/lot/lot-6314500");
+  assert.deepEqual([p?.price, p?.currency, p?.date], [2250, "EUR", "2021-04-27"]);
+  assert.match(String(p?.description), /acajou/);
+  const b = parseBonhamsLot(bonhamsHtml, 4096);
+  assert.deepEqual([b?.price, b?.currency], [4096, "USD"]);
+  assert.equal(priceOnPage("<p>Adjugé 3 200 € frais compris</p>", 3200), true);
+  assert.equal(priceOnPage("<p>Estimation 3 200 - 4 000 €</p><p>Lot 32000</p>", 3200), false);
+  assert.equal(classifyStamp("A SET OF FOUR EMPIRE GILTWOOD FAUTEUILS, BY PIERRE-ANTOINE BELLANGE"), "by");
+  assert.equal(classifyStamp("Paire de fauteuils, chacun estampillé P.BELLANGE"), "stamped");
+  const re = /\b(arm\s?chairs?|fauteuils?)\b/;
+  const v = verifyComparable(christiesHtml("6314500", "1"), "https://www.christies.com/en/lot/lot-6314500", null, "bellange", re);
+  assert.deepEqual([v.comp?.stamp, v.comp?.pieces, v.comp?.feesIncluded, v.comp?.perPieceAllInEur, v.comp?.material], ["stamped", 1, true, 2250, "mahogany"]);
+  assert.equal(verifyComparable(christiesHtml("6314500", "1"), "https://www.christies.com/en/lot/lot-6314500", null, "jacob", re).reason, "maker_not_on_page");
+  assert.equal(verifyComparable(christiesHtml("6314500", "1"), "https://www.christies.com/en/lot/lot-6314500", null, "bellange", /\bcommodes?\b/).reason, "other_piece");
+  assert.equal(verifyComparable(bonhamsHtml, "https://www.bonhams.com/auction/31313/lot/152/x/", { url: "", price: 4096, currency: "USD", sale_date: "2025-05-07" }, "bellange", re).comp?.stamp, "attributed");
+  // a claimed price that is not on the page is never accepted
+  assert.equal(verifyComparable("<html><title>Fauteuil estampillé Bellangé</title><p>Adjugé 1 500 €</p></html>", "https://www.example-auction.fr/lot/1", { url: "", price: 9999, currency: "EUR" }, "bellange", re).reason, "price_not_on_page");
+});
+
+const comp = (o: Partial<Comparable>): Comparable => ({ url: `https://x/${Math.random()}`, house: "Christie's", title: "fauteuil Bellangé", pieces: 1, stamp: "stamped", price: 0, currency: "EUR", feesIncluded: true, allInEur: 0, hammerEur: 0, perPieceAllInEur: 0, perPieceHammerEur: 0, verifiedBy: "christies_lot_data", ...o });
+const BELL_COMPS: Comparable[] = [
+  comp({ date: "2021-04-27", material: "mahogany", perPieceAllInEur: 2250, perPieceHammerEur: 1772 }),
+  comp({ date: "2024-06-18", material: "giltwood", pieces: 4, stamp: "by", perPieceAllInEur: 2029, perPieceHammerEur: 1597 }),
+  comp({ date: "2021-07-12", material: "giltwood", pieces: 2, perPieceAllInEur: 3510, perPieceHammerEur: 2764 }),
+  comp({ date: "2004-04-22", material: "mahogany", pieces: 2, perPieceAllInEur: 2056, perPieceHammerEur: 1619 }),
+  comp({ date: "2025-05-07", material: "giltwood", stamp: "attributed", house: "Bonhams", perPieceAllInEur: 3768, perPieceHammerEur: 2967 }),
+];
+
+check("comparables anchor the range, scaled to the number of pieces (stamped on stamped, never on a dealer's label)", () => {
+  const a = anchorOnComparables(BELL_COMPS, { status: "stamped_confirmed", pieces: 4, material: "mahogany", isAuction: false, eurTo: (e) => e });
+  assert.equal(a.applied, true);
+  assert.equal(a.used.length, 3); // 2018+ stamped/by results; the attributed one and the 2004 sale are not used
+  assert.equal(a.perPieceMedianEur, 2250);
+  assert.deepEqual([a.low, a.high], [7650, 11500]); // about €8–9k for four at auction, incl. fees
+  const h = anchorOnComparables(BELL_COMPS, { status: "stamped_stated", pieces: 4, isAuction: true, eurTo: (e) => e });
+  assert.equal(h.basis, "hammer"); assert.ok(h.high < a.high);
+  assert.equal(anchorOnComparables(BELL_COMPS, { status: "dealer_label", pieces: 4, isAuction: false, eurTo: (e) => e }).applied, false);
+  assert.equal(anchorOnComparables(BELL_COMPS, { status: "attributed", pieces: 4, isAuction: false, eurTo: (e) => e }).reason, "too_few");
+  assert.equal(anchorOnComparables([], { status: "stamped_confirmed", pieces: 4, isAuction: false, eurTo: (e) => e }).reason, "none");
+});
+
+const bellRaw = () => ({ items: [{
+  item_summary: { title: "Set of Four Empire Mahogany Fauteuils (Attributed to P. Bellangé)", category: "Chairs", likely_origin: "France", likely_style: "Empire", likely_period: "Early 19th Century", value_tier: "B", snap_judgement: "Standard Empire form.", confidence: "low", confidence_score: 40, confidence_breakdown: { evidence_quality: 20, identification_certainty: 15, risk_factors: 15 }, confidence_reason: "Photos of the chairs.", confidence_improvement_suggestions: [], evidence_gaps: [], period_certainty: "probable_period", reproduction_risk: false, construction_evidence: "none shown", maker: { name: "Pierre-Antoine Bellangé", status: "stamped_stated", evidence: "buyer's text" } },
+  buy_decision: { score: 20, label: "Walk Away", confidence: "low", decision_summary: [], investment_insight: "", must_have_insight: "", resale_insight: "" },
+  price_guidance: { currency: "EUR", estimated_market_range_low: 2500, estimated_market_range_high: 5500, good_buy_below: 3500, fair_price_low: 6000, fair_price_high: 9000, overpaying_above: 5500, pricing_reasoning: "Standard Empire chairs." },
+  dealer_take: { target_buy_price_low: 2000, target_buy_price_high: 3500, resale_strategy: "", dealer_view: [] },
+  negotiation_strategy: { opening_offer: 2500, target_price_low: 3000, target_price_high: 4500, walk_away_price: 5500, points_to_raise: [] },
+  walk_away_if: [], top_checks: [], red_flags: [], market_insight: { demand: "", resale_ease: "", drivers_of_value: [] },
+  scoring_inputs: { authenticity: 15, condition: 10, rarity_desirability: 10, market_demand: 8, price_vs_market: 2, liquidity: 5, risk_penalty: -5 }, disclaimer: "", teaser_insight: "",
+}] });
+const dealerCtx = (query: string, extra: any = {}) => ({ query, hasPhotos: true, askingPrice: 12000, isAuction: false, premiumPct: 0, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Antique Shop", fetchedEstimate: false, eurTo: (e: number) => e, category: "chairs", ...extra });
+const COMPS_RESP = { ok: true, comparables: BELL_COMPS, searched: [], unreachable: ["Drouot (results need an account)"], stats: { candidates: 5, verified: 5, dropped: {} } };
+
+check("a confirmed Bellangé stamp changes the valuation: comps-anchored range, 'Overpriced' (slightly) not 'Walk Away' at €12k; a dealer's label stays plain Empire", () => {
+  const conf: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: COMPS_RESP }))[0];
+  assert.equal(conf.maker_attribution.status, "stamped_confirmed");
+  assert.equal(conf.comparables.status, "anchored");
+  assert.deepEqual([conf.price_guidance.estimated_market_range_low, conf.price_guidance.estimated_market_range_high], [7650, 11500]);
+  assert.equal(conf.buy_decision.label, "Overpriced");
+  assert.ok(conf.buy_decision.score >= 30, String(conf.buy_decision.score)); // just above the walk-away
+  assert.match(conf.item_summary.title, /stamped Bellangé/); assert.ok(!/Attributed/i.test(conf.item_summary.title));
+  assert.match(conf.price_guidance.pricing_reasoning, /Anchored on 3 verified auction results/);
+  const label: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_LABEL, { comps: COMPS_RESP }))[0];
+  assert.equal(label.maker_attribution.status, "dealer_label");
+  assert.equal(label.comparables.status, "shown");
+  assert.equal(label.price_guidance.estimated_market_range_high, 5500);
+  assert.equal(label.buy_decision.label, "Walk Away");
+  // no verified comparables: says so and falls back to the appraiser's range
+  const none: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: { ...COMPS_RESP, comparables: [] } }))[0];
+  assert.equal(none.comparables.status, "none_verified");
+  assert.equal(none.price_guidance.estimated_market_range_high, 5500);
+  const failed: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: null }))[0];
+  assert.equal(failed.comparables.status, "error");
+});
+
+check("before you buy: a checklist for the piece, maker claim and set; answers re-run (confirm firms up, deny lowers)", () => {
+  const items = buildChecklist({ pieceKind: "seating", pieces: 4, period: "Empire", maker: { name: "Bellangé", status: "stamped_confirmed" }, basis: "overpriced", text: BELL_CONF });
+  const ids = items.map(i => i.id);
+  for (const id of ["stamp_every_piece", "matching_set", "joints_underneath", "seat_rails_webbing", "invoice_wording", "provenance_condition_report"]) assert.ok(ids.includes(id as any), id);
+  assert.equal(items[0].id, "stamp_every_piece"); assert.equal(items[0].vars?.where, "seat_rail");
+  assert.ok(buildChecklist({ pieceKind: "seating", pieces: 4, maker: { name: "Bellangé", status: "dealer_label" }, text: BELL_LABEL }).some(i => i.id === "label_is_not_stamp"));
+  const mirror = buildChecklist({ pieceKind: "mirror", pieces: 1, period: "Louis XVI", maker: null, basis: "walk_away", text: "Louis XVI mirror carved giltwood with crest, glass original" }).map(i => i.id);
+  for (const id of ["mirror_glass_original", "mirror_back_original", "crest_original", "gilding_original", "invoice_wording"]) assert.ok(mirror.includes(id as any), id);
+  assert.ok(!mirror.includes("stamp_present"));
+  assert.ok(buildChecklist({ pieceKind: "case", pieces: 1, text: "Commode à plateau de marbre, bronzes, placage" }).some(i => i.id === "marble_original"));
+  const yes = checksEffect({ stamp_every_piece: "yes", matching_set: "yes", joints_underneath: "yes" }, items);
+  assert.ok(yes.confidenceDelta > 0); assert.equal(yes.rangeFactor, 1); assert.equal(yes.stampOverride, "confirmed"); assert.equal(yes.periodConfirmed, true);
+  const no = checksEffect({ stamp_every_piece: "no", matching_set: "no" }, items);
+  assert.ok(no.confidenceDelta < 0); assert.equal(no.rangeFactor, DENIAL_FACTOR.matching_set); assert.equal(no.stampOverride, "denied");
+  assert.equal(checksEffect({ mirror_glass_original: "unsure" }).confidenceDelta, 0);
+  assert.match(checksPrompt({ mirror_glass_original: "yes" }), /mirror glass original: CONFIRMED/);
+  // in the appraisal: stamp denied -> no maker premium, lower confidence; glass + back confirmed -> higher confidence, narrower range
+  const confirmed: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: COMPS_RESP }))[0];
+  const denied: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: COMPS_RESP, checkAnswers: { stamp_every_piece: "no" } }))[0];
+  assert.equal(denied.comparables.status, "shown"); assert.equal(denied.price_guidance.estimated_market_range_high, 5500);
+  assert.ok(denied.item_summary.confidence_score < confirmed.item_summary.confidence_score);
+  assert.ok(denied.checklist.items.some((i: any) => i.id === "stamp_every_piece")); // the question stays, with its answer
+  assert.equal(denied.checklist.answers.stamp_every_piece, "no");
+  const firm: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: COMPS_RESP, checkAnswers: { stamp_every_piece: "yes", matching_set: "yes", joints_underneath: "yes" } }))[0];
+  assert.ok(firm.item_summary.confidence_score > confirmed.item_summary.confidence_score);
+  assert.ok(firm.price_guidance.estimated_market_range_low > confirmed.price_guidance.estimated_market_range_low);
+  const set: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: COMPS_RESP, checkAnswers: { matching_set: "no" } }))[0];
+  assert.ok(set.price_guidance.estimated_market_range_high < confirmed.price_guidance.estimated_market_range_high);
+});
+
+check("checklist re-run: starts from the range the checklist was shown with (a fresh model call cannot move it), unless the stamp basis changed", () => {
+  const first: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: { ...COMPS_RESP, comparables: [] } }))[0];
+  assert.deepEqual([first.checklist.base.low, first.checklist.base.high, first.checklist.base.maker_status], [2500, 5500, "stamped_confirmed"]);
+  const drift = () => { const r: any = bellRaw(); Object.assign(r.items[0].price_guidance, { estimated_market_range_low: 900, estimated_market_range_high: 1600, fair_price_low: 2000, fair_price_high: 3000 }); return r; };
+  const yes: any = postProcessAppraisal(drift(), dealerCtx(BELL_CONF, { comps: { ...COMPS_RESP, comparables: [] }, checkAnswers: { stamp_every_piece: "yes", matching_set: "yes" }, previousBase: first.checklist.base }))[0];
+  assert.equal(yes.price_guidance.estimated_market_range_high, 5500); assert.ok(yes.price_guidance.estimated_market_range_low > 2500);
+  assert.ok(yes.item_summary.confidence_score > first.item_summary.confidence_score);
+  const no: any = postProcessAppraisal(drift(), dealerCtx(BELL_CONF, { comps: { ...COMPS_RESP, comparables: [] }, checkAnswers: { stamp_every_piece: "no" }, previousBase: first.checklist.base }))[0];
+  assert.equal(no.price_guidance.estimated_market_range_high, 1600);
+  const t: any = bellRaw(); t.items[0].item_summary.title = "Set of four Empire mahogany armchairs, attributed to Pierre-Antoine Bellangé";
+  assert.equal((postProcessAppraisal(t, dealerCtx(BELL_CONF, { comps: null }))[0] as any).item_summary.title, "Set of four Empire mahogany armchairs (stamped Bellangé)");
+});
+
+check("checklist and comparables texts exist in EN and FR (every item, status and fallback)", () => {
+  const ids = ["stamp_every_piece", "stamp_present", "label_is_not_stamp", "matching_set", "joints_underneath", "seat_rails_webbing", "mirror_glass_original", "mirror_back_original", "crest_original", "gilding_original", "marble_original", "hardware_original", "veneer_sound", "no_major_restoration", "invoice_wording", "provenance_condition_report"];
+  for (const lang of ["en", "fr"]) {
+    const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8"));
+    for (const id of ids) assert.ok(j.checklist.items[id], `${lang} ${id}`);
+    for (const k of ["yes", "no", "unsure", "rerun", "title", "title_embedded"]) assert.ok(j.checklist[k], `${lang} ${k}`);
+    for (const st of ["stamped_confirmed", "stamped_stated", "stamp_in_photo", "attributed", "dealer_label", "mentioned"]) { assert.ok(j.comps.status[st]); assert.ok(j.comps.status_note[st]); }
+    for (const f of ["too_few", "not_stamped", "none_verified", "error", "not_searched"]) assert.ok(j.comps.fallback[f], `${lang} ${f}`);
+    assert.match(j.comps.stamp_warning, /(EVERY|CHAQUE)/);
+    assert.match(j.comps.stamp_warning, /(invoice|facture)/);
+  }
+  const view = readFileSync(new URL("../src/components/AnalysisView.tsx", import.meta.url), "utf8");
+  assert.match(view, /<MakerAndComparables/); assert.match(view, /<BeforeYouBuy embedded/); assert.match(view, /<BeforeYouBuy items/);
+});
+
+check("comps server function: within the 50 s budget; never returns an unverified result; says so when nothing is verified", () => {
+  assert.ok(COMPS_TOTAL_BUDGET_MS <= 47_000 && COMPS_GEMINI_TIMEOUT_MS + COMPS_VERIFY_BUDGET_MS <= COMPS_TOTAL_BUDGET_MS);
+  assert.ok(COMPS_CLIENT_TIMEOUT_MS <= 50_000);
+  const vj = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
+  assert.equal(vj.functions["api/comps.ts"].maxDuration, 60);
+  assert.match(readFileSync(new URL("../api/comps.ts", import.meta.url), "utf8"), /handleCompsRequest/);
+  assert.match(readFileSync(new URL("../server.ts", import.meta.url), "utf8"), /\/api\/comps/);
+});
+
+await (async () => {
+  const r400 = await handleCompsRequest({}, "x");
+  assert.equal(r400.status, 400);
+  const noKey = await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined);
+  assert.equal(noKey.error, "no_api_key"); assert.equal(noKey.comparables.length, 0);
+  const pages: Record<string, string> = {
+    "https://www.christies.com/en/lot/lot-6314500": christiesHtml("6314500", "1"),
+    "https://www.bonhams.com/auction/31313/lot/152/x/": bonhamsHtml,
+    "https://www.example-auction.fr/lot/9": "<html><title>Paire de fauteuils estampillés Bellangé</title><p>Estimation 3 000 €</p></html>",
+  };
+  const res = await findComparables({ maker: "Bellangé", piece: "armchair", material: "mahogany", pieces: 4 }, undefined, Date.now(), {
+    search: async () => ({ text: JSON.stringify({ results: [
+      { url: "https://www.christies.com/en/lot/lot-6314500", house: "Christie's", title: "x", price: 2250, currency: "EUR" },
+      { url: "https://www.bonhams.com/auction/31313/lot/152/x/", house: "Bonhams", title: "x", price: 4096, currency: "USD", sale_date: "2025-05-07" },
+      { url: "https://www.example-auction.fr/lot/9", house: "X", title: "invented", price: 7000, currency: "EUR" },
+      { url: "https://www.christies.com/en/lot/lot-404", house: "Christie's", title: "invented", price: 5000, currency: "EUR" },
+    ] }), grounded: [] }),
+    fetchHtml: async (url) => pages[url] ? { status: 200, html: pages[url], finalUrl: url } : { status: 404, finalUrl: url },
+  });
+  assert.equal(res.ok, true);
+  assert.equal(res.comparables.length, 2);
+  assert.deepEqual(res.comparables.map(c => c.house).sort(), ["Bonhams", "Christie's"]);
+  assert.equal(res.stats.dropped.price_not_on_page, 1); assert.equal(res.stats.dropped.http_404, 1);
+  assert.ok(res.checked?.some(c => c.result === 'verified') && res.checked?.some(c => c.result === 'http_404'));
+  passed++; console.log("ok - comps server function: only page-verified results are returned (invented or unreachable ones are dropped)");
+  // parallel scoped searches: one failing scope does not lose the others; all failing reports the error
+  const part = await findComparables({ maker: "Bellangé", piece: "armchair", material: "mahogany", pieces: 4 }, undefined, Date.now(), {
+    search: async (prompt) => {
+      const scope = (prompt.match(/Where to look: ([^\n]*)/) || [])[1] || "";
+      if (scope.startsWith("Bonhams")) throw new Error("boom");
+      if (scope.startsWith("French")) return { text: "not json", grounded: ["https://www.christies.com/en/lot/lot-6314500"] };
+      return { text: JSON.stringify({ results: [{ url: "https://www.bonhams.com/auction/31313/lot/152/x/", house: "Bonhams", title: "x", price: 4096, currency: "USD" }] }), grounded: [] };
+    },
+    fetchHtml: async (url) => pages[url] ? { status: 200, html: pages[url], finalUrl: url } : { status: 404, finalUrl: url },
+  });
+  assert.equal(part.comparables.length, 2); assert.equal(part.error, undefined); assert.ok(part.partial?.length && part.partial.every(e => e === "boom"));
+  const all = await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), { search: async () => { throw new Error("down"); }, fetchHtml: async (url) => ({ status: 404, finalUrl: url }) });
+  assert.equal(all.error, "down"); assert.equal(all.comparables.length, 0);
+  const blocked = await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), {
+    search: async () => ({ text: JSON.stringify({ results: [{ url: "https://www.bonhams.com/auction/1/lot/2/", house: "Bonhams", title: "x", price: 1, currency: "USD" }] }), grounded: [] }),
+    fetchHtml: async (url) => ({ status: 403, finalUrl: url }),
+  });
+  assert.equal(blocked.comparables.length, 0); assert.ok(blocked.unreachable.some(u => /Bonhams/.test(u)));
+  assert.equal(parseLooseJson('Here:\n```json\n{"results":[{"url":"u"}]}\n```').results[0].url, "u");
+  assert.deepEqual(parseLooseJson("no json here"), {});
+  passed++; console.log("ok - comps server function: scoped searches run in parallel; a failed scope keeps the others' verified results");
+})();
 
 console.log(`\n${passed} checks passed`);
