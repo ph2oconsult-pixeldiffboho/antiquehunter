@@ -29,7 +29,7 @@ import { localQueries } from "../src/services/huntGeo.ts";
 import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
 import { applyRanking } from "../src/services/hunting.ts";
 import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
-import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceCheck, evidenceAsks, pieceKindOf, isBriefInput, periodStatedIn, centuryStatedIn } from "../src/services/appraisalMath.ts";
+import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceCheck, evidenceAsks, pieceKindOf, isBriefInput, periodStatedIn, centuryStatedIn, laterSignIn } from "../src/services/appraisalMath.ts";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => { fn(); passed++; console.log("ok -", name); };
@@ -965,7 +965,7 @@ check("need more evidence: when it triggers (ambiguous period, possible copy, lo
   assert.equal(evidenceCheck({ ...base, periodCertainty: "probable_period" }).required, false);
   // a piece correctly identified as a later style piece gets a normal verdict at its (later) price
   assert.equal(evidenceCheck({ ...base, periodCertainty: "later_style_or_revival", reproductionRisk: true }).required, false);
-  assert.deepEqual(evidenceCheck({ ...base, periodCertainty: "ambiguous" }).reasons, ["period_ambiguous"]);
+  assert.deepEqual(evidenceCheck({ ...base, periodCertainty: "ambiguous", typedText: "Set of four mahogany armchairs with gilded dolphin heads and sword-shaped front legs, minor restorations, modern upholstery" }).reasons, ["period_ambiguous"]);
   const undated = { ...base, typedText: "" };
   assert.deepEqual(evidenceCheck({ ...undated, periodCertainty: "probable_period", reproductionRisk: true, confidence: "high" }).reasons, ["possible_reproduction"]);
   // low confidence alone: only on a short note (a full catalogue entry has already said what it can)
@@ -992,8 +992,14 @@ check("need more evidence: a catalogue that dates the piece (or calls it a style
   assert.equal(evidenceCheck({ ...base, typedText: "Commode dans le style Louis XVI en noyer ouvrant à trois rangs de tiroirs, plateau marqueté, poignées en laiton" }).required, false);
   // a short note giving a century is not a catalogue dating: still asks
   assert.deepEqual(evidenceCheck({ ...base, typedText: "four 19th century armchairs" }).reasons, ["possible_reproduction"]);
-  // an ambiguous period still asks, whatever the text says
+  // an ambiguous period still asks when the text only gives a century
   assert.equal(evidenceCheck({ ...base, periodCertainty: "ambiguous", typedText: long }).required, true);
+  // ...but a catalogue that states the period is sent back only on a concrete later sign
+  const cat = "Set of four mahogany and mahogany veneered armchairs with gilded dolphin heads resting on sword-shaped front legs. Restoration period. Minor restorations, modern upholstery.";
+  assert.equal(evidenceCheck({ ...base, periodCertainty: "ambiguous", typedText: cat, constructionEvidence: "None visible (modern upholstery covers the frame)." }).required, false);
+  assert.deepEqual(evidenceCheck({ ...base, reproductionRisk: false, periodCertainty: "ambiguous", typedText: cat, constructionEvidence: "Machine-cut dovetails and Phillips screws on the seat rail" }).reasons, ["period_ambiguous"]);
+  assert.equal(laterSignIn("modern upholstery"), false);
+  assert.equal(laterSignIn("agrafes sous l'assise"), true);
 });
 
 check("need more evidence: photos or a short note only -> a period or revival call is not confirmed (Peter's chairs, photos only)", () => {

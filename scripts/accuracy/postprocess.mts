@@ -29,7 +29,7 @@ for (const f of readdirSync(runsDir).filter(f => f.endsWith('.json')).sort()) {
   let oldConf = (Number(rb.evidence_quality) || 0) + (Number(rb.identification_certainty) || 0) + (Number(rb.risk_factors) || 0);
   const lf = r.raw.lot && r.raw.lot.ok ? r.raw.lot : null;
   const mode = r.mode || 'photos';
-  const query = mode === 'url' ? (lf ? [lf.title, lf.description].filter(Boolean).join('\n') : `Auction lot: ${lot.url}`) : lot.text;
+  const query = r.query !== undefined ? r.query : mode === 'url' ? (lf ? [lf.title, lf.description].filter(Boolean).join('\n') : `Auction lot: ${lot.url}`) : lot.text;
   const compText = [query, lf ? `${lf.title || ''}\n${lf.description || ''}` : ''].filter(Boolean).join('\n');
   const location = mode === 'url' ? (lf?.city || undefined) : lot.location;
   const premiumPct = mode === 'url' ? (lf?.premiumPct || 25) : Number(lot.premium_pct);
@@ -39,9 +39,9 @@ for (const f of readdirSync(runsDir).filter(f => f.endsWith('.json')).sort()) {
   const oldConfLabel = oldConfScore >= 80 ? 'high' : oldConfScore >= 60 ? 'medium' : oldConfScore >= 40 ? 'low' : 'very_low';
   const fetchedEstimate = !!(lf && (lf.estimateLow || lf.estimateHigh));
   const pp = postProcessAppraisal(result, {
-    query, hasPhotos, askingPrice: lot.hammer_eur, isAuction: true, premiumPct, targetCurrency: 'EUR', currencySymbol: '€',
+    query, hasPhotos, askingPrice: r.hammer ?? lot.hammer_eur, isAuction: true, premiumPct, targetCurrency: 'EUR', currencySymbol: '€',
     language: 'en', sellerType: 'Auction', lotUrl: mode === 'url' ? lot.url : undefined, lotFacts: lf,
-    fetchedEstimate, eurTo: (e: number) => e, category: lot.category,
+    fetchedEstimate, eurTo: (e: number) => e, category: r.category !== undefined ? r.category : lot.category,
   });
   const item: any = pp[0], pg = item.price_guidance, ns = item.negotiation_strategy, bd = item.buy_decision;
   out.push({

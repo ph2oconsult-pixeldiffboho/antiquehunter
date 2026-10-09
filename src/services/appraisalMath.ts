@@ -436,7 +436,12 @@ export interface EvidenceCheckInput {
   category?: string;
   title?: string;
   styleText?: string;                // model's likely_style + likely_period
+  constructionEvidence?: string;     // model's item_summary.construction_evidence
 }
+
+/** A concrete sign of later manufacture named by the model (replaced upholstery alone is not one). */
+export const laterSignIn = (text: string): boolean =>
+  /(staple|screw|machine[- ]?(cut|made|carv)|circular[- ]saw|band[- ]?saw|plywood|wire nail|phillips|mdf|chipboard|particle ?board|router|agrafe|\bvis\b|contre-?plaqu|scie circulaire|scie m[ée]canique|clous? (de )?tr[ée]fil|agglom[ée]r)/i.test(String(text || ''));
 
 export interface EvidenceCheck {
   required: boolean;
@@ -499,13 +504,17 @@ export const centuryStatedIn = (text: string): boolean =>
 export const evidenceCheck = (i: EvidenceCheckInput): EvidenceCheck => {
   const reasons: EvidenceReason[] = [];
   const pc = String(i.periodCertainty || '');
-  if (pc === 'ambiguous') reasons.push('period_ambiguous');
   // A possible later copy matters when the piece is not already identified (and priced) as a later piece, and the
   // description does not already state the period (an auction catalogue entry "Restoration period" is the house's
   // attribution; the model's generic "could be a copy" caution should not block the verdict then).
   const brief = isBriefInput(i.typedText, i.lotPageRead);
   // A catalogue that already dates the piece, or declares it a "style" piece, has answered the period question.
   const dated = periodStatedIn(i.typedText) || (!brief && (centuryStatedIn(i.typedText) || /\b(style|stil)\b/i.test(String(i.typedText || ''))));
+  // A catalogue entry that states the period ("Restoration period", "d'époque", "circa 1780") is the auction house's
+  // attribution: the model's doubt sends it back only when it names a concrete later sign (staples, screws, machine
+  // cuts...), not on the general look.
+  const catalogueDated = !brief && periodStatedIn(i.typedText);
+  if (pc === 'ambiguous' && !(catalogueDated && !laterSignIn(i.constructionEvidence || ''))) reasons.push('period_ambiguous');
   if (i.reproductionRisk === true && pc !== 'later_style_or_revival' && !dated) reasons.push('possible_reproduction');
   if ((i.confidence === 'low' || i.confidence === 'very_low') && brief) reasons.push('low_confidence_brief');
   // Photos (or a short note) only: a period call, or a "revival of a historic style" call, cannot be confirmed from the
