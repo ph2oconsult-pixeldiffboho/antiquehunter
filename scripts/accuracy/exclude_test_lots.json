@@ -1,0 +1,280 @@
+{
+ "ids": [
+  "auctionet-4245030",
+  "auctionet-4318214",
+  "auctionet-4322497",
+  "auctionet-4492386",
+  "auctionet-4585078",
+  "auctionet-4601099",
+  "auctionet-4604073",
+  "auctionet-4637911",
+  "auctionet-4703827",
+  "auctionet-4741824",
+  "auctionet-4758071",
+  "auctionet-4814151",
+  "auctionet-4820497",
+  "auctionet-4827010",
+  "auctionet-4852878",
+  "auctionet-4862879",
+  "auctionet-4883226",
+  "auctionet-5069068",
+  "auctionet-5085964",
+  "auctionet-5090050",
+  "auctionet-5094572",
+  "auctionet-5103301",
+  "auctionet-5171119",
+  "auctionet-5261736",
+  "auctionet-5277139",
+  "auctionet-5353205",
+  "auctionet-5396478",
+  "auctionet-5439249",
+  "drouot-34785441",
+  "drouot-34791514",
+  "drouot-34803944",
+  "drouot-34841295",
+  "drouot-34845277",
+  "drouot-34934236",
+  "drouot-34943207",
+  "drouot-34952708",
+  "drouot-34956043",
+  "drouot-34965710",
+  "drouot-34965712",
+  "drouot-34965716",
+  "drouot-34965719",
+  "drouot-34965721",
+  "drouot-34965726",
+  "drouot-34965739",
+  "drouot-34965755",
+  "drouot-34987490",
+  "drouot-34994475",
+  "drouot-35008640",
+  "drouot-35033673",
+  "drouot-35051106",
+  "drouot-35082101",
+  "drouot-35105740",
+  "drouot-35105741",
+  "drouot-35105751",
+  "drouot-35105769",
+  "drouot-35105849",
+  "drouot-35105855",
+  "drouot-35127780",
+  "drouot-35127782",
+  "drouot-35127785",
+  "drouot-35127792",
+  "drouot-35127801",
+  "drouot-35127903",
+  "drouot-35141964",
+  "drouot-35142051"
+ ],
+ "sales": [
+  [
+   "Ader",
+   "2026-10-02"
+  ],
+  [
+   "Alexandre Landre Beaune",
+   "2026-09-12"
+  ],
+  [
+   "Alexandre Landre Semur",
+   "2026-10-04"
+  ],
+  [
+   "Astrid Guillon Maison de ventes aux enchères",
+   "2026-09-19"
+  ],
+  [
+   "Audap & Associés",
+   "2026-09-30"
+  ],
+  [
+   "Auktionshuset Thelin & Johansson",
+   "2026-05-16"
+  ],
+  [
+   "Auktionsverket Engelholm",
+   "2026-05-26"
+  ],
+  [
+   "Auktionsverket Engelholm",
+   "2026-09-09"
+  ],
+  [
+   "Beaussant Lefèvre & Associés",
+   "2026-09-23"
+  ],
+  [
+   "Bishop & Miller",
+   "2025-08-27"
+  ],
+  [
+   "Bishop & Miller",
+   "2026-01-24"
+  ],
+  [
+   "Bishop & Miller",
+   "2026-09-16"
+  ],
+  [
+   "Conan Belleville Hôtel d'Ainay",
+   "2026-10-08"
+  ],
+  [
+   "Crafoord Auktioner Stockholm",
+   "2025-07-31"
+  ],
+  [
+   "Côte Basque Enchères Lelièvre - Cabarrouy",
+   "2026-10-02"
+  ],
+  [
+   "Daguerre",
+   "2026-09-20"
+  ],
+  [
+   "Daguerre",
+   "2026-09-29"
+  ],
+  [
+   "Daguerre Val de Loire",
+   "2026-09-17"
+  ],
+  [
+   "De Baecque et Associés",
+   "2026-09-26"
+  ],
+  [
+   "Formstad Auktioner",
+   "2026-01-10"
+  ],
+  [
+   "Göteborgs Auktionsverk",
+   "2025-08-08"
+  ],
+  [
+   "Göteborgs Auktionsverk",
+   "2025-10-16"
+  ],
+  [
+   "Handelslagret Auktionsservice",
+   "2026-03-05"
+  ],
+  [
+   "Hôtel des ventes Élysée",
+   "2026-09-22"
+  ],
+  [
+   "Kalmar Auktionsverk",
+   "2026-10-06"
+  ],
+  [
+   "Lawrences Auctioneers",
+   "2025-10-28"
+  ],
+  [
+   "Lawrences Auctioneers",
+   "2025-12-05"
+  ],
+  [
+   "Lawrences Auctioneers",
+   "2026-01-20"
+  ],
+  [
+   "Lawrences Auctioneers",
+   "2026-02-11"
+  ],
+  [
+   "Lawrences Auctioneers",
+   "2026-05-05"
+  ],
+  [
+   "Lawrences Auctioneers",
+   "2026-05-06"
+  ],
+  [
+   "Lawrences Auctioneers",
+   "2026-10-05"
+  ],
+  [
+   "Le Floc'h",
+   "2026-10-04"
+  ],
+  [
+   "Lots Road Auctions",
+   "2025-09-08"
+  ],
+  [
+   "Lots Road Auctions",
+   "2026-03-08"
+  ],
+  [
+   "Lots Road Auctions",
+   "2026-05-10"
+  ],
+  [
+   "Millon",
+   "2026-09-11"
+  ],
+  [
+   "Mirabaud - Mercier",
+   "2026-09-28"
+  ],
+  [
+   "Nice Enchères",
+   "2026-10-06"
+  ],
+  [
+   "Osenat",
+   "2026-09-20"
+  ],
+  [
+   "Stockholms Auktionsverk Helsingborg",
+   "2025-11-25"
+  ],
+  [
+   "Stockholms Auktionsverk Helsingborg",
+   "2026-02-15"
+  ],
+  [
+   "Stockholms Auktionsverk Sickla",
+   "2026-07-30"
+  ],
+  [
+   "Södermanlands Auktionsverk",
+   "2025-11-22"
+  ],
+  [
+   "Uppsala Auktionskammare",
+   "2026-03-20"
+  ],
+  [
+   "Vanderkindere",
+   "2026-10-07"
+  ],
+  [
+   "Växjö Auktionskammare",
+   "2026-06-19"
+  ]
+ ],
+ "drouot_sale_ids": [
+  "174343",
+  "180029",
+  "181199",
+  "182114",
+  "182146",
+  "182671",
+  "182907",
+  "183848",
+  "183871",
+  "184293",
+  "184405",
+  "184551",
+  "184776",
+  "184796",
+  "184806",
+  "185158",
+  "185283",
+  "185411",
+  "185541"
+ ]
+}

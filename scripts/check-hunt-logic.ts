@@ -29,6 +29,7 @@ import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, piec
 import { applyRanking } from "../src/services/hunting.ts";
 import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
 import { calibratedConfidence, confidenceLabel, normaliseConfidence } from "../src/services/appraisalMath.ts";
+import { blendFactor, comparableStats, comparablesConfidenceCap, findComparables, NOT_FURNITURE_RE, similarity, featuresOf, sizeOf, type SoldComparable } from "../src/services/comparables.ts";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => { fn(); passed++; console.log("ok -", name); };
@@ -952,10 +953,50 @@ check("fix 6: confidence inputs on fixed scales, calibrated with the app's own e
   assert.equal(confidenceLabel(80), "high"); assert.equal(confidenceLabel(60), "medium"); assert.equal(confidenceLabel(40), "low"); assert.equal(confidenceLabel(10), "very_low");
 });
 
-check("step 1 split: the original valuation path (fixed reference price ranges, no comparables, no band correction)", () => {
+check("step 2: the model keeps the original fixed reference ranges; comparables only adjust the range afterwards", () => {
   const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
   assert.match(gem, /Provincial walnut commode, 18th c\.: €300/);
   assert.ok(!/comparablesPrompt|bandFactor/.test(gem));
+  assert.match(gem, /blendFactor\(/);
+});
+
+check("step 2: comparables matching (size, non-furniture heads, period vs later copies) and the blend", () => {
+  assert.equal(sizeOf("Haut. : 84 cm - Larg. : 131 cm - Prof. : 69 cm"), 131);
+  assert.equal(sizeOf("Höjd ca 162, bredd ca 121, djup ca 46 cm"), 162);
+  assert.equal(sizeOf("122cm x 50cm x 210cm high"), 210);
+  assert.equal(sizeOf("Commode Louis XV"), undefined);
+  assert.ok(NOT_FURNITURE_RE.test("SERVICE A GLACE En argent 925"));
+  assert.ok(NOT_FURNITURE_RE.test("Bracelet semainier en or jaune"));
+  assert.ok(!NOT_FURNITURE_RE.test("Miroir en bois argenté"));
+  const mk = (id: string, hammer: number, title: string, extra: Partial<SoldComparable> = {}): SoldComparable =>
+    ({ id, url: "", title, hammer, date: "2026-09-01", region: "France", type: "commode", later: 0, century: 18, stamped: 0, mats: [], ...extra });
+  const p = featuresOf("Commode tombeau en placage de palissandre, époque Louis XV, 84 x 131 x 69 cm", "Paris, France");
+  // a later copy is never a comparable for a period piece
+  assert.equal(similarity(p, mk("a", 300, "Commode de style Louis XV", { later: 1 })), -Infinity);
+  assert.equal(similarity(p, mk("b", 300, "Miroir", { type: "mirror" })), -Infinity);
+  // same size scores higher than a much smaller piece
+  assert.ok(similarity(p, mk("c", 300, "Commode tombeau Louis XV palissandre", { size: 130 })) > similarity(p, mk("d", 300, "Commode tombeau Louis XV palissandre", { size: 50 })));
+  const data = [1, 2, 3, 4, 5].map(i => mk(`x${i}`, 1000 + i * 50, `Commode tombeau Louis XV palissandre époque ${i}`, { size: 130, style: "Louis XV" }));
+  const st = comparableStats(findComparables(data, "Commode tombeau en placage de palissandre, époque Louis XV, 84 x 131 x 69 cm", "Paris, France", 5));
+  assert.equal(st.n, 5);
+  assert.ok(st.spread < 1.2);
+  // model says 300–900 (mid ≈ 520), five agreeing sales at ≈ €1,150: moved up, but at most ×2.5, and never without evidence
+  const f = blendFactor(300, 900, st);
+  assert.ok(f > 1.3 && f <= 2.5, String(f));
+  assert.equal(blendFactor(300, 900, { n: 1, median: 5000, p25: 5000, p75: 5000, spread: 1 }), 1);
+  // confidence: agreeing sales allow "high", none caps at "low"
+  assert.equal(comparablesConfidenceCap(st, 300 * f, 900 * f), 100);
+  assert.equal(confidenceLabel(Math.min(90, comparablesConfidenceCap({ n: 0, median: 0, p25: 0, p75: 0, spread: Infinity }, 300, 900))), "low");
+});
+
+check("step 2: no accuracy-test lot (or lot from the same sale) is in the comparables data", () => {
+  const comps: SoldComparable[] = JSON.parse(readFileSync(new URL("../src/data/soldComparables.json", import.meta.url), "utf8"));
+  const test = JSON.parse(readFileSync(new URL("./accuracy/lots_split.json", import.meta.url), "utf8")).lots;
+  assert.ok(test.length >= 60);
+  const ids = new Set(comps.map(c => c.id));
+  assert.deepEqual(test.filter((l: any) => ids.has(l.lot_id)).map((l: any) => l.lot_id), []);
+  const sales = new Set(test.map((l: any) => `${l.house}|${l.sale_date}`));
+  assert.deepEqual(comps.filter(c => sales.has(`${c.house}|${c.date}`)).map(c => c.id), []);
 });
 
 check("fix 9: appraisals are repeatable (temperature 0, fixed seed)", () => {

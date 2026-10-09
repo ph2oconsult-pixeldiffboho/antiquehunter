@@ -29,3 +29,12 @@ python3 hunt_grade.py hunt                       # precision per search (strict 
 npx tsx scripts/accuracy/recall_pool.mts hunt ; python3 recall_filter.py hunt <UTC time of the runs> ; python3 recall.py hunt
 ```
 `hunt/recall_exclusions.json` holds manual exclusions from the recall pool (e.g. "en partie d'époque").
+
+## Step 2: comparables blend (valuation-rework branch)
+`lots_split.json` now holds 65 sold lots (34 calibration / 31 holdout); `exclude_test_lots.json` lists every test lot and sale.
+```
+npx tsx scripts/build-comparables.ts --exclude scripts/accuracy/exclude_test_lots.json <harvest files…>   # rebuild src/data/soldComparables.json
+npx tsx scripts/accuracy/fit_blend.mts <runs of the original valuation>    # grid on the CALIBRATION lots only
+npx tsx scripts/accuracy/postprocess.mts runs old.json --no-comps ; npx tsx scripts/accuracy/postprocess.mts runs new.json
+python3 appraisal_metrics.py old.json photos ; python3 appraisal_metrics.py new.json photos   # holdout: look once, with frozen settings
+```
