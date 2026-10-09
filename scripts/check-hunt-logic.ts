@@ -976,6 +976,7 @@ check("fix 4: comparables — same type and region first, style vs period kept a
   for (const b of BAND_CORRECTION) assert.ok(b.factor > 0.3 && b.factor < 3);
   assert.equal(BAND_CORRECTION[BAND_CORRECTION.length - 1].upToEur, Infinity);
   assert.equal(bandFactor(0), 1);
+  assert.equal(bandFactor(250), 1.24); assert.equal(bandFactor(600), 1.73); assert.equal(bandFactor(5000), 0.82); // fitted on the calibration half only
   // the fixed reference price ranges are gone from the prompt
   const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
   assert.ok(!/Provincial walnut commode, 18th c\.: €300/.test(gem));

@@ -354,10 +354,13 @@ export const parseBudget = (raw: string): number[] | null => {
 // ---------------------------------------------------------------------------
 
 export interface BandFactor { upToEur: number; factor: number }
+// Fitted 9 Oct 2026 by scripts/accuracy/fit_bands.py on the 17 calibration lots only (preview 10f71dc, identity factors):
+// median hammer / model mid per band, shrunk toward 1 by n/(n+3). <=300: n=13 (x1.30 raw), 300-1000: n=2 (x3.96 raw),
+// >1000: n=2 (x0.60 raw). The two upper bands rest on 2 lots each: treat them as provisional until more sold lots are added.
 export const BAND_CORRECTION: BandFactor[] = [
-  { upToEur: 300, factor: 1 },
-  { upToEur: 1000, factor: 1 },
-  { upToEur: Infinity, factor: 1 },
+  { upToEur: 300, factor: 1.24 },
+  { upToEur: 1000, factor: 1.73 },
+  { upToEur: Infinity, factor: 0.82 },
 ];
 
 export const bandFactor = (midEur: number, table: BandFactor[] = BAND_CORRECTION): number => {
