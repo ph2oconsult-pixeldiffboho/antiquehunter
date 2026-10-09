@@ -178,7 +178,9 @@
     "overpaying_value": "Au-delà de {{price}}",
     "overpaying_all_in": "{{allIn}} frais compris",
     "reason_hammer_suffix": " au marteau (≈ {{allIn}} frais compris, {{pct}} % de frais acheteur)",
-    "hammer_word": "au marteau"
+    "hammer_word": "au marteau",
+    "verdict_need_evidence": "Plus d'éléments nécessaires",
+    "reason_need_evidence": "L'époque n'est pas encore confirmée : pas de verdict d'achat à {{price}}{{premium}}. Fourchette provisoire {{low}} – {{high}} ; ajoutez les éléments ci-dessous et relancez."
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",
@@ -427,5 +429,36 @@
     "save_failed": "Échec de l'enregistrement : {{reason}}",
     "signin_needed": "Connectez-vous avec Google pour enregistrer dans votre compte…",
     "save_failed_local": "Impossible d'enregistrer dans votre compte ({{reason}}). Enregistré sur cet appareil à la place."
+  },
+  "evidence": {
+    "title": "Il faut plus d'éléments",
+    "intro": "Impossible de dire pour l'instant s'il s'agit d'une pièce d'époque ou d'une pièce de style plus tardive : pas encore de verdict d'achat. La fourchette ci-dessous est provisoire.",
+    "reasons": {
+      "period_ambiguous": "Époque ou style / néo plus tardif : impossible de trancher avec ces éléments.",
+      "possible_reproduction": "Certains indices font penser à une copie plus tardive.",
+      "low_confidence_brief": "Confiance faible sur une description courte."
+    },
+    "ask_title": "Ajoutez ces éléments et relancez (vos photos et informations sont conservées) :",
+    "asks": {
+      "photos": "Des photos de l'objet (face, côté, dos)",
+      "underside_back": "Une photo du dessous ou du dos",
+      "drawer_joints": "Un côté de tiroir montrant les assemblages (queues d'aronde)",
+      "hardware_mounts": "La quincaillerie, ou le revers des bronzes",
+      "seat_frame_webbing": "Le bâti de l'assise et les sangles sous le tissu",
+      "stamp_label": "Toute estampille, marque ou étiquette",
+      "catalogue_or_link": "Le texte du catalogue ou le lien du lot"
+    },
+    "kind": {
+      "case": "Pour un meuble à caisson",
+      "seating": "Pour un siège",
+      "mirror": "Pour un miroir",
+      "table": "Pour une table",
+      "other": "Pour cet objet"
+    },
+    "button": "Ajouter des éléments et relancer",
+    "provisional_range": "Fourchette de marché provisoire",
+    "provisional_note": "Provisoire tant que l'époque n'est pas confirmée.",
+    "describe_banner": "Ajoutez les éléments demandés : les nouvelles photos s'ajoutent à celles déjà fournies.",
+    "construction_seen": "Construction observée"
   }
 }

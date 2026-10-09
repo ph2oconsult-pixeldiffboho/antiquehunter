@@ -2,7 +2,7 @@ import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
 import {
-  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, normaliseConfidence, reconcileNegotiation, sanitizeDeep,
+  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, sanitizeDeep,
   type PriceBasis, type ScoreBand,
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFetch";
@@ -107,6 +107,18 @@ You must speak with the authority of an expert who has seen thousands of pieces.
 - NEVER multiply value because the user claims a stamp or "18th century" in their typed text. A user's text claim is unverified. Only raise value for a stamp when a photograph of the stamp is provided and it is clearly legible.
 - Reduce value for replaced marble, replaced/later bronzes, veneer losses, woodworm, restorations, and "partly period" or marriage pieces.
 - If a listing or auction estimate is given (typed by the user, or read from the lot page below), treat it as a strong anchor: your market range should normally sit within 0.7x–2.0x of that estimate unless you give a specific, documented reason.
+
+### PERIOD vs STYLE, AND CONSTRUCTION EVIDENCE
+- Use construction evidence whenever photos or text show it, and say what you saw in item_summary.construction_evidence:
+  period signs = hand-cut dovetails (irregular, few, thin pins), pegged mortise-and-tenon joints, pit-saw / hand-plane / scrub marks, natural oxidation on unpolished surfaces (backs, undersides, drawer insides), hand-forged or cut nails, old hand-made screws, wear where hands and feet touch;
+  later signs = machine-cut uniform dovetails, circular-saw marks, plywood / MDF / chipboard, Phillips or cross-head screws, staples, uniform modern finishes, artificial distressing.
+  Replaced upholstery or a re-gilt mount is normal on period pieces and is not by itself a sign of a later copy.
+- item_summary.period_certainty:
+  "confirmed_period" = construction evidence of period work, or a catalogue entry stating the period ("époque…", "period", a date) that fits what you see;
+  "probable_period" = form, materials and wear fit the period and nothing points to a later piece, but construction is not shown;
+  "ambiguous" = from the evidence available you cannot tell a period piece from a later style / revival piece (for example Empire vs Restauration vs a late 19th-century revival) and the value would differ materially;
+  "later_style_or_revival" = clear evidence the piece is later (catalogue says "style", later construction, modern materials).
+- item_summary.reproduction_risk = true only when something specific suggests a later copy that could be passed off as period.
 
 ### LOT LINK (CRITICAL)
 ${lotFacts ? lotFactsPrompt(lotFacts, fmtCur) : '- No lot link was given.'}
@@ -249,9 +261,12 @@ ${getGlossaryPrompt(language)}`;
                     },
                     confidence_reason: { type: Type.STRING },
                     confidence_improvement_suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "2-3 specific suggestions to increase confidence, tailored to the item." },
-                    evidence_gaps: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    evidence_gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    period_certainty: { type: Type.STRING, enum: ["confirmed_period", "probable_period", "ambiguous", "later_style_or_revival"] },
+                    reproduction_risk: { type: Type.BOOLEAN },
+                    construction_evidence: { type: Type.STRING, description: "Construction details actually seen (joints, saw marks, nails/screws, oxidation), or 'none shown'." }
                   },
-                  required: ["title", "category", "likely_origin", "likely_style", "likely_period", "value_tier", "snap_judgement", "confidence", "confidence_score", "confidence_breakdown", "confidence_reason", "confidence_improvement_suggestions", "evidence_gaps"]
+                  required: ["title", "category", "likely_origin", "likely_style", "likely_period", "value_tier", "snap_judgement", "confidence", "confidence_score", "confidence_breakdown", "confidence_reason", "confidence_improvement_suggestions", "evidence_gaps", "period_certainty", "reproduction_risk", "construction_evidence"]
                 },
                 buy_decision: {
                   type: Type.OBJECT,
@@ -356,7 +371,7 @@ ${getGlossaryPrompt(language)}`;
   const result = JSON.parse(response.text);
   return postProcessAppraisal(result, {
     query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
-    lotFacts, fetchedEstimate, eurTo,
+    lotFacts, fetchedEstimate, eurTo, category,
   });
 };
 
@@ -364,6 +379,7 @@ export interface PostProcessContext {
   query: string; hasPhotos: boolean; askingPrice?: number; isAuction: boolean; premiumPct: number; targetCurrency: string;
   currencySymbol: string; language: string; sellerType?: string; lotUrl?: string;
   lotFacts?: LotFacts | null; fetchedEstimate: boolean; eurTo: (eur: number) => number;
+  category?: string;
 }
 
 /**
@@ -371,7 +387,7 @@ export interface PostProcessContext {
  * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
  */
 export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
-  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo } = ctx;
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
@@ -383,6 +399,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     walk_away: "Walk Away",
     high_risk: "High Risk",
     no_price: "Needs a Price",
+    need_evidence: "Need More Evidence",
   } as Record<PriceBasis, string>)[basis];
 
   // One source of truth for confidence: confidenceLabel() (appraisalMath.ts) from the calibrated score is used for
@@ -423,6 +440,18 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
 
     const finalConfScore = Math.max(1, Math.min(100, Math.round(confScore)));
     const confLabel = confidenceLabel(finalConfScore);
+
+    // "Need more evidence": period not established -> no firm buy verdict, provisional range, ask for evidence
+    const evidence = evidenceCheck({
+      periodCertainty: item.item_summary.period_certainty,
+      reproductionRisk: item.item_summary.reproduction_risk,
+      confidence: confLabel,
+      typedText: query,
+      lotPageRead: !!lotFacts?.ok,
+      hasPhotos,
+      category,
+      title: `${item.item_summary.title || ''} ${query || ''}`,
+    });
 
     // Value Tier Consistency Check:
     // If estimated market range is under 5000, it cannot be Tier A ("Investment")
@@ -521,6 +550,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       riskPenalty: Number(s.risk_penalty) || 0,
       itemScore: calculatedScore,
       valueTier: item.item_summary.value_tier,
+      needsEvidence: evidence.required,
     });
     const allIn = decision.effectivePrice;
     const finalScore = decision.score;
@@ -546,9 +576,11 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       : v;
     const cleaned: any = align(sanitizeDeep(item));
     item = cleaned;
+    if (evidence.required) item.price_guidance = { ...item.price_guidance, provisional: true };
 
     return {
       ...item,
+      evidence_check: evidence,
       appraisal_inputs: {
         lot_page_read: !!lotFacts?.ok, estimate_read: fetchedEstimate, band_factor: 1, raw_mid_eur: Math.round(rawMidEur),
       },

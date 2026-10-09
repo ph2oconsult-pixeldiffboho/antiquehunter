@@ -10,7 +10,7 @@ CONF = ['high', 'medium', 'low', 'very_low']
 def row(r):
     h = r['hammer_eur']; lo, hi = r['app_low'], r['app_high']; mid = (lo + hi) / 2
     return {**{k: r.get(k) for k in ['lot_id', 'split', 'type', 'hammer_eur', 'est_low_eur', 'est_high_eur', 'premium_pct', 'app_low', 'app_high', 'smart_buy_hammer',
-                                      'walk_away_hammer', 'verdict_at_hammer', 'score_at_hammer', 'model_confidence', 'app_confidence', 'app_confidence_score', 'likely_period', 'title', 'elapsed_s', 'old_rule_confidence']},
+                                      'walk_away_hammer', 'verdict_at_hammer', 'score_at_hammer', 'model_confidence', 'app_confidence', 'app_confidence_score', 'likely_period', 'title', 'elapsed_s', 'old_rule_confidence', 'evidence_required', 'evidence_reasons', 'period_certainty', 'reproduction_risk', 'price_basis']},
             'app_mid': mid, 'in_range': lo <= h <= hi, 'err_pct': (mid - h) / h * 100, 'abs_err_pct': abs(mid - h) / h * 100, 'log2_ratio': math.log2(mid / h) if mid > 0 else -10,
             'auctioneer_hit': (r['est_low_eur'] or 0) <= h <= (r['est_high_eur'] or 0), 'auctioneer_mid_abs_err_pct': abs((r['est_low_eur'] + r['est_high_eur']) / 2 - h) / h * 100,
             'would_win_at_walkaway': (r.get('walk_away_hammer') or 0) >= h,
@@ -40,6 +40,12 @@ def summary(rows):
     for c in CONF:
         sub = [x for x in rows if x.get('old_rule_confidence') == c]
         if sub: S[f'old-rule confidence {c}'] = dict(n=len(sub), hit=sum(x['in_range'] for x in sub), med_abs=round(st.median(x['abs_err_pct'] for x in sub)))
+    trig = [x for x in rows if x.get('evidence_required')]
+    S['need_more_evidence'] = dict(n=len(trig), pct=round(100 * len(trig) / n), reasons=dict(Counter(r for x in trig for r in (x.get('evidence_reasons') or []))),
+                                   hit=sum(x['in_range'] for x in trig), med_abs=round(st.median(x['abs_err_pct'] for x in trig)) if trig else None)
+    rest = [x for x in rows if not x.get('evidence_required')]
+    if trig and rest: S['no_evidence_step'] = dict(n=len(rest), hit=sum(x['in_range'] for x in rest), med_abs=round(st.median(x['abs_err_pct'] for x in rest)))
+    S['period_certainty'] = dict(Counter(str(x.get('period_certainty')) for x in rows))
     S['shown_vs_model_confidence_mismatch'] = sum(x['app_confidence'] != x['model_confidence'] for x in rows)
     S['median_elapsed_s'] = st.median(x['elapsed_s'] or 0 for x in rows)
     S['comparables_leaks'] = sum(x['comps_leak'] or 0 for x in rows)

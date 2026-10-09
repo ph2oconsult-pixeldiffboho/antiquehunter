@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Send, Plus, X, Camera, MapPin, Tag, Mic, MicOff, Sparkles, Link as LinkIcon, Info, ChevronDown, ChevronUp, Gavel, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AntiqueCategory } from '../services/gemini';
-import { parsePriceInput, sanitizePriceTyping } from '../services/appraisalMath';
+import { parsePriceInput, sanitizePriceTyping, type EvidenceCheck } from '../services/appraisalMath';
+import { EvidenceChecklist } from './EvidenceStep';
 
 interface DescriptionInputProps {
   onBack: () => void;
@@ -16,6 +17,10 @@ interface DescriptionInputProps {
   autoStartListening?: boolean;
   currency: string;
   onCurrencyChange?: (currency: string) => void;
+  /** "Need more evidence" re-run: the form opens with the earlier text and details, and the checklist on top */
+  initialDescription?: string;
+  initialDetails?: any;
+  evidenceRequest?: EvidenceCheck | null;
 }
 
 export const DescriptionInput: React.FC<DescriptionInputProps> = ({ 
@@ -28,28 +33,32 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   onRemoveImage,
   autoStartListening = false,
   currency: globalCurrency,
-  onCurrencyChange
+  onCurrencyChange,
+  initialDescription,
+  initialDetails,
+  evidenceRequest,
 }) => {
+  const d0 = initialDetails || {};
   const { t, i18n } = useTranslation();
   const [showHint, setShowHint] = useState(() => {
     return localStorage.getItem('input_hint_shown') !== 'true';
   });
   const [isGuideOpen, setIsGuideOpen] = useState(false);
-  const [description, setDescription] = useState('');
-  const [lotUrl, setLotUrl] = useState('');
+  const [description, setDescription] = useState(initialDescription || '');
+  const [lotUrl, setLotUrl] = useState<string>(d0.lotUrl || '');
   // Price is a text field (not type="number"): number inputs drop the whole value when you type "1 500" or "1,500",
   // which garbled fast typing. We keep digits/separators only and parse on submit.
-  const [price, setPrice] = useState('');
+  const [price, setPrice] = useState(d0.askingPrice ? String(d0.askingPrice) : '');
   const [priceTouched, setPriceTouched] = useState(false);
   const priceInvalid = priceTouched && price.trim() !== '' && parsePriceInput(price) === null;
-  const [priceType, setPriceType] = useState<'offered' | 'paid'>('offered');
-  const [currency, setCurrency] = useState(globalCurrency);
-  const [sellerType, setSellerType] = useState('Market/Fair');
-  const [buyersPremium, setBuyersPremium] = useState('25');
+  const [priceType, setPriceType] = useState<'offered' | 'paid'>(d0.priceType || 'offered');
+  const [currency, setCurrency] = useState(d0.currency || globalCurrency);
+  const [sellerType, setSellerType] = useState(d0.sellerType || 'Market/Fair');
+  const [buyersPremium, setBuyersPremium] = useState(d0.buyerPremiumRate !== undefined ? String(d0.buyerPremiumRate) : '25');
   // Fix 5/9: decimal fees (28.8%) are accepted; a fee read from the lot page is used unless the user typed one
-  const [premiumTouched, setPremiumTouched] = useState(false);
-  const [category, setCategory] = useState<AntiqueCategory>('unknown');
-  const [location, setLocation] = useState('');
+  const [premiumTouched, setPremiumTouched] = useState(!!d0.premiumTouched);
+  const [category, setCategory] = useState<AntiqueCategory>(d0.category || 'unknown');
+  const [location, setLocation] = useState(d0.location || '');
   const [isListening, setIsListening] = useState(false);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
 
@@ -135,7 +144,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim() && !lotUrl.trim()) return;
+    if (!description.trim() && !lotUrl.trim() && !(evidenceRequest && images.length > 0)) return;
     
     if (showHint) {
       setShowHint(false);
@@ -328,6 +337,13 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {evidenceRequest?.required && (
+          <div data-testid="evidence-request" className="p-5 bg-amber-50 border-2 border-amber-300 rounded-[24px] space-y-3">
+            <p className="serif text-xl text-amber-900">{t('evidence.title')}</p>
+            <p className="text-xs text-ink">{t('evidence.describe_banner')}</p>
+            <EvidenceChecklist check={evidenceRequest} compact />
+          </div>
+        )}
         {/* Dedicated Auction or Listing Link Input */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -554,7 +570,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
 
         <button
           type="submit"
-          disabled={isAnalyzing || (!description.trim() && !/^https?:\/\/\S+/i.test(lotUrl.trim()))}
+          disabled={isAnalyzing || (!description.trim() && !/^https?:\/\/\S+/i.test(lotUrl.trim()) && !(evidenceRequest && images.length > 0))}
           className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-2xl shadow-ink/20"
         >
           {isAnalyzing ? (

@@ -178,7 +178,9 @@
     "overpaying_value": "Above {{price}}",
     "overpaying_all_in": "{{allIn}} all-in",
     "reason_hammer_suffix": " hammer (≈ {{allIn}} all-in incl. {{pct}}% buyer's premium)",
-    "hammer_word": "hammer"
+    "hammer_word": "hammer",
+    "verdict_need_evidence": "Need More Evidence",
+    "reason_need_evidence": "We can't confirm the period yet, so no buy verdict at {{price}}{{premium}}. The provisional range is {{low}} – {{high}}; add the evidence below and re-run."
   },
   "results": {
     "title": "Dealer's Findings",
@@ -427,5 +429,36 @@
     "save_failed": "Could not save: {{reason}}",
     "signin_needed": "Sign in with Google to save to your account…",
     "save_failed_local": "Couldn't save to your account ({{reason}}). Saved on this device instead."
+  },
+  "evidence": {
+    "title": "Need more evidence",
+    "intro": "We can't yet tell whether this is a period piece or a later style or revival piece, so there is no buy verdict yet. The range below is provisional.",
+    "reasons": {
+      "period_ambiguous": "Period vs later style / revival is unclear from what we have.",
+      "possible_reproduction": "Something suggests it could be a later copy.",
+      "low_confidence_brief": "Low confidence on a short description."
+    },
+    "ask_title": "Add these and re-run (your photos and details are kept):",
+    "asks": {
+      "photos": "Photos of the piece (front, side, back)",
+      "underside_back": "A photo of the underside or the back",
+      "drawer_joints": "A drawer side showing the joints (dovetails)",
+      "hardware_mounts": "The hardware, or the backs of the mounts",
+      "seat_frame_webbing": "The seat frame and webbing under the fabric",
+      "stamp_label": "Any stamp, mark or label",
+      "catalogue_or_link": "The catalogue text or the lot link"
+    },
+    "kind": {
+      "case": "For a case piece",
+      "seating": "For seating",
+      "mirror": "For a mirror",
+      "table": "For a table",
+      "other": "For this piece"
+    },
+    "button": "Add evidence and re-run",
+    "provisional_range": "Provisional market range",
+    "provisional_note": "Provisional until the period is confirmed.",
+    "describe_banner": "Add the evidence asked for: new photos are added to the ones you already have.",
+    "construction_seen": "Construction seen"
   }
 }

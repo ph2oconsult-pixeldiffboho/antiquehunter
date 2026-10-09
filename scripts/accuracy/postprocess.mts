@@ -10,7 +10,8 @@ import { postProcessAppraisal } from '../../src/services/gemini.ts';
 const here = dirname(fileURLToPath(import.meta.url));
 const runsDir = process.argv[2] || 'runs';
 const outFile = process.argv[3] || 'appraisal_results.json';
-const lots: any[] = JSON.parse(readFileSync(join(here, 'lots_split.json'), 'utf8')).lots;
+const li = process.argv.indexOf('--lots');
+const lots: any[] = JSON.parse(readFileSync(li > 0 ? process.argv[li + 1] : join(here, 'lots_split.json'), 'utf8')).lots;
 const byId = Object.fromEntries(lots.map(l => [l.lot_id, l]));
 const testIds = new Set(lots.map(l => l.lot_id));
 
@@ -40,7 +41,7 @@ for (const f of readdirSync(runsDir).filter(f => f.endsWith('.json')).sort()) {
   const pp = postProcessAppraisal(result, {
     query, hasPhotos, askingPrice: lot.hammer_eur, isAuction: true, premiumPct, targetCurrency: 'EUR', currencySymbol: '€',
     language: 'en', sellerType: 'Auction', lotUrl: mode === 'url' ? lot.url : undefined, lotFacts: lf,
-    fetchedEstimate, eurTo: (e: number) => e,
+    fetchedEstimate, eurTo: (e: number) => e, category: lot.category,
   });
   const item: any = pp[0], pg = item.price_guidance, ns = item.negotiation_strategy, bd = item.buy_decision;
   out.push({
@@ -55,6 +56,10 @@ for (const f of readdirSync(runsDir).filter(f => f.endsWith('.json')).sort()) {
     prompt_has_estimate_claim: /anchor(ed)? to the (catalogue )?estimate/i.test(JSON.stringify(result)),
     lot_page: lf ? { ok: lf.ok, estimateLow: lf.estimateLow, estimateHigh: lf.estimateHigh, premiumPct: lf.premiumPct, currency: lf.currency } : null,
     reasoning: pg.pricing_reasoning,
+    likely_style_raw: item.item_summary.likely_style, period_certainty: item.item_summary.period_certainty ?? null, reproduction_risk: item.item_summary.reproduction_risk ?? null,
+    construction_evidence: item.item_summary.construction_evidence ?? null,
+    evidence_required: !!item.evidence_check?.required, evidence_reasons: item.evidence_check?.reasons || [], evidence_asks: item.evidence_check?.asks || [],
+    price_basis: bd.price_basis, provisional: !!pg.provisional,
   });
 }
 writeFileSync(outFile, JSON.stringify(out, null, 1));

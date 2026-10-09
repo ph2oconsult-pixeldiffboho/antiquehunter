@@ -1,6 +1,7 @@
 // Quick self-checks for the hunt URL filters and appraisal maths.
 // Run: npx tsx scripts/check-hunt-logic.ts
 import assert from "node:assert/strict";
+import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
 import {
   allowedDomainsFor, cleanText, failsPeriodRule, interencheresLotId, isAllowedHost, isGenericUrl, isSpecificListingUrl,
@@ -28,7 +29,7 @@ import { localQueries } from "../src/services/huntGeo.ts";
 import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
 import { applyRanking } from "../src/services/hunting.ts";
 import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
-import { calibratedConfidence, confidenceLabel, normaliseConfidence } from "../src/services/appraisalMath.ts";
+import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceCheck, evidenceAsks, pieceKindOf, isBriefInput } from "../src/services/appraisalMath.ts";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => { fn(); passed++; console.log("ok -", name); };
@@ -956,6 +957,78 @@ check("step 1 split: the original valuation path (fixed reference price ranges, 
   const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
   assert.match(gem, /Provincial walnut commode, 18th c\.: €300/);
   assert.ok(!/comparablesPrompt|bandFactor/.test(gem));
+});
+
+check("need more evidence: when it triggers (ambiguous period, possible copy, low confidence on a short note)", () => {
+  const base = { confidence: "medium", typedText: "Set of four mahogany armchairs with gilded dolphin heads, sword-shaped front legs, Restoration period, minor restorations, modern upholstery", lotPageRead: false, hasPhotos: true, category: "furniture", title: "Set of four Restauration armchairs" };
+  assert.equal(evidenceCheck({ ...base, periodCertainty: "confirmed_period" }).required, false);
+  assert.equal(evidenceCheck({ ...base, periodCertainty: "probable_period" }).required, false);
+  // a piece correctly identified as a later style piece gets a normal verdict at its (later) price
+  assert.equal(evidenceCheck({ ...base, periodCertainty: "later_style_or_revival", reproductionRisk: true }).required, false);
+  assert.deepEqual(evidenceCheck({ ...base, periodCertainty: "ambiguous" }).reasons, ["period_ambiguous"]);
+  assert.deepEqual(evidenceCheck({ ...base, periodCertainty: "probable_period", reproductionRisk: true }).reasons, ["possible_reproduction"]);
+  // low confidence alone: only on a short note (a full catalogue entry has already said what it can)
+  assert.equal(evidenceCheck({ ...base, periodCertainty: "probable_period", confidence: "low" }).required, false);
+  const brief = evidenceCheck({ ...base, periodCertainty: "probable_period", confidence: "low", typedText: "four 19th century armchairs" });
+  assert.deepEqual(brief.reasons, ["low_confidence_brief"]);
+  assert.ok(brief.asks.includes("catalogue_or_link"));
+  assert.equal(isBriefInput("", false), true);
+  assert.equal(isBriefInput("", true), false); // lot page read = catalogue text
+});
+
+check("need more evidence: asks are specific to the kind of piece", () => {
+  assert.equal(pieceKindOf("furniture", "Set of Four Empire-Style Mahogany Fauteuils"), "seating");
+  assert.equal(pieceKindOf("chairs", "anything"), "seating");
+  assert.equal(pieceKindOf("furniture", "Commode tombeau Louis XV"), "case");
+  assert.equal(pieceKindOf("furniture", "Commode à miroir psyché"), "case"); // first piece word wins
+  assert.equal(pieceKindOf("furniture", "Miroir en bois doré"), "mirror");
+  assert.deepEqual(evidenceAsks("seating", { hasPhotos: true, hasCatalogue: false }), ["underside_back", "seat_frame_webbing", "hardware_mounts", "stamp_label", "catalogue_or_link"]);
+  assert.deepEqual(evidenceAsks("case", { hasPhotos: true, hasCatalogue: true }), ["underside_back", "drawer_joints", "hardware_mounts", "stamp_label"]);
+  assert.deepEqual(evidenceAsks("mirror", { hasPhotos: false, hasCatalogue: true }), ["photos", "underside_back", "hardware_mounts", "stamp_label"]);
+});
+
+check("need more evidence: no Strong/Good Buy or Fair verdict, but Overpriced/Walk Away still shown", () => {
+  const d = (asking: number, needsEvidence: boolean) => decideBuy({ askingPrice: asking, isAuction: true, premiumPct: 28, hasPhotos: true, marketLow: 1000, marketHigh: 2500, retailHigh: 5000, smartBuy: 1200, walkAway: 2500, needsEvidence });
+  assert.equal(d(850, false).basis, "strong_buy");
+  assert.equal(d(850, true).basis, "need_evidence");
+  assert.equal(d(850, true).score, 50);
+  assert.equal(d(2000, true).basis, "need_evidence");
+  assert.equal(d(3000, true).basis, "overpriced");
+  assert.equal(d(9000, true).basis, "walk_away");
+});
+
+check("need more evidence: post-processing marks the range provisional and the verdict; prompt asks for construction evidence; EN/FR text", () => {
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  assert.match(gem, /hand-cut dovetails/);
+  assert.match(gem, /pegged mortise-and-tenon/);
+  assert.match(gem, /Phillips or cross-head screws, staples/);
+  assert.match(gem, /period_certainty: \{ type: Type.STRING, enum: \["confirmed_period", "probable_period", "ambiguous", "later_style_or_revival"\] \}/);
+  const answer = (pc: string, b = { evidence_quality: 38, identification_certainty: 28, risk_factors: 28 }) => ({ items: [{
+    item_summary: { title: "Set of Four Empire-Style Mahogany Fauteuils", likely_period: "19th c.", likely_style: "Empire", value_tier: "B", snap_judgement: "", confidence: "medium",
+      confidence_breakdown: { ...b }, confidence_reason: "", period_certainty: pc, reproduction_risk: false, construction_evidence: "none shown" },
+    buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 1000, estimated_market_range_high: 2500, pricing_reasoning: "" },
+    negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {}, }] });
+  const ctx = { query: "Assess this antique from the images provided.", hasPhotos: true, askingPrice: 850, isAuction: true, premiumPct: 28, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture" };
+  const amb: any = postProcessAppraisal(answer("ambiguous"), ctx)[0];
+  assert.equal(amb.buy_decision.price_basis, "need_evidence");
+  assert.equal(amb.buy_decision.label, "Need More Evidence");
+  assert.equal(amb.price_guidance.provisional, true);
+  assert.equal(amb.evidence_check.pieceKind, "seating");
+  assert.ok(amb.evidence_check.asks.includes("seat_frame_webbing"));
+  const ok: any = postProcessAppraisal(answer("confirmed_period"), ctx)[0];
+  assert.equal(ok.buy_decision.price_basis, "strong_buy");
+  assert.equal(ok.price_guidance.provisional, undefined);
+  // photos only (no typed text) with a weak identification: low confidence on a bare input -> need more evidence
+  const weak: any = postProcessAppraisal(answer("probable_period", { evidence_quality: 20, identification_certainty: 12, risk_factors: 15 }), ctx)[0];
+  assert.deepEqual(weak.evidence_check.reasons, ["low_confidence_brief"]);
+  for (const lang of ["en", "fr"]) {
+    const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8"));
+    assert.ok(j.analysis.verdict_need_evidence && j.analysis.reason_need_evidence && j.evidence.title && j.evidence.provisional_range);
+    for (const a of ["photos", "underside_back", "drawer_joints", "hardware_mounts", "seat_frame_webbing", "stamp_label", "catalogue_or_link"]) assert.ok(j.evidence.asks[a], `${lang} ${a}`);
+    for (const r of ["period_ambiguous", "possible_reproduction", "low_confidence_brief"]) assert.ok(j.evidence.reasons[r], `${lang} ${r}`);
+    for (const k of ["case", "seating", "mirror", "table", "other"]) assert.ok(j.evidence.kind[k], `${lang} ${k}`);
+  }
+  assert.equal(JSON.parse(readFileSync(new URL("../src/i18n/fr.json", import.meta.url), "utf8")).evidence.title, "Il faut plus d'éléments");
 });
 
 check("fix 9: appraisals are repeatable (temperature 0, fixed seed)", () => {
