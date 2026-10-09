@@ -185,7 +185,7 @@
     "dealer_range": "Fourchette marchand (prix en boutique)",
     "dealer_scale_note": "Les prix demandés par un marchand, une boutique ou un particulier sont comparés à la fourchette marchand. La fourchette aux enchères est ce que la pièce ferait en vente publique (marteau, hors frais).",
     "reason_dealer_strong_buy": "{{price}} est au niveau ou en dessous du milieu de la fourchette aux enchères ({{auctionMid}}) – un excellent prix pour une boutique.",
-    "reason_dealer_good_buy": "{{price}} est au niveau ou en dessous de {{goodTop}} (haut de la fourchette aux enchères ou bas de la fourchette marchand) – un bon prix en boutique.",
+    "reason_dealer_good_buy": "{{price}} est au niveau ou en dessous de {{goodTop}} (le plus bas entre le haut de la fourchette aux enchères et le bas de la fourchette marchand) – un bon prix en boutique.",
     "reason_dealer_fair": "{{price}} est dans la fourchette marchand ({{dealerLow}}–{{dealerHigh}}) – un prix correct en boutique.",
     "reason_dealer_overpriced": "{{price}} dépasse le haut de la fourchette marchand ({{dealerHigh}}) – trop cher, même en boutique. Ne dépassez pas {{dealerHigh}}.",
     "reason_dealer_walk_away": "{{price}} est bien au-dessus de la fourchette marchand (plus de {{overTop}}) – passez votre chemin."

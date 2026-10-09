@@ -1243,7 +1243,7 @@ const bellRaw = () => ({ items: [{
 const dealerCtx = (query: string, extra: any = {}) => ({ query, hasPhotos: true, askingPrice: 12000, isAuction: false, premiumPct: 0, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Antique Shop", fetchedEstimate: false, eurTo: (e: number) => e, category: "chairs", ...extra });
 const COMPS_RESP = { ok: true, comparables: BELL_COMPS, searched: [], unreachable: ["Drouot (results need an account)"], stats: { candidates: 5, verified: 5, dropped: {} } };
 
-check("dealer mode: asking prices are judged against the dealer range (Strong <= auction mid, Good <= max(auction high, dealer low), Fair <= dealer high, Overpriced <= 1.5x, then Walk Away)", () => {
+check("dealer mode: asking prices are judged against the dealer range (Strong <= auction mid, Good <= min(auction high, dealer low), Fair <= dealer high, Overpriced <= 1.5x, then Walk Away)", () => {
   // the generic bands reproduce the auction bands exactly
   for (const p of [50, 300, 450, 500, 699, 700, 701, 900, 1100, 1500, 3000]) assert.deepEqual(pbs(p, 300, 700, 1100), bandScore(p, { strongTop: 300, goodTop: 500, fairTop: 700, overTop: 1100 }), String(p));
   // sane dealer range: low >= auction mid, high >= auction high and >= low; missing -> defaults
@@ -1253,7 +1253,11 @@ check("dealer mode: asking prices are judged against the dealer range (Strong <=
   assert.equal(saneDealerRange(300, 700).low, 500); assert.equal(saneDealerRange(300, 700).high, 1400);
   const b = dealerBands(300, 700, 700, 1100);
   assert.deepEqual(b, { strongTop: 500, goodTop: 700, fairTop: 1100, overTop: 1100 * DEALER_WALK_AWAY_FACTOR });
-  assert.equal(dealerBands(300, 700, 600, 1100).goodTop, 700); assert.equal(dealerBands(300, 700, 900, 1100).goodTop, 900);
+  assert.equal(dealerBands(300, 700, 600, 1100).goodTop, 600); assert.equal(dealerBands(300, 700, 900, 1100).goodTop, 700);
+  // the Provençal mirror: auction €800–3,000, dealer €2,200–3,500 -> Good Buy ends at €2,200, €3,000 is Fair
+  const pb = dealerBands(800, 3000, 2200, 3500); assert.equal(pb.goodTop, 2200);
+  assert.equal(decideBuyX({ askingPrice: 3000, isAuction: false, premiumPct: 0, hasPhotos: true, marketLow: 800, marketHigh: 3000, retailHigh: 3500, smartBuy: 2200, walkAway: 3500, bands: pb }).basis, "fair");
+  assert.equal(decideBuyX({ askingPrice: 2100, isAuction: false, premiumPct: 0, hasPhotos: true, marketLow: 800, marketHigh: 3000, retailHigh: 3500, smartBuy: 2200, walkAway: 3500, bands: pb }).basis, "good_buy");
   const v = (ask: number) => decideBuyX({ askingPrice: ask, isAuction: false, premiumPct: 0, hasPhotos: true, marketLow: 300, marketHigh: 700, retailHigh: 1100, smartBuy: 700, walkAway: 1100, bands: b }).basis;
   assert.deepEqual([450, 500, 650, 700, 800, 950, 1100, 1300, 1650, 1700].map(v), ["strong_buy", "strong_buy", "good_buy", "good_buy", "fair", "fair", "fair", "overpriced", "overpriced", "walk_away"]);
   // scores never rise as the price rises
@@ -1301,6 +1305,32 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   const bad2 = lpRaw(); Object.assign(bad2.items[0].price_guidance, { fair_price_low: 320, fair_price_high: 650 });
   const au2: any = postProcessAppraisal(bad2, dealerCtx(q, { askingPrice: 950, category: "mirrors", isAuction: true, premiumPct: 25, sellerType: "Auction" }))[0];
   assert.deepEqual([au2.price_guidance.fair_price_low, au2.price_guidance.fair_price_high], [320, 700]); // not clamped in auction mode (unchanged)
+  // the model's notes never contradict the verdict (dealer mode); auction prose untouched
+  const wordy = () => { const r = lpRaw(); const it = r.items[0];
+    it.item_summary.snap_judgement = "A decorative piece. At 950 EUR this is a full retail price.";
+    it.buy_decision.decision_summary = ["Large size is desirable.", "Too expensive for a dealer purchase.", "Painted finish limits the audience."];
+    it.buy_decision.resale_insight = "The asking price is full retail, leaving little margin.";
+    it.dealer_take.dealer_view = ["Trop cher pour un achat marchand.", "La peinture est un risque."];
+    it.price_guidance.pricing_reasoning = "Louis-Philippe mirrors are common. 950 EUR is a full retail price; auction hammers fall between 300 and 700 EUR."; return r; };
+  const w: any = postProcessAppraisal(wordy(), dealerCtx(q, { askingPrice: 950, category: "mirrors" }))[0];
+  assert.equal(w.buy_decision.label, "Fair Price");
+  const prose = JSON.stringify([w.item_summary.snap_judgement, w.buy_decision.decision_summary, w.buy_decision.resale_insight, w.dealer_take.dealer_view, w.price_guidance.pricing_reasoning]);
+  assert.ok(!/full retail|too expensive|trop cher/i.test(prose), prose);
+  assert.deepEqual(w.buy_decision.decision_summary, ["Large size is desirable.", "Painted finish limits the audience."]);
+  assert.deepEqual(w.dealer_take.dealer_view, ["La peinture est un risque."]);
+  assert.equal(w.item_summary.snap_judgement, "A decorative piece.");
+  assert.match(w.price_guidance.pricing_reasoning, /^€950 is within the dealer range \(€700–€1,100\): a fair shop price\. At auction it would make about €300–€700 \(hammer\)\. Louis-Philippe mirrors are common\. Auction hammers fall between 300 and 700 EUR\.$/);
+  assert.ok(w.buy_decision.resale_insight && !/retail/.test(w.buy_decision.resale_insight)); // emptied -> the verdict line
+  assert.ok(w.buy_decision.prose_sentences_removed >= 5);
+  const wf: any = postProcessAppraisal(wordy(), dealerCtx(q, { askingPrice: 950, category: "mirrors", language: "fr" }))[0];
+  assert.match(wf.price_guidance.pricing_reasoning, /dans la fourchette marchand/);
+  // Overpriced: "a bargain" style sentences go instead
+  const ov = wordy(); ov.items[0].buy_decision.decision_summary = ["A bargain for the size.", "Check the glass."];
+  const o: any = postProcessAppraisal(ov, dealerCtx(q, { askingPrice: 1400, category: "mirrors" }))[0];
+  assert.equal(o.buy_decision.label, "Overpriced"); assert.deepEqual(o.buy_decision.decision_summary, ["Check the glass."]);
+  // auction mode: the model's prose is not touched
+  const wa: any = postProcessAppraisal(wordy(), dealerCtx(q, { askingPrice: 500, category: "mirrors", isAuction: true, premiumPct: 25, sellerType: "Auction" }))[0];
+  assert.ok(wa.buy_decision.decision_summary.includes("Too expensive for a dealer purchase.")); assert.equal(wa.buy_decision.prose_sentences_removed, undefined);
   // texts in EN and FR
   for (const lang of ["en", "fr"]) {
     const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8")).analysis;

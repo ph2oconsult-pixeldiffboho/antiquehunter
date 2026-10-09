@@ -2,7 +2,7 @@ import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
 import {
-  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, reconcileDealerNegotiation, saneDealerRange, dealerBands, sanitizeDeep,
+  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, reconcileDealerNegotiation, saneDealerRange, dealerBands, dropContradictions, sanitizeDeep,
   type PriceBasis, type ScoreBand, type VerdictBands,
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFetch";
@@ -694,6 +694,35 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const basis: PriceBasis = decision.basis;
     const cappedScore = Math.max(1, Math.min(100, Math.round(finalScore)));
 
+    // Dealer mode: the model's notes must not contradict the verdict (it often calls a fair shop price "full retail" /
+    // "too expensive", judging it as a dealer buying for resale). Contradicting sentences are dropped, and the pricing
+    // notes open with the verdict explained from the bands. Auction mode is untouched.
+    let proseRemoved = 0;
+    if (bands && Number(askingPrice) > 0 && ['strong_buy', 'good_buy', 'fair', 'overpriced', 'walk_away'].includes(basis)) {
+      const fr = String(language || '').toLowerCase().startsWith('fr');
+      const m = (n: number) => { try { return new Intl.NumberFormat(fr ? 'fr-FR' : (language || 'en'), { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
+      const ask = m(Number(askingPrice)), dl = m(pg.fair_price_low), dh = m(pg.fair_price_high), al = m(pg.estimated_market_range_low), ah = m(pg.estimated_market_range_high);
+      const band: Record<string, [string, string]> = {
+        strong_buy: [`${ask} is at or below the middle of the auction range: a strong buy for a shop price.`, `${ask} est au niveau ou en dessous du milieu de la fourchette aux enchères : un excellent prix en boutique.`],
+        good_buy: [`${ask} is below the dealer range (${dl}–${dh}): a good shop price.`, `${ask} est sous la fourchette marchand (${dl}–${dh}) : un bon prix en boutique.`],
+        fair: [`${ask} is within the dealer range (${dl}–${dh}): a fair shop price.`, `${ask} est dans la fourchette marchand (${dl}–${dh}) : un prix correct en boutique.`],
+        overpriced: [`${ask} is above the dealer range (${dl}–${dh}): overpriced, even for a shop.`, `${ask} dépasse la fourchette marchand (${dl}–${dh}) : trop cher, même en boutique.`],
+        walk_away: [`${ask} is well above the dealer range (${dl}–${dh}): walk away.`, `${ask} est bien au-dessus de la fourchette marchand (${dl}–${dh}) : passez votre chemin.`],
+      };
+      const verdictLine = band[basis][fr ? 1 : 0];
+      const auctionLine = fr ? `Aux enchères, la pièce ferait environ ${al}–${ah} (marteau).` : `At auction it would make about ${al}–${ah} (hammer).`;
+      const fix = (t: any) => { if (typeof t !== 'string') return t; const r = dropContradictions(t, basis); proseRemoved += r.removed; return r.text || verdictLine; };
+      const fixList = (a: any) => { if (!Array.isArray(a)) return a; const out = a.map((x: any) => { const r = dropContradictions(String(x || ''), basis); proseRemoved += r.removed; return r.text; }).filter((x: string) => x); return out.length ? out : [verdictLine]; };
+      const is = item.item_summary || {}, bd = item.buy_decision || {}, dtk = item.dealer_take || {};
+      is.snap_judgement = fix(is.snap_judgement);
+      bd.decision_summary = fixList(bd.decision_summary);
+      bd.investment_insight = fix(bd.investment_insight); bd.must_have_insight = fix(bd.must_have_insight); bd.resale_insight = fix(bd.resale_insight);
+      dtk.dealer_view = fixList(dtk.dealer_view); dtk.resale_strategy = fix(dtk.resale_strategy);
+      item.teaser_insight = fix(item.teaser_insight);
+      const pr = dropContradictions(String(pg.pricing_reasoning || ''), basis); proseRemoved += pr.removed;
+      pg.pricing_reasoning = `${verdictLine} ${auctionLine} ${pr.text}`.trim();
+    }
+
     // Text clean-up: no JSON field names in prose, and restated market/retail ranges must equal the cards
     const fmtMoney = (n: number) => {
       try {
@@ -770,6 +799,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         compare_price: decision.comparePrice || null,
         // which range the price was judged against: 'dealer' (shop / dealer / private) or 'auction'
         price_scale: bands ? 'dealer' : 'auction',
+        prose_sentences_removed: bands ? proseRemoved : undefined,
         dealer_bands: bands ? { strong_buy_to: Math.round(bands.strongTop), good_buy_to: Math.round(bands.goodTop), fair_to: Math.round(bands.fairTop), overpriced_to: Math.round(bands.overTop) } : null,
         label: getBuyLabel(basis),
         confidence: confLabel

@@ -97,11 +97,30 @@ export const saneDealerRange = (auctionLow: number, auctionHigh: number, dealerL
   return { low, high, clamped: low !== Math.round(num(dealerLow)) || high !== Math.round(num(dealerHigh)) };
 };
 
-/** Dealer-mode bands: Strong Buy <= auction mid; Good Buy <= max(auction high, dealer low); Fair <= dealer high; Overpriced <= 1.5x dealer high */
+/** Dealer-mode bands: Strong Buy <= auction mid; Good Buy <= the LOWER of auction high and dealer low; Fair <= dealer high; Overpriced <= 1.5x dealer high */
 export const dealerBands = (auctionLow: number, auctionHigh: number, dealerLow: number, dealerHigh: number): VerdictBands => {
-  const lo = Math.max(0, num(auctionLow)), hi = Math.max(lo, num(auctionHigh));
-  const dHigh = Math.max(hi, num(dealerHigh), num(dealerLow));
-  return { strongTop: (lo + hi) / 2, goodTop: Math.min(dHigh, Math.max(hi, num(dealerLow))), fairTop: dHigh, overTop: dHigh * DEALER_WALK_AWAY_FACTOR };
+  const lo = Math.max(0, num(auctionLow)), hi = Math.max(lo, num(auctionHigh)), mid = (lo + hi) / 2;
+  const dLow = num(dealerLow) > 0 ? num(dealerLow) : hi;
+  const dHigh = Math.max(hi, num(dealerHigh), dLow);
+  return { strongTop: mid, goodTop: Math.min(dHigh, Math.max(mid, Math.min(hi, dLow))), fairTop: dHigh, overTop: dHigh * DEALER_WALK_AWAY_FACTOR };
+};
+
+// Model prose that contradicts the app's verdict (dealer mode): "too expensive" / "full retail" next to a Fair verdict,
+// "a bargain" next to Overpriced. Such sentences are dropped (the verdict and its explanation come from the bands).
+const TOO_HIGH = /(too expensive|over-?priced|overpay(ing)?|over-?paying|full[- ]retail|retail[- ]level|top[- ]of[- ](the )?retail|high[- ]retail|top retail|walk away|poor value|not a (good|great) (buy|deal)|above (the )?market|steep price|pricey|trop cher|surpay|sur[ée]valu|plein tarif|prix fort|d[ée]tail (plein|haut)|haut(e)? (du |de )?(gamme du )?d[ée]tail|fourchette haute du d[ée]tail|au-dessus du (prix du )?march[ée]|passez votre chemin|mauvaise affaire|trop [ée]lev[ée])/i;
+const TOO_LOW = /(good buy|great buy|strong buy|bargain|great deal|good deal|fair price|well[- ]priced|reasonably priced|good value|bonne affaire|bon achat|excellent achat|prix correct|prix raisonnable|bien plac[ée])/i;
+
+/** Drops the sentences of `text` that contradict the verdict basis; returns the kept text and how many were dropped. */
+export const dropContradictions = (text: string, basis: PriceBasis): { text: string; removed: number } => {
+  if (!text || typeof text !== 'string') return { text, removed: 0 };
+  const re = ['strong_buy', 'good_buy', 'fair'].includes(basis) ? TOO_HIGH : ['overpriced', 'walk_away'].includes(basis) ? TOO_LOW : null;
+  if (!re) return { text, removed: 0 };
+  const parts = text.match(/[^.!?;]+[.!?;]*["»”']?\s*/g) || [text];
+  const kept = parts.filter(p => !re.test(p));
+  if (kept.length === parts.length) return { text, removed: 0 };
+  // a kept fragment that followed a dropped one starts a sentence now
+  const out = kept.map(p => p.replace(/^(\s*)(\p{Ll})/u, (_m, sp: string, c: string) => sp + c.toUpperCase())).join('').trim().replace(/;$/, '.');
+  return { text: out, removed: parts.length - kept.length };
 };
 
 /**
