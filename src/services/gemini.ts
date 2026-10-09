@@ -451,6 +451,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       hasPhotos,
       category,
       title: `${item.item_summary.title || ''} ${query || ''}`,
+      styleText: `${item.item_summary.likely_style || ''} ${item.item_summary.likely_period || ''}`,
     });
 
     // Value Tier Consistency Check:

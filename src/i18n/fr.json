@@ -436,7 +436,8 @@
     "reasons": {
       "period_ambiguous": "Époque ou style / néo plus tardif : impossible de trancher avec ces éléments.",
       "possible_reproduction": "Certains indices font penser à une copie plus tardive.",
-      "low_confidence_brief": "Confiance faible sur une description courte."
+      "low_confidence_brief": "Confiance faible sur une description courte.",
+      "period_not_confirmed": "Avec seulement des photos ou une note courte, l'époque (d'origine ou reprise plus tardive) ne peut pas être confirmée."
     },
     "ask_title": "Ajoutez ces éléments et relancez (vos photos et informations sont conservées) :",
     "asks": {

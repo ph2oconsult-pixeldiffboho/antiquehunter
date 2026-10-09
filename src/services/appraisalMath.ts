@@ -422,7 +422,7 @@ export const confidenceLabel = (score: number): 'high' | 'medium' | 'low' | 'ver
 // ---------------------------------------------------------------------------
 
 export type PeriodCertainty = 'confirmed_period' | 'probable_period' | 'ambiguous' | 'later_style_or_revival';
-export type EvidenceReason = 'period_ambiguous' | 'possible_reproduction' | 'low_confidence_brief';
+export type EvidenceReason = 'period_ambiguous' | 'possible_reproduction' | 'low_confidence_brief' | 'period_not_confirmed';
 export type EvidenceAsk = 'underside_back' | 'drawer_joints' | 'hardware_mounts' | 'seat_frame_webbing' | 'stamp_label' | 'catalogue_or_link' | 'photos';
 export type PieceKind = 'case' | 'seating' | 'mirror' | 'table' | 'other';
 
@@ -435,6 +435,7 @@ export interface EvidenceCheckInput {
   hasPhotos: boolean;
   category?: string;
   title?: string;
+  styleText?: string;                // model's likely_style + likely_period
 }
 
 export interface EvidenceCheck {
@@ -507,6 +508,12 @@ export const evidenceCheck = (i: EvidenceCheckInput): EvidenceCheck => {
   const dated = periodStatedIn(i.typedText) || (!brief && (centuryStatedIn(i.typedText) || /\b(style|stil)\b/i.test(String(i.typedText || ''))));
   if (i.reproductionRisk === true && pc !== 'later_style_or_revival' && !dated) reasons.push('possible_reproduction');
   if ((i.confidence === 'low' || i.confidence === 'very_low') && brief) reasons.push('low_confidence_brief');
+  // Photos (or a short note) only: a period call, or a "revival of a historic style" call, cannot be confirmed from the
+  // look of the piece alone (the same photos are read one day as period, the next as a later revival). Ask, unless the
+  // model already flagged it for another reason.
+  const historicStyle = /(revival|\bstyle\b|\bn[ée]o|\bneo-|in the manner|napol[eé]on\s*iii|second empire|empire|restoration|restauration|regency|louis|georgian|george|victorian|gustavian|gustaviansk|directoire|baroque|rococo|renaissance|queen anne|william|charles x|transition)/i;
+  if (!reasons.length && brief && (pc === 'probable_period' || (pc === 'later_style_or_revival' && historicStyle.test(String(i.styleText || '')))))
+    reasons.push('period_not_confirmed');
   const pieceKind = pieceKindOf(i.category, i.title);
   return {
     required: reasons.length > 0,

@@ -436,7 +436,8 @@
     "reasons": {
       "period_ambiguous": "Period vs later style / revival is unclear from what we have.",
       "possible_reproduction": "Something suggests it could be a later copy.",
-      "low_confidence_brief": "Low confidence on a short description."
+      "low_confidence_brief": "Low confidence on a short description.",
+      "period_not_confirmed": "From photos or a short note alone, the period (original or a later revival) can't be confirmed."
     },
     "ask_title": "Add these and re-run (your photos and details are kept):",
     "asks": {

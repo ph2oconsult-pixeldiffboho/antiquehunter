@@ -996,6 +996,25 @@ check("need more evidence: a catalogue that dates the piece (or calls it a style
   assert.equal(evidenceCheck({ ...base, periodCertainty: "ambiguous", typedText: long }).required, true);
 });
 
+check("need more evidence: photos or a short note only -> a period or revival call is not confirmed (Peter's chairs, photos only)", () => {
+  const base = { confidence: "high", reproductionRisk: false, lotPageRead: false, hasPhotos: true, category: "furniture", title: "Set of Empire-style mahogany armchairs" };
+  const photosOnly = "Analyze this antique from the images provided.";
+  const rev = evidenceCheck({ ...base, typedText: photosOnly, periodCertainty: "later_style_or_revival", styleText: "Empire Revival Late 19th Century (Napoleon III)" });
+  assert.deepEqual(rev.reasons, ["period_not_confirmed"]);
+  assert.equal(rev.pieceKind, "seating");
+  assert.deepEqual(evidenceCheck({ ...base, typedText: "four 19th century armchairs", periodCertainty: "probable_period", styleText: "Restauration c.1820" }).reasons, ["period_not_confirmed"]);
+  // a plainly modern piece is not sent back
+  assert.equal(evidenceCheck({ ...base, typedText: photosOnly, periodCertainty: "later_style_or_revival", styleText: "Mid-century modern 1960s" }).required, false);
+  // with the catalogue entry, the same model call gives a normal verdict
+  const cat = "Set of four mahogany and mahogany veneered armchairs with gilded dolphin heads resting on sword-shaped front legs. Restoration period. Minor restorations, modern upholstery.";
+  assert.equal(evidenceCheck({ ...base, typedText: cat, periodCertainty: "probable_period", styleText: "Restauration" }).required, false);
+  assert.equal(evidenceCheck({ ...base, typedText: cat, periodCertainty: "later_style_or_revival", styleText: "Empire Revival" }).required, false);
+  for (const lang of ["en", "fr"]) {
+    const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8"));
+    for (const r of ["period_ambiguous", "possible_reproduction", "low_confidence_brief", "period_not_confirmed"]) assert.ok(j.evidence.reasons[r], `${lang} ${r}`);
+  }
+});
+
 check("need more evidence: asks are specific to the kind of piece", () => {
   assert.equal(pieceKindOf("furniture", "Set of Four Empire-Style Mahogany Fauteuils"), "seating");
   assert.equal(pieceKindOf("chairs", "anything"), "seating");
