@@ -1293,6 +1293,19 @@ check("before you buy: a checklist for the piece, maker claim and set; answers r
   assert.ok(set.price_guidance.estimated_market_range_high < confirmed.price_guidance.estimated_market_range_high);
 });
 
+check("checklist re-run: starts from the range the checklist was shown with (a fresh model call cannot move it), unless the stamp basis changed", () => {
+  const first: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: { ...COMPS_RESP, comparables: [] } }))[0];
+  assert.deepEqual([first.checklist.base.low, first.checklist.base.high, first.checklist.base.maker_status], [2500, 5500, "stamped_confirmed"]);
+  const drift = () => { const r: any = bellRaw(); Object.assign(r.items[0].price_guidance, { estimated_market_range_low: 900, estimated_market_range_high: 1600, fair_price_low: 2000, fair_price_high: 3000 }); return r; };
+  const yes: any = postProcessAppraisal(drift(), dealerCtx(BELL_CONF, { comps: { ...COMPS_RESP, comparables: [] }, checkAnswers: { stamp_every_piece: "yes", matching_set: "yes" }, previousBase: first.checklist.base }))[0];
+  assert.equal(yes.price_guidance.estimated_market_range_high, 5500); assert.ok(yes.price_guidance.estimated_market_range_low > 2500);
+  assert.ok(yes.item_summary.confidence_score > first.item_summary.confidence_score);
+  const no: any = postProcessAppraisal(drift(), dealerCtx(BELL_CONF, { comps: { ...COMPS_RESP, comparables: [] }, checkAnswers: { stamp_every_piece: "no" }, previousBase: first.checklist.base }))[0];
+  assert.equal(no.price_guidance.estimated_market_range_high, 1600);
+  const t: any = bellRaw(); t.items[0].item_summary.title = "Set of four Empire mahogany armchairs, attributed to Pierre-Antoine Bellangé";
+  assert.equal((postProcessAppraisal(t, dealerCtx(BELL_CONF, { comps: null }))[0] as any).item_summary.title, "Set of four Empire mahogany armchairs (stamped Bellangé)");
+});
+
 check("checklist and comparables texts exist in EN and FR (every item, status and fallback)", () => {
   const ids = ["stamp_every_piece", "stamp_present", "label_is_not_stamp", "matching_set", "joints_underneath", "seat_rails_webbing", "mirror_glass_original", "mirror_back_original", "crest_original", "gilding_original", "marble_original", "hardware_original", "veneer_sound", "no_major_restoration", "invoice_wording", "provenance_condition_report"];
   for (const lang of ["en", "fr"]) {

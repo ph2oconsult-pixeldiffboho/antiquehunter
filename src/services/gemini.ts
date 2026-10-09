@@ -15,6 +15,8 @@ import { pieceKindOf } from "./appraisalMath";
 /** Fixed seed + temperature 0: the same input gives the same appraisal (fix 9). */
 export const APPRAISAL_SEED = 20261009;
 
+export interface ChecklistBase { low: number; high: number; fair_low: number; fair_high: number; maker_status: string | null }
+
 export interface AppraisalExtra {
   /** What was read from the pasted lot link (server-side, /api/lot); null = a link was given but could not be read */
   lotFacts?: LotFacts | null;
@@ -22,6 +24,9 @@ export interface AppraisalExtra {
   comps?: CompsResponse | null;
   /** The buyer's answers to the "Before you buy" checklist (re-run) */
   checkAnswers?: CheckAnswers;
+  /** The range the checklist was shown with (checklist.base of the previous result): a re-run with answers adjusts THAT range
+   *  instead of letting a fresh model call move it, unless the answers change the stamp basis */
+  previousBase?: ChecklistBase | null;
   /** Injectable for tests; default POST /api/comps */
   fetchComps?: (req: { maker: string; piece?: string; material?: string; pieces: number; language: string }) => Promise<CompsResponse | null>;
 }
@@ -426,7 +431,7 @@ ${getGlossaryPrompt(language)}`;
   const comps = compsP ? await compsP : undefined;
   return postProcessAppraisal(result, {
     query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
-    lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers: extra.checkAnswers,
+    lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers: extra.checkAnswers, previousBase: extra.previousBase,
   });
 };
 
@@ -438,6 +443,7 @@ export interface PostProcessContext {
   /** Verified auction comparables (null = lookup failed; undefined = not looked up) */
   comps?: CompsResponse | null;
   checkAnswers?: CheckAnswers;
+  previousBase?: ChecklistBase | null;
 }
 
 /**
@@ -445,7 +451,7 @@ export interface PostProcessContext {
  * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
  */
 export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
-  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers } = ctx;
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers, previousBase } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
@@ -546,6 +552,16 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       pgA.fair_price_low = Math.round(anchor.low * 1.3);
       pgA.fair_price_high = Math.round(anchor.high * 1.6);
     }
+    // A re-run with answers starts from the range the checklist was shown with (the model's new numbers would otherwise
+    // move it at random), unless the answers changed the stamp basis or verified comparables now anchor it
+    const stampedNow = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
+    const stampedBefore = ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(String(previousBase?.maker_status));
+    if (checkAnswers && previousBase && previousBase.low > 0 && previousBase.high >= previousBase.low && !anchor.applied && stampedNow === stampedBefore) {
+      pgA.estimated_market_range_low = previousBase.low; pgA.estimated_market_range_high = previousBase.high;
+      pgA.fair_price_low = previousBase.fair_low; pgA.fair_price_high = previousBase.fair_high;
+    }
+    const checklistBase: ChecklistBase = { low: Number(pgA.estimated_market_range_low) || 0, high: Number(pgA.estimated_market_range_high) || 0,
+      fair_low: Number(pgA.fair_price_low) || 0, fair_high: Number(pgA.fair_price_high) || 0, maker_status: maker?.status || null };
     // The buyer's checklist answers: denials lower the range, confirmations narrow it upwards
     if (fx.rangeFactor !== 1 || fx.narrowLow > 0) {
       const lo = Number(pgA.estimated_market_range_low) || 0, hi = Number(pgA.estimated_market_range_high) || lo;
@@ -558,7 +574,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       if (Number(pgA.good_buy_below) > 0) pgA.good_buy_below = r(Number(pgA.good_buy_below) * f);
     }
     if (maker && (maker.status === 'stamped_confirmed' || maker.status === 'stamped_stated' || maker.status === 'stamp_in_photo'))
-      item.item_summary.title = String(item.item_summary.title || '').replace(/\(?\s*attributed\s+to\s+[^),]*\)?/i, `(stamped ${maker.name})`).replace(/\(?\s*attribu[ée]e?s?\s+[àa]\s+[^),]*\)?/i, `(estampillé ${maker.name})`).trim();
+      item.item_summary.title = String(item.item_summary.title || '').replace(/,?\s*\(?\s*attributed\s+to\s+[^),]*\)?/i, ` (stamped ${maker.name})`).replace(/,?\s*\(?\s*attribu[ée]e?s?\s+[àa]\s+[^),]*\)?/i, ` (estampillé ${maker.name})`).replace(/\s{2,}/g, ' ').trim();
 
     // Value Tier Consistency Check:
     // If estimated market range is under 5000, it cannot be Tier A ("Investment")
@@ -702,7 +718,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         reason: anchor.reason, group: anchor.group, pieces: anchor.pieces, per_piece_median_eur: anchor.perPieceMedianEur || null, basis: anchor.basis,
         list: compList, used_urls: anchor.used.map(x => x.url), unreachable: comps?.unreachable || [],
       },
-      checklist: { items: checklistItems, answers: checkAnswers || {}, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },
+      checklist: { items: checklistItems, answers: checkAnswers || {}, base: checklistBase, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },
       appraisal_inputs: {
         lot_page_read: !!lotFacts?.ok, estimate_read: fetchedEstimate, band_factor: 1, raw_mid_eur: Math.round(rawMidEur),
       },
