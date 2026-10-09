@@ -131,7 +131,7 @@ const SEARCHERS: Record<DirectSite, { url: (q: string) => string; parse: (html: 
 
 // Fix 2: several keyword queries per site (the user's piece word + style, + century, + "époque", + form words),
 // run in parallel and merged. Interencheres often blocks the server: its other queries only run when the first one answers.
-export const SITE_QUERY_COUNT: Record<DirectSite, number> = { drouot: 4, interencheres: 2 };
+export const SITE_QUERY_COUNT: Record<DirectSite, number> = { drouot: 6, interencheres: 2 };
 
 export const siteQueries = (site: DirectSite, query: string): string[] => {
   const qs = frenchSiteQueries(query, SITE_QUERY_COUNT[site]);

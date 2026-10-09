@@ -113,8 +113,8 @@ const STYLE_CENTURY: Record<string, 'xviiie' | 'xixe'> = {
   'Napoléon III': 'xixe', 'Louis-Philippe': 'xixe', 'Charles X': 'xixe', 'Restauration': 'xixe', 'Empire': 'xixe', 'Directoire': 'xixe', 'victorien': 'xixe',
 };
 const FORM_WORDS: Record<string, Record<string, string[]>> = {
-  commode: { 'Louis XV': ['commode tombeau', 'commode galbee'], 'Régence': ['commode tombeau'], 'Transition': ['commode ressaut'], 'Louis XVI': ['commode marbre xviiie'] },
-  mirror: { 'Napoléon III': ['miroir bois dore xixe'], 'Louis XVI': ['miroir bois dore xviiie'], 'Louis XV': ['miroir bois dore xviiie'] },
+  commode: { 'Louis XV': ['commode tombeau', 'commode galbee', 'commode arbalete'], 'Régence': ['commode tombeau'], 'Transition': ['commode ressaut'], 'Louis XVI': ['commode marbre xviiie'] },
+  mirror: { 'Napoléon III': ['miroir stuc dore', 'glace napoleon iii', 'miroir bois dore xixe'], 'Louis XVI': ['miroir bois dore xviiie'], 'Louis XV': ['miroir bois dore xviiie'] },
   cabinet: { 'Louis XV': ['armoire chantournee'] },
 };
 const ascii = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();

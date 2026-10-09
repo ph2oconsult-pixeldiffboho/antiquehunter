@@ -822,7 +822,10 @@ check("fix 1: chairs, lamps and writing accessories are not desks; a secrétaire
 
 check("fix 2: several Drouot queries per search, with period and form words", () => {
   assert.deepEqual(frenchSiteQueries("Louis XV commode"), ["commode louis xv", "commode xviiie", "commode epoque louis xv", "commode tombeau"]);
-  assert.deepEqual(frenchSiteQueries("Napoleon III mirror"), ["miroir napoleon iii", "miroir xixe", "miroir epoque napoleon iii", "miroir bois dore xixe"]);
+  assert.deepEqual(frenchSiteQueries("Napoleon III mirror"), ["miroir napoleon iii", "miroir xixe", "miroir epoque napoleon iii", "miroir stuc dore"]);
+  // preview re-test: relevant lots were only found by form/material queries ("commode galbée", "miroir stuc doré"), so Drouot gets 6
+  assert.deepEqual(siteQueries("drouot", "Louis XV commode"), ["commode louis xv", "commode xviiie", "commode epoque louis xv", "commode tombeau", "commode galbee", "commode arbalete"]);
+  assert.deepEqual(siteQueries("drouot", "Napoleon III mirror").slice(3), ["miroir stuc dore", "glace napoleon iii", "miroir bois dore xixe"]);
   assert.deepEqual(frenchSiteQueries("secrétaire à abattant", 3), ["secretaire a abattant", "secretaire a abattant xviiie", "secretaire a abattant xixe"]);
   assert.equal(frenchSiteQueries("Louis XV commode walnut")[0], "commode louis xv noyer");
   assert.equal(frenchSiteQueries("Louis XV commode walnut")[1], "commode louis xv");
