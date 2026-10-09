@@ -596,6 +596,7 @@
     "bid_absentee": "Can't attend? Leave an absentee bid (ordre d'achat) at your maximum or bid live online; the house bids for you only as far as needed.",
     "bid_discipline": "Don't bid above your maximum in the heat of the room; the next one will come.",
     "bid_costs": "Add the costs: VAT on the premium, online-bidding fees and transport.",
-    "bid_max_note": "with the {{pct}}% buyer's premium"
+    "bid_max_note": "with the {{pct}}% buyer's premium",
+    "bid_max_locked": "Set your maximum before the sale, including the {{pct}}% buyer's premium. Your suggested maximum bid:"
   }
 }

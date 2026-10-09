@@ -21,7 +21,9 @@ export const Negotiate: React.FC<{ plan?: NegotiationPlan | null; currency?: str
       <section data-testid="negotiate" data-kind="auction" className={box}>
         <div className="flex items-center gap-2 text-ink"><Gavel className="w-5 h-5 text-gold" /><h3 className={embedded ? 'text-sm font-bold uppercase tracking-widest' : 'serif text-2xl font-normal'}>{t('negotiate.bidding_title')}</h3></div>
         <ul className="space-y-2 text-sm text-ink/90 leading-snug list-disc pl-4">
-          <li data-testid="bid-max">{t('negotiate.bid_max_prefix')} {price(plan.bidding.max_hammer)} {t('negotiate.bid_max_suffix')} {price(plan.bidding.max_all_in)} {t('negotiate.bid_max_note', { pct: plan.bidding.premium_pct })}.</li>
+          <li data-testid="bid-max">{showPrices
+            ? <>{t('negotiate.bid_max_prefix')} {price(plan.bidding.max_hammer)} {t('negotiate.bid_max_suffix')} {price(plan.bidding.max_all_in)} {t('negotiate.bid_max_note', { pct: plan.bidding.premium_pct })}.</>
+            : <>{t('negotiate.bid_max_locked', { pct: plan.bidding.premium_pct })} {price(undefined)}</>}</li>
           <li>{t('negotiate.bid_absentee')}</li>
           <li>{t('negotiate.bid_discipline')}</li>
           <li>{t('negotiate.bid_costs')}</li>

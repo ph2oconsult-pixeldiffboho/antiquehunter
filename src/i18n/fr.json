@@ -596,6 +596,7 @@
     "bid_absentee": "Vous ne pouvez pas venir ? Laissez un ordre d'achat à votre maximum ou enchérissez en ligne ; la maison n'enchérit pour vous qu'autant que nécessaire.",
     "bid_discipline": "Ne dépassez pas votre maximum dans l'ambiance de la salle ; une autre occasion viendra.",
     "bid_costs": "Ajoutez les frais : TVA sur les frais, frais d'enchères en ligne et transport.",
-    "bid_max_note": "avec {{pct}} % de frais acheteur"
+    "bid_max_note": "avec {{pct}} % de frais acheteur",
+    "bid_max_locked": "Fixez votre maximum avant la vente, frais acheteur de {{pct}} % compris. Votre enchère maximale suggérée :"
   }
 }

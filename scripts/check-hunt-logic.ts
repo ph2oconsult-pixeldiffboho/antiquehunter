@@ -1347,7 +1347,7 @@ check("negotiate: opening / happy-at from the app's own figures, never above the
   // texts in EN and FR
   for (const lang of ["en", "fr"]) {
     const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8")).negotiate;
-    for (const k of ["title", "bidding_title", "opening", "happy_at", "suggestion_note", "pay_cash", "pay_cash_private", "pay_transfer", "invoice", "bid_absentee", "bid_max_prefix"]) assert.ok(j[k], `${lang} ${k}`);
+    for (const k of ["title", "bidding_title", "opening", "happy_at", "suggestion_note", "pay_cash", "pay_cash_private", "pay_transfer", "invoice", "bid_absentee", "bid_max_prefix", "bid_max_locked"]) assert.ok(j[k], `${lang} ${k}`);
     assert.match(j.pay_transfer, /D112-3/); assert.match(j.pay_transfer, /\{\{cap\}\}/);
     for (const id of ["bundle", "flaws", "delivery", "timing"]) assert.ok(j.levers[id]);
     for (const id of ["epoque", "estampille", "bronzes", "marbre", "glace", "restaurations"]) assert.ok(j.invoice_terms[id]);
