@@ -1032,4 +1032,14 @@ check("fix 9: appraisals are repeatable (temperature 0, fixed seed)", () => {
   }
 }
 
+check("preview re-test: toy furniture and 'modern'/'twentieth century' UK titles are dropped", () => {
+  const q = "vaisselier / Welsh dresser"; const t = itemTypesInQuery(q);
+  assert.equal(pieceProblem(q, t, "QTY OF DOLLS HOUSE FURNITURE & ACCESSORIES - KITCHEN ITEMS."), "not_requested_type");
+  assert.equal(pieceProblem(q, t, "AN 18TH CENTURY OAK DRESSER & RACK."), null);
+  assert.equal(pieceProblem("commode miniature", itemTypesInQuery("commode miniature"), "Commode miniature Louis XV"), null);
+  assert.ok(failsPeriodRule("AN EARLY TWENTIETH CENTURY GLAZED DISPLAY CABINET."));
+  assert.ok(failsPeriodRule("PAIR OF MODERN PINE CORNER CUPBOARDS."));
+  assert.equal(failsPeriodRule("A GEORGE III OAK DRESSER, circa 1780", "with modern handles"), null);
+});
+
 console.log(`\n${passed} checks passed`);

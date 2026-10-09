@@ -79,10 +79,14 @@ export const headType = (title: string): string | null => {
  *  - when the user named a specific kind of piece (secrétaire, buffet deux corps…), the lot must name it too.
  * (The broad type check — matchesItemType — runs before this.)
  */
+const MINIATURE_RE = /(doll'?s?'? ?house|dollhouse|\bdolls\b|de poupee|\bpoupee\b|\bdockskap|\bmaquette\b|\bminiature\b|\bmaitrise\b|\btoy\b|\bjouet\b|apprentice piece)/;
+
 export const pieceProblem = (query: string, types: string[], title?: string | null, description?: string | null): string | null => {
   if (!types.length) return null;
   const head = headType(String(title || ''));
   if (head && BLOCKING_HEADS.has(head) && !types.includes(head)) return 'not_requested_type';
+  // Toy / miniature furniture ("dolls house furniture", "meuble de poupée", "maquette", "miniature") is not the piece asked for
+  if (MINIATURE_RE.test(normalise(String(title || ''))) && !MINIATURE_RE.test(normalise(query))) return 'not_requested_type';
   const sub = subtypeInQuery(query);
   if (sub?.require) {
     const text = normalise(`${title || ''} \n ${String(description || '').slice(0, 300)}`);
