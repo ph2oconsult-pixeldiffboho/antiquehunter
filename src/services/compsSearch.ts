@@ -88,7 +88,7 @@ export const parseLooseJson = (text: string): any => {
 
 export interface CompsDeps {
   /** Gemini + Google Search (injectable for tests): the JSON text and the grounding page URLs */
-  search?: (prompt: string, signal: AbortSignal, model?: string) => Promise<{ text: string; grounded: string[] }>;
+  search?: (prompt: string, signal: AbortSignal, model?: string) => Promise<{ text: string; grounded: string[]; queries?: number }>;
   fetchHtml?: (url: string, ms: number) => Promise<{ status: number; html?: string; finalUrl: string }>;
 }
 
@@ -107,8 +107,9 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
       // no responseSchema: with one, the preview runs came back with 0 grounding chunks (the real pages Google found)
       config: { tools: [{ googleSearch: {} }], thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, abortSignal: signal } as any,
     });
-    const chunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    return { text: String(response?.text || '{}'), grounded: chunks.map((c: any) => c?.web?.uri).filter(Boolean) };
+    const gm = response?.candidates?.[0]?.groundingMetadata || {};
+    const chunks = gm.groundingChunks || [];
+    return { text: String(response?.text || '{}'), grounded: chunks.map((c: any) => c?.web?.uri).filter(Boolean), queries: (gm.webSearchQueries || []).length };
   });
   const getHtml = deps.fetchHtml || fetchHtml;
   const drop = (r: string) => { out.stats.dropped[r] = (out.stats.dropped[r] || 0) + 1; };
@@ -118,7 +119,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   let grounded: string[] = [];
   const g0 = Date.now();
   const searchMs: number[] = [];
-  const jobs: Array<[string, string]> = COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]);
+  const jobs: Array<[string, string]> = COMPS_SEARCH_SCOPES.map(sc => [sc, process.env.COMPS_MODEL || FAST_MODEL] as [string, string]);
   const run = (scope: string, model: string, i: number) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
     search(buildCompsPrompt(req, scope), signal, model),
     new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
@@ -126,10 +127,12 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   const promises = jobs.map(([scope, model], i) => run(scope, model, i));
   const settled = await Promise.allSettled(promises);
   const errors: string[] = [];
+  let webQueries = 0;
   for (const s of settled) {
     if (s.status === 'rejected') { const e: any = s.reason; errors.push(e?.name === 'AbortError' ? 'search_timeout' : String(e?.message || e).slice(0, 120)); continue; }
     try { claims.push(...(parseLooseJson(s.value.text).results || []).filter((c: any) => c && c.url)); } catch { /* unparsable answer: grounding pages still checked */ }
     grounded.push(...(s.value.grounded || []));
+    webQueries += Number(s.value.queries) || 0;
   }
   if (errors.length === settled.length) out.error = errors[0];
   else if (errors.length) out.partial = errors;
@@ -170,7 +173,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   comps.sort((a, b) => (Number(b.material === req.material) - Number(a.material === req.material)) || String(b.date || '').localeCompare(String(a.date || '')));
   out.comparables = comps.slice(0, MAX_COMPS);
   out.stats.verified = out.comparables.length;
-  out.stats.grounded = grounded.length; out.stats.claimed = claims.length;
+  out.stats.grounded = grounded.length; out.stats.webQueries = webQueries; out.stats.claimed = claims.length;
   out.stats.timingMs = { gemini: geminiMs, searches: searchMs, verify: Date.now() - v0, total: Date.now() - startedAt };
   out.ok = true;
   return out;
