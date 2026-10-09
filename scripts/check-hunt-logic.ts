@@ -33,7 +33,7 @@ import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceChe
 
 import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker } from "../src/services/makers.ts";
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
-import { findComparables, handleCompsRequest, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS } from "../src/services/compsSearch.ts";
+import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS } from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
 import { COMPS_CLIENT_TIMEOUT_MS } from "../src/services/gemini.ts";
 
@@ -1354,6 +1354,8 @@ await (async () => {
   assert.equal(part.comparables.length, 2); assert.equal(part.error, undefined); assert.deepEqual(part.partial, ["boom"]);
   const all = await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), { search: async () => { throw new Error("down"); }, fetchHtml: async (url) => ({ status: 404, finalUrl: url }) });
   assert.equal(all.error, "down"); assert.equal(all.comparables.length, 0);
+  assert.equal(parseLooseJson('Here:\n```json\n{"results":[{"url":"u"}]}\n```').results[0].url, "u");
+  assert.deepEqual(parseLooseJson("no json here"), {});
   passed++; console.log("ok - comps server function: scoped searches run in parallel; a failed scope keeps the others' verified results");
 })();
 

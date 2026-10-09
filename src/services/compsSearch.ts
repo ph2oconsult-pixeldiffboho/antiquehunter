@@ -1,7 +1,7 @@
 // Server side of "real auction comparables" (POST /api/comps): Gemini with Google Search proposes past results for a
 // maker's piece; every one is opened and verified from the page itself (compsMath.verifyComparable) before it is
 // returned. Nothing unverified is ever returned. Budget: Gemini <= 30 s, page checks <= 10 s, whole request <= 45 s.
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { verifyComparable, type CompClaim, type Comparable, type CompsResponse } from "./compsMath.js";
 import { findMaker, PIECES, fold } from "./makers.js";
 import { isGroundingRedirect } from "./huntValidation.js";
@@ -52,30 +52,6 @@ const fetchHtml = async (url: string, ms: number): Promise<{ status: number; htm
   } catch { return { status: 0, finalUrl: url }; }
 };
 
-const schema = {
-  type: Type.OBJECT,
-  properties: {
-    results: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          url: { type: Type.STRING, description: "The lot page URL exactly as found (not a search page)." },
-          house: { type: Type.STRING },
-          sale_date: { type: Type.STRING, description: "YYYY-MM-DD" },
-          title: { type: Type.STRING },
-          pieces: { type: Type.NUMBER, description: "Number of chairs / pieces in the lot." },
-          stamp_status: { type: Type.STRING, enum: ["stamped", "attributed", "by"] },
-          price: { type: Type.NUMBER, description: "The sold price exactly as printed on the page." },
-          currency: { type: Type.STRING },
-          price_includes_fees: { type: Type.BOOLEAN },
-        },
-        required: ["url", "house", "title", "price", "currency"],
-      },
-    },
-  },
-  required: ["results"],
-};
 
 /** Narrower searches run in parallel (one long search often exceeds the budget). */
 export const COMPS_SEARCH_SCOPES = [
@@ -96,9 +72,18 @@ export const buildCompsPrompt = (r: CompsRequest, scope = COMPS_SEARCH_SCOPES.jo
 Prefer sales from 2018 onwards; include stamped ("estampillé", "stamped") and attributed ("attribué à") lots and say which.
 Where to look: ${scope}. Use Google searches such as: ${site}${r.maker} ${piece ? piece.fr.split(/[ ,/]/)[0] : ''} ; ${site}${r.maker} ${piece ? piece.en.split(/[ ,/]/)[0] : ''} sold. One or two searches are enough.
 Copy each URL EXACTLY from the search results - never construct or guess a lot number. If you are not sure of a URL, leave the result out.
-Return up to 6 results. Each must be ONE lot page URL that shows the sold price (not a search page, not a dealer's shop listing, not an unsold lot).
+Return up to 6 results as JSON only: {"results":[{"url","house","sale_date" (YYYY-MM-DD),"title","pieces","stamp_status" (stamped|attributed|by),"price" (number as printed),"currency","price_includes_fees"}]}. Each must be ONE lot page URL that shows the sold price (not a search page, not a dealer's shop listing, not an unsold lot).
 Give the price exactly as printed on the page, its currency, the sale date, the number of pieces in the lot, and whether the price includes the buyer's premium.
 Never invent a result: only return pages you actually found.`;
+};
+
+/** JSON from a free-text answer (```json fences or surrounding prose tolerated). */
+export const parseLooseJson = (text: string): any => {
+  const t = String(text || '').replace(/```(?:json)?/gi, '');
+  try { return JSON.parse(t); } catch { /* fall through */ }
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch { /* ignore */ } }
+  return {};
 };
 
 export interface CompsDeps {
@@ -119,7 +104,8 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
     const response: any = await ai.models.generateContent({
       model,
       contents: prompt,
-      config: { tools: [{ googleSearch: {} }], thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, responseMimeType: 'application/json', responseSchema: schema, abortSignal: signal } as any,
+      // no responseSchema: with one, the preview runs came back with 0 grounding chunks (the real pages Google found)
+      config: { tools: [{ googleSearch: {} }], thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, abortSignal: signal } as any,
     });
     const chunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     return { text: String(response?.text || '{}'), grounded: chunks.map((c: any) => c?.web?.uri).filter(Boolean) };
@@ -142,7 +128,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   const errors: string[] = [];
   for (const s of settled) {
     if (s.status === 'rejected') { const e: any = s.reason; errors.push(e?.name === 'AbortError' ? 'search_timeout' : String(e?.message || e).slice(0, 120)); continue; }
-    try { claims.push(...(JSON.parse(s.value.text || '{}').results || []).filter((c: any) => c && c.url)); } catch { /* unparsable answer: grounding pages still checked */ }
+    try { claims.push(...(parseLooseJson(s.value.text).results || []).filter((c: any) => c && c.url)); } catch { /* unparsable answer: grounding pages still checked */ }
     grounded.push(...(s.value.grounded || []));
   }
   if (errors.length === settled.length) out.error = errors[0];
