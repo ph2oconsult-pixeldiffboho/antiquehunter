@@ -180,7 +180,15 @@
     "reason_hammer_suffix": " hammer (≈ {{allIn}} all-in incl. {{pct}}% buyer's premium)",
     "hammer_word": "hammer",
     "verdict_need_evidence": "Need More Evidence",
-    "reason_need_evidence": "We can't confirm the period yet, so no buy verdict at {{price}}{{premium}}. The provisional range is {{low}} – {{high}}; add the evidence below and re-run."
+    "reason_need_evidence": "We can't confirm the period yet, so no buy verdict at {{price}}{{premium}}. The provisional range is {{low}} – {{high}}; add the evidence below and re-run.",
+    "auction_range": "Auction range (hammer)",
+    "dealer_range": "Dealer range (shop price)",
+    "dealer_scale_note": "Shop, dealer and private asking prices are judged against the dealer range. The auction range is what the piece would make at auction (hammer, before fees).",
+    "reason_dealer_strong_buy": "{{price}} is at or below the auction mid ({{auctionMid}}) – a strong buy for a shop price.",
+    "reason_dealer_good_buy": "{{price}} is at or below {{goodTop}} (the top of the auction range or the dealer low) – a good shop price.",
+    "reason_dealer_fair": "{{price}} is within the dealer range ({{dealerLow}}–{{dealerHigh}}) – a fair shop price.",
+    "reason_dealer_overpriced": "{{price}} is above the dealer high ({{dealerHigh}}) – overpriced, even for a shop. Don't go above {{dealerHigh}}.",
+    "reason_dealer_walk_away": "{{price}} is well above the dealer range (over {{overTop}}) – walk away."
   },
   "results": {
     "title": "Dealer's Findings",

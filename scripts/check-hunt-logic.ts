@@ -29,6 +29,7 @@ import { localQueries } from "../src/services/huntGeo.ts";
 import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
 import { applyRanking } from "../src/services/hunting.ts";
 import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
+import { bandScore, dealerBands, saneDealerRange, reconcileDealerNegotiation, priceBandScore as pbs, decideBuy as decideBuyX, DEALER_WALK_AWAY_FACTOR } from "../src/services/appraisalMath.ts";
 import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceCheck, evidenceAsks, pieceKindOf, isBriefInput, periodStatedIn, centuryStatedIn, laterSignIn } from "../src/services/appraisalMath.ts";
 
 import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker } from "../src/services/makers.ts";
@@ -1242,20 +1243,87 @@ const bellRaw = () => ({ items: [{
 const dealerCtx = (query: string, extra: any = {}) => ({ query, hasPhotos: true, askingPrice: 12000, isAuction: false, premiumPct: 0, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Antique Shop", fetchedEstimate: false, eurTo: (e: number) => e, category: "chairs", ...extra });
 const COMPS_RESP = { ok: true, comparables: BELL_COMPS, searched: [], unreachable: ["Drouot (results need an account)"], stats: { candidates: 5, verified: 5, dropped: {} } };
 
-check("a confirmed Bellangé stamp changes the valuation: comps-anchored range, 'Overpriced' (slightly) not 'Walk Away' at €12k; a dealer's label stays plain Empire", () => {
+check("dealer mode: asking prices are judged against the dealer range (Strong <= auction mid, Good <= max(auction high, dealer low), Fair <= dealer high, Overpriced <= 1.5x, then Walk Away)", () => {
+  // the generic bands reproduce the auction bands exactly
+  for (const p of [50, 300, 450, 500, 699, 700, 701, 900, 1100, 1500, 3000]) assert.deepEqual(pbs(p, 300, 700, 1100), bandScore(p, { strongTop: 300, goodTop: 500, fairTop: 700, overTop: 1100 }), String(p));
+  // sane dealer range: low >= auction mid, high >= auction high and >= low; missing -> defaults
+  assert.deepEqual(saneDealerRange(300, 700, 700, 1100), { low: 700, high: 1100, clamped: false });
+  assert.deepEqual(saneDealerRange(300, 700, 350, 600), { low: 500, high: 700, clamped: true });
+  assert.deepEqual(saneDealerRange(300, 700, 2000, 1500), { low: 2000, high: 2000, clamped: true });
+  assert.equal(saneDealerRange(300, 700).low, 500); assert.equal(saneDealerRange(300, 700).high, 1400);
+  const b = dealerBands(300, 700, 700, 1100);
+  assert.deepEqual(b, { strongTop: 500, goodTop: 700, fairTop: 1100, overTop: 1100 * DEALER_WALK_AWAY_FACTOR });
+  assert.equal(dealerBands(300, 700, 600, 1100).goodTop, 700); assert.equal(dealerBands(300, 700, 900, 1100).goodTop, 900);
+  const v = (ask: number) => decideBuyX({ askingPrice: ask, isAuction: false, premiumPct: 0, hasPhotos: true, marketLow: 300, marketHigh: 700, retailHigh: 1100, smartBuy: 700, walkAway: 1100, bands: b }).basis;
+  assert.deepEqual([450, 500, 650, 700, 800, 950, 1100, 1300, 1650, 1700].map(v), ["strong_buy", "strong_buy", "good_buy", "good_buy", "fair", "fair", "fair", "overpriced", "overpriced", "walk_away"]);
+  // scores never rise as the price rises
+  let last = 101; for (let p = 100; p <= 3000; p += 25) { const d = decideBuyX({ askingPrice: p, isAuction: false, premiumPct: 0, hasPhotos: true, marketLow: 300, marketHigh: 700, retailHigh: 1100, smartBuy: 700, walkAway: 1100, bands: b }); assert.ok(d.score <= last, String(p)); last = d.score; }
+  // negotiation figures: walk-away = dealer high, opening anchored toward the dealer low, all <= walk-away
+  const nf = reconcileDealerNegotiation(b, 700);
+  assert.equal(nf.walk_away_price, 1100); assert.equal(nf.good_buy_below, 700); assert.equal(nf.opening_offer, 630); assert.equal(nf.target_price_low, 700); assert.equal(nf.target_price_high, 900);
+  for (const [lo, hi, dl, dh] of [[100, 300, 50, 80], [2500, 5500, 6000, 9000], [7650, 11500, 9945, 18400], [0, 0, 0, 0]]) {
+    const dr = saneDealerRange(lo, hi, dl, dh); const bb = dealerBands(lo, hi, dr.low, dr.high); const x = reconcileDealerNegotiation(bb, dr.low);
+    assert.ok(x.opening_offer <= x.good_buy_below && x.good_buy_below <= x.walk_away_price && x.target_price_low <= x.target_price_high && x.target_price_high <= x.walk_away_price, `${lo} ${hi}`);
+  }
+});
+
+check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, dealer €700–1,100) is Fair at €950 and €800; offers <= the dealer high; auction mode unchanged", () => {
+  const lpRaw = () => { const r: any = bellRaw(); const it = r.items[0];
+    it.item_summary.title = "Large Louis-Philippe Painted Mirror"; it.item_summary.category = "Mirrors"; it.item_summary.maker = null; it.item_summary.period_certainty = "confirmed_period"; it.item_summary.confidence_breakdown = { evidence_quality: 30, identification_certainty: 25, risk_factors: 20 };
+    Object.assign(it.price_guidance, { estimated_market_range_low: 300, estimated_market_range_high: 700, good_buy_below: 400, fair_price_low: 700, fair_price_high: 1100, overpaying_above: 700, pricing_reasoning: "Painted Louis-Philippe mirror." });
+    Object.assign(it.negotiation_strategy, { opening_offer: 300, target_price_low: 400, target_price_high: 600, walk_away_price: 700 }); return r; };
+  const q = "Large Louis-Philippe mirror, 1.7 m × 1.2 m, painted cream frame with moulded decoration; the dealer says the glass is original 19th-century mercury glass.";
+  for (const ask of [950, 800]) {
+    const a: any = postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: ask, category: "mirrors" }))[0];
+    assert.equal(a.buy_decision.label, "Fair Price", String(ask)); assert.equal(a.buy_decision.price_scale, "dealer");
+    assert.deepEqual([a.price_guidance.estimated_market_range_low, a.price_guidance.estimated_market_range_high, a.price_guidance.fair_price_low, a.price_guidance.fair_price_high], [300, 700, 700, 1100]);
+    assert.equal(a.negotiation_strategy.walk_away_price, 1100); assert.equal(a.price_guidance.overpaying_above, 1100);
+    const np = a.negotiation_plan; assert.ok(np.opening_offer <= np.happy_at && np.happy_at <= 1100 && np.happy_at < ask, JSON.stringify(np));
+    assert.ok(np.opening_offer >= 700 - 1, String(np.opening_offer)); // anchored toward the dealer low
+    assert.equal(np.payment.mode, "cash");
+    assert.deepEqual(a.buy_decision.dealer_bands, { strong_buy_to: 500, good_buy_to: 700, fair_to: 1100, overpriced_to: 1650 });
+  }
+  const at950: any = postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 950, category: "mirrors" }))[0];
+  assert.deepEqual([at950.negotiation_plan.opening_offer, at950.negotiation_plan.happy_at], [760, 830]);
+  assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 650, category: "mirrors" }))[0].buy_decision.label, "Good Buy");
+  assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 1400, category: "mirrors" }))[0].buy_decision.label, "Overpriced");
+  assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 2000, category: "mirrors" }))[0].buy_decision.label, "Walk Away");
+  // private seller: same dealer range scale
+  assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 950, category: "mirrors", sellerType: "Market/Fair" }))[0].buy_decision.price_scale, "dealer");
+  // the model's dealer range out of line: clamped (low >= auction mid, high >= auction high)
+  const bad = lpRaw(); Object.assign(bad.items[0].price_guidance, { fair_price_low: 320, fair_price_high: 650 });
+  const c: any = postProcessAppraisal(bad, dealerCtx(q, { askingPrice: 950, category: "mirrors" }))[0];
+  assert.deepEqual([c.price_guidance.fair_price_low, c.price_guidance.fair_price_high], [500, 700]); assert.equal(c.buy_decision.label, "Overpriced");
+  // auction mode: the auction range, its walk-away and bands as before
+  const au: any = postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 950, category: "mirrors", isAuction: true, premiumPct: 25, sellerType: "Auction" }))[0];
+  assert.equal(au.buy_decision.price_scale, "auction"); assert.equal(au.buy_decision.dealer_bands, null);
+  assert.equal(au.negotiation_strategy.walk_away_price, 700); assert.equal(au.buy_decision.label, "Overpriced");
+  const bad2 = lpRaw(); Object.assign(bad2.items[0].price_guidance, { fair_price_low: 320, fair_price_high: 650 });
+  const au2: any = postProcessAppraisal(bad2, dealerCtx(q, { askingPrice: 950, category: "mirrors", isAuction: true, premiumPct: 25, sellerType: "Auction" }))[0];
+  assert.deepEqual([au2.price_guidance.fair_price_low, au2.price_guidance.fair_price_high], [320, 700]); // not clamped in auction mode (unchanged)
+  // texts in EN and FR
+  for (const lang of ["en", "fr"]) {
+    const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8")).analysis;
+    for (const k of ["auction_range", "dealer_range", "dealer_scale_note", "reason_dealer_strong_buy", "reason_dealer_good_buy", "reason_dealer_fair", "reason_dealer_overpriced", "reason_dealer_walk_away"]) assert.ok(j[k], `${lang} ${k}`);
+  }
+});
+
+check("a confirmed Bellangé stamp changes the valuation: comps-anchored range, 'Fair' at a dealer's €12k (within the dealer range), not 'Overpriced'; a dealer's label stays plain Empire", () => {
   const conf: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: COMPS_RESP }))[0];
   assert.equal(conf.maker_attribution.status, "stamped_confirmed");
   assert.equal(conf.comparables.status, "anchored");
   assert.deepEqual([conf.price_guidance.estimated_market_range_low, conf.price_guidance.estimated_market_range_high], [7650, 11500]);
-  assert.equal(conf.buy_decision.label, "Overpriced");
-  assert.ok(conf.buy_decision.score >= 30, String(conf.buy_decision.score)); // just above the walk-away
+  // shop price judged against the dealer range (comps x1.3 .. x1.6 = €9,950–18,400): €12k is a fair shop price
+  assert.deepEqual([conf.price_guidance.fair_price_low, conf.price_guidance.fair_price_high], [9945, 18400]);
+  assert.equal(conf.buy_decision.label, "Fair Price"); assert.equal(conf.buy_decision.price_scale, "dealer");
+  assert.equal(conf.negotiation_strategy.walk_away_price, 18400);
   assert.match(conf.item_summary.title, /stamped Bellangé/); assert.ok(!/Attributed/i.test(conf.item_summary.title));
   assert.match(conf.price_guidance.pricing_reasoning, /Anchored on 3 verified auction results/);
   const label: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_LABEL, { comps: COMPS_RESP }))[0];
   assert.equal(label.maker_attribution.status, "dealer_label");
   assert.equal(label.comparables.status, "shown");
   assert.equal(label.price_guidance.estimated_market_range_high, 5500);
-  assert.equal(label.buy_decision.label, "Walk Away");
+  assert.equal(label.buy_decision.label, "Overpriced"); // above the dealer high (€9,000), not 1.5x above it
   // no verified comparables: says so and falls back to the appraiser's range
   const none: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: { ...COMPS_RESP, comparables: [] } }))[0];
   assert.equal(none.comparables.status, "none_verified");

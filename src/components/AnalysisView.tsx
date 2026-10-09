@@ -323,7 +323,19 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const walkAllIn = Number(originalDecision.walk_away_all_in) || allInCost(Number(ns.walk_away_price) || 0, pct, isAuction);
     const smartHammer = Number(pg.good_buy_below) || 0;
     const walkHammer = Number(ns.walk_away_price) || Number(pg.overpaying_above) || 0;
-    const reason = (effective > 0 || basis === 'high_risk' || basis === 'no_price')
+    // Dealer / shop / private: the price was judged against the dealer range (gemini.ts); its own reason texts
+    const db = originalDecision.price_scale === 'dealer' ? originalDecision.dealer_bands : null;
+    const dealerReason = db && effective > 0 && ['strong_buy', 'good_buy', 'fair', 'overpriced', 'walk_away'].includes(basis);
+    const reason = dealerReason
+      ? t(`analysis.reason_dealer_${basis}`, {
+          price: formatMoney(effective, pg.currency),
+          auctionMid: formatMoney(Number(db.strong_buy_to) || 0, pg.currency),
+          goodTop: formatMoney(Number(db.good_buy_to) || 0, pg.currency),
+          dealerLow: formatMoney(Number(pg.fair_price_low) || 0, pg.currency),
+          dealerHigh: formatMoney(Number(pg.fair_price_high) || 0, pg.currency),
+          overTop: formatMoney(Number(db.overpriced_to) || 0, pg.currency),
+        })
+      : (effective > 0 || basis === 'high_risk' || basis === 'no_price')
       ? t(`analysis.${reasonKeyFor(basis, originalDecision.price_cap || undefined)}`, hammerMode ? {
           price: formatMoney(compare, pg.currency),
           premium: pct > 0 ? t('analysis.reason_hammer_suffix', { pct, allIn: formatMoney(effective, pg.currency) }) : '',
@@ -500,6 +512,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   // Buyer's premium figures: computed once and reused everywhere so totals always match
   const isAuctionItem = !!(currentItem.seller_context?.isAuction || currentItem.seller_context?.sellerType?.toLowerCase().includes('auction'));
+  const dealerScale = currentItem.buy_decision?.price_scale === 'dealer';
   const premiumPct = Number(currentItem.seller_context?.buyerPremiumRate) > 0 ? Number(currentItem.seller_context.buyerPremiumRate) : 25;
   const marketLow = Math.round(Number(currentItem.price_guidance?.estimated_market_range_low) || 0);
   const marketHigh = Math.round(Number(currentItem.price_guidance?.estimated_market_range_high) || 0);
@@ -1008,9 +1021,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
               <p className={`text-[9px] uppercase tracking-widest font-bold ${currentItem.price_guidance.provisional ? 'text-amber-700' : 'text-muted'}`}>
-                {currentItem.price_guidance.provisional ? t('evidence.provisional_range') : t('analysis.value_insight', 'Market Range')}
+                {currentItem.price_guidance.provisional ? t('evidence.provisional_range') : dealerScale ? t('analysis.auction_range') : t('analysis.value_insight', 'Market Range')}
               </p>
-              <p className="text-xl font-medium text-ink">
+              <p className="text-xl font-medium text-ink" data-testid="range-auction">
                 {formatPrice(currentItem.price_guidance.estimated_market_range_low)} - {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
               </p>
               {currentItem.price_guidance.provisional && (
@@ -1029,8 +1042,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.retail_range', 'Retail Range')}</p>
-              <p className="text-lg font-medium text-muted">
+              <p className={`text-[9px] uppercase tracking-widest font-bold ${dealerScale ? 'text-ink' : 'text-muted'}`}>{dealerScale ? t('analysis.dealer_range') : t('analysis.retail_range', 'Retail Range')}</p>
+              <p className={dealerScale ? 'text-xl font-medium text-ink' : 'text-lg font-medium text-muted'} data-testid="range-dealer">
                 {formatPrice(currentItem.price_guidance.fair_price_low)} - {formatPrice(currentItem.price_guidance.fair_price_high)}
               </p>
             </div>
@@ -1046,6 +1059,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
           </div>
 
+          {dealerScale && (
+            <p className="text-xs text-ink leading-relaxed" data-testid="dealer-scale-note">{t('analysis.dealer_scale_note')}</p>
+          )}
           <p className="text-xs text-muted leading-relaxed border-t border-border-custom pt-4 italic">
             {currentItem.price_guidance.pricing_reasoning}
           </p>

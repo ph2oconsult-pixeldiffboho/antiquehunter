@@ -2,8 +2,8 @@ import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
 import {
-  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, sanitizeDeep,
-  type PriceBasis, type ScoreBand,
+  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, reconcileDealerNegotiation, saneDealerRange, dealerBands, sanitizeDeep,
+  type PriceBasis, type ScoreBand, type VerdictBands,
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFetch";
 import { convertApprox } from "./budget";
@@ -615,7 +615,16 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // Smart buy + negotiation figures, consistent with the buy-score bands:
     // smart buy within [market low, market mid]; opening <= smart buy <= walk-away;
     // opening <= target low <= target high <= walk-away; walk-away = market high (auction: max hammer bid)
-    const nf = reconcileNegotiation(
+    // Dealer, shop and private prices are judged against the DEALER range (the retail tier), not the auction range:
+    // the dealer range is made sane first (dealer low >= auction mid, dealer high >= auction high), the walk-away is
+    // the dealer high. Auction mode is unchanged.
+    let bands: VerdictBands | undefined;
+    if (!isAuction) {
+      const dr = saneDealerRange(pg.estimated_market_range_low, pg.estimated_market_range_high, pg.fair_price_low, pg.fair_price_high);
+      pg.fair_price_low = dr.low; pg.fair_price_high = dr.high;
+      bands = dealerBands(pg.estimated_market_range_low, pg.estimated_market_range_high, dr.low, dr.high);
+    }
+    const nf = bands ? reconcileDealerNegotiation(bands, pg.fair_price_low) : reconcileNegotiation(
       { good_buy_below: pg.good_buy_below, ...(ns || {}) },
       pg.estimated_market_range_low, pg.estimated_market_range_high, premiumPct, isAuction
     );
@@ -644,7 +653,9 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     if (!item.teaser_insight || teaserHasMoney) {
       if (item.price_guidance?.good_buy_below) {
         const money = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
-        item.teaser_insight = `Dealers would typically buy below ${money(item.price_guidance.good_buy_below)}${isAuction ? ' (hammer)' : ''}. Above ${money(nf.walk_away_price)}, you are overpaying.`;
+        item.teaser_insight = bands
+          ? `A good shop price is below ${money(item.price_guidance.good_buy_below)}. Above ${money(nf.walk_away_price)} (the top of the dealer range), you are overpaying.`
+          : `Dealers would typically buy below ${money(item.price_guidance.good_buy_below)}${isAuction ? ' (hammer)' : ''}. Above ${money(nf.walk_away_price)}, you are overpaying.`;
       } else {
         item.teaser_insight = `Dealers typically negotiate 30–50% below retail on this category.`;
       }
@@ -675,6 +686,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       itemScore: calculatedScore,
       valueTier: item.item_summary.value_tier,
       needsEvidence: evidence.required,
+      bands,
     });
     const allIn = decision.effectivePrice;
     const finalScore = decision.score;
@@ -715,6 +727,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       sellerType, isAuction, askingPrice: Number(askingPrice) || undefined, currency: targetCurrency,
       walkAway: Number(nsF.walk_away_price) || Number(item.price_guidance?.estimated_market_range_high) || 0,
       openingOffer: Number(nsF.opening_offer) || undefined, targetHigh: Number(nsF.target_price_high) || undefined, premiumPct,
+      dealerLow: bands ? Number(item.price_guidance?.fair_price_low) || undefined : undefined,
       checklist: checklistItems, answers: checkAnswers, maker: makerAsClaimed && !['mentioned', 'dealer_label'].includes(makerAsClaimed.status) ? makerAsClaimed.name : null,
       period: item.item_summary.likely_period, text: `${query} ${titleText}`, pieces, pieceKind,
     });
@@ -755,6 +768,9 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         walk_away_all_in: decision.walkAwayAllIn || null,
         effective_price: allIn || null,
         compare_price: decision.comparePrice || null,
+        // which range the price was judged against: 'dealer' (shop / dealer / private) or 'auction'
+        price_scale: bands ? 'dealer' : 'auction',
+        dealer_bands: bands ? { strong_buy_to: Math.round(bands.strongTop), good_buy_to: Math.round(bands.goodTop), fair_to: Math.round(bands.fairTop), overpriced_to: Math.round(bands.overTop) } : null,
         label: getBuyLabel(basis),
         confidence: confLabel
       }

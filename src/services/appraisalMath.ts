@@ -48,13 +48,19 @@ export const allInCost = (price: number, premiumPct: number, isAuction: boolean)
  *  - above retail high             -> walk_away  14..1
  */
 export const priceBandScore = (effectivePrice: number, marketLow: number, marketHigh: number, retailHigh?: number): PriceScore | null => {
-  const price = num(effectivePrice);
   const low = Math.max(0, num(marketLow));
   const high = Math.max(low, num(marketHigh));
-  if (!(price > 0) || !(high > 0)) return null;
-  const mid = (low + high) / 2;
-  const retail = Math.max(high, num(retailHigh) || high * 2);
+  if (!(high > 0)) return null;
+  return bandScore(effectivePrice, { strongTop: low, goodTop: (low + high) / 2, fairTop: high, overTop: Math.max(high, num(retailHigh) || high * 2) });
+};
 
+/** Upper edges of the verdict bands: <= strongTop Strong Buy, <= goodTop Good Buy, <= fairTop Fair, <= overTop Overpriced, above: Walk Away */
+export interface VerdictBands { strongTop: number; goodTop: number; fairTop: number; overTop: number }
+
+export const bandScore = (effectivePrice: number, b: VerdictBands): PriceScore | null => {
+  const price = num(effectivePrice);
+  const low = Math.max(0, num(b.strongTop)), mid = Math.max(low, num(b.goodTop)), high = Math.max(mid, num(b.fairTop)), retail = Math.max(high, num(b.overTop));
+  if (!(price > 0) || !(high > 0)) return null;
   if (price <= low) {
     const r = low > 0 ? clamp(price / low, 0, 1) : 1;
     return { score: Math.round(95 - 15 * r), band: PRICE_BANDS.strong_buy, basis: 'strong_buy' };
@@ -72,6 +78,45 @@ export const priceBandScore = (effectivePrice: number, marketLow: number, market
     return { score: Math.round(34 - 19 * r), band: PRICE_BANDS.overpriced, basis: 'overpriced' };
   }
   return { score: clamp(Math.round(14 * retail / price), 1, 14), band: PRICE_BANDS.walk_away, basis: 'walk_away' };
+};
+
+// ---------------------------------------------------------------------------
+// Dealer, shop and private asking prices are judged against the DEALER (retail) range, not the auction range
+// ---------------------------------------------------------------------------
+
+/** "Walk Away" starts this far above the dealer high (between the dealer high and here: "Overpriced") */
+export const DEALER_WALK_AWAY_FACTOR = 1.5;
+
+/** The dealer range, always present and sane: dealer low >= auction mid, dealer high >= auction high and >= dealer low. */
+export const saneDealerRange = (auctionLow: number, auctionHigh: number, dealerLow?: number, dealerHigh?: number) => {
+  const lo = Math.max(0, num(auctionLow)), hi = Math.max(lo, num(auctionHigh)), mid = (lo + hi) / 2;
+  const rawLow = num(dealerLow) > 0 ? num(dealerLow) : Math.round(lo * 1.5);
+  const rawHigh = num(dealerHigh) > 0 ? num(dealerHigh) : Math.round(hi * 2);
+  const low = Math.round(Math.max(rawLow, mid));
+  const high = Math.round(Math.max(rawHigh, hi, low));
+  return { low, high, clamped: low !== Math.round(num(dealerLow)) || high !== Math.round(num(dealerHigh)) };
+};
+
+/** Dealer-mode bands: Strong Buy <= auction mid; Good Buy <= max(auction high, dealer low); Fair <= dealer high; Overpriced <= 1.5x dealer high */
+export const dealerBands = (auctionLow: number, auctionHigh: number, dealerLow: number, dealerHigh: number): VerdictBands => {
+  const lo = Math.max(0, num(auctionLow)), hi = Math.max(lo, num(auctionHigh));
+  const dHigh = Math.max(hi, num(dealerHigh), num(dealerLow));
+  return { strongTop: (lo + hi) / 2, goodTop: Math.min(dHigh, Math.max(hi, num(dealerLow))), fairTop: dHigh, overTop: dHigh * DEALER_WALK_AWAY_FACTOR };
+};
+
+/**
+ * Dealer-mode negotiation figures: walk-away = dealer high; smart buy = top of the Good Buy band; the opening offer is
+ * anchored toward the dealer low (never below the auction mid, never above the smart buy); targets between the dealer
+ * low and the walk-away. All <= the walk-away.
+ */
+export const reconcileDealerNegotiation = (b: VerdictBands, dealerLow: number): NegotiationFigures => {
+  const walk = Math.round(b.fairTop);
+  const smart = Math.round(Math.min(walk, b.goodTop));
+  const dLow = Math.min(walk, Math.max(0, num(dealerLow)));
+  const opening = Math.round(Math.min(smart, Math.max(b.strongTop, dLow * 0.9)));
+  const targetLow = Math.round(clamp(dLow, opening, walk));
+  const targetHigh = Math.round(clamp((dLow + walk) / 2, targetLow, walk));
+  return { good_buy_below: smart, opening_offer: opening, target_price_low: targetLow, target_price_high: targetHigh, walk_away_price: walk };
 };
 
 /** Max hammer bid such that hammer x (1 + premium) <= market high. */
@@ -240,6 +285,8 @@ export interface BuyDecisionInput {
   valueTier?: string;
   /** The period is not established (see evidenceCheck): never Strong Buy / Good Buy / Fair, show "Need more evidence" */
   needsEvidence?: boolean;
+  /** Dealer / shop / private mode: the bands from dealerBands() (the asking price is judged against the dealer range) */
+  bands?: VerdictBands;
 }
 
 /** Why the market band was overridden: the price is above the smart-buy or the walk-away price. */
@@ -277,10 +324,10 @@ export const decideBuy = (i: BuyDecisionInput): BuyDecision => {
   // … but compared like with like (fix 3): the hammer / asking price against the hammer / asking-price market range
   const smartCmp = num(i.smartBuy);
   const walkCmp = num(i.walkAway);
-  let ps = asking > 0 ? priceBandScore(asking, i.marketLow, i.marketHigh, i.retailHigh) : null;
+  let ps = asking > 0 ? (i.bands ? bandScore(asking, i.bands) : priceBandScore(asking, i.marketLow, i.marketHigh, i.retailHigh)) : null;
   let cap: VerdictCap | undefined;
   if (ps) {
-    const retail = Math.max(num(i.marketHigh), num(i.retailHigh) || num(i.marketHigh) * 2);
+    const retail = i.bands ? Math.max(i.bands.fairTop, i.bands.overTop) : Math.max(num(i.marketHigh), num(i.retailHigh) || num(i.marketHigh) * 2);
     // Above the walk-away: never Fair or better. Scores use min() with the market-band score so the
     // score never rises as the price rises.
     if (walkCmp > 0 && asking > walkCmp && ps.basis !== 'walk_away') {
