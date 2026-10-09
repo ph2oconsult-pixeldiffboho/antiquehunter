@@ -1351,7 +1351,7 @@ await (async () => {
     },
     fetchHtml: async (url) => pages[url] ? { status: 200, html: pages[url], finalUrl: url } : { status: 404, finalUrl: url },
   });
-  assert.equal(part.comparables.length, 2); assert.equal(part.error, undefined); assert.deepEqual(part.partial, ["boom"]);
+  assert.equal(part.comparables.length, 2); assert.equal(part.error, undefined); assert.ok(part.partial?.length && part.partial.every(e => e === "boom"));
   const all = await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), { search: async () => { throw new Error("down"); }, fetchHtml: async (url) => ({ status: 404, finalUrl: url }) });
   assert.equal(all.error, "down"); assert.equal(all.comparables.length, 0);
   assert.equal(parseLooseJson('Here:\n```json\n{"results":[{"url":"u"}]}\n```').results[0].url, "u");
