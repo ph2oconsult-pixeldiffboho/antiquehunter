@@ -31,7 +31,7 @@ export const regionsFor = (geographies: string[]): Set<Region> | null => {
 // own location (from the page, or the search result) must match a selected region.
 /** Auctionet lists the house currency: a strong hint of the country when the city is not in our lists. */
 export const auctionetCurrencyRegion = (currency?: string): Region | null =>
-  currency === 'SEK' ? 'Sweden' : currency === 'DKK' || currency === 'EUR' || currency === 'NOK' ? 'Europe' : null;
+  currency === 'SEK' ? 'Sweden' : currency === 'GBP' ? 'United Kingdom' : currency === 'DKK' || currency === 'EUR' || currency === 'NOK' ? 'Europe' : null;
 
 const DOMAIN_REGIONS: Array<[string, Region[] | 'multi']> = [
   ['interencheres.com', ['France']],

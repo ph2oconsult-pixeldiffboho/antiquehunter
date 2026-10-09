@@ -350,7 +350,8 @@ export const candidateToMatch = (c: DirectCandidate, params: DirectParams, analy
     url: l.url,
     platform: SITE_LABEL[l.site],
     price,
-    location: [l.city, country].filter(Boolean).join(', ') || (l.house || ''),
+    // Never the house name as a location (fix 9): city + country, else the region the lot was placed in
+    location: [l.city, country].filter(Boolean).join(', ') || (c.region || ''),
     date: l.saleDate ? (l.dateOnly ? formatSaleDay(l.saleDate) : formatSaleDate(l.saleDate)) : undefined,
     description: l.description && l.description !== l.title ? l.description : undefined,
     dealerAnalysis: analysis || templateAnalysis(c, params.query),

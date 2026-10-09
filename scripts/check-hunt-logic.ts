@@ -846,6 +846,33 @@ check("fix 7: partly-period, old-parts and later 'de style <requested style>' lo
   assert.equal(periodProblemFor(q, "Commode tombeau", "d'époque Louis XV, estampillée"), null);
 });
 
+check("fix 8: UK searches use Auctionet's UK houses; fix 9: Auctionet all-in, location never the house name", () => {
+  const json = JSON.parse(readFileSync(new URL("./fixtures/auctionet_george_iii_chest.json", import.meta.url), "utf8"));
+  const params = { query: "George III chest of drawers", geographies: ["United Kingdom"], platforms: ["The Saleroom", "easyLive Auction"], periodOnly: true, priceRange: "2000 EUR", currency: "EUR" };
+  const plan = planHunt(params);
+  assert.equal(plan.useAuctionet, true);
+  const now = Date.UTC(2026, 9, 9, 8, 0, 0);
+  const outs = json.items.map((it: any) => ({ id: it.id, ...auctionetToMatch(it, params, plan, now) }));
+  const kept = outs.filter((o: any) => o.match);
+  assert.ok(kept.length >= 3, JSON.stringify(outs.map((o: any) => [o.id, o.dropReason])));
+  assert.equal(outs.find((o: any) => o.id === 5410718).dropReason, "not_period"); // "GEORGE III STYLE"
+  for (const o of kept) {
+    assert.match(o.match.location, /United Kingdom/);
+    assert.match(o.match.allInEstimate || "", /^All-in ≈ €[\d,]+( – €[\d,]+)? ~25% fees assumed$/);
+    assert.equal(o.match.premiumAssumed, true);
+  }
+  const m = kept.find((o: any) => o.id === 5401614).match;
+  assert.ok(m.allInLow > 250 && m.allInLow < 350 && m.allInHigh > 500 && m.allInHigh < 700, `${m.allInLow}-${m.allInHigh}`);
+  // a Sweden-only search does not take UK lots
+  const sv = planHunt({ ...params, geographies: ["Sweden"], platforms: ["Auctionet"] });
+  assert.equal(auctionetToMatch(json.items.find((i: any) => i.id === 5401614), params, sv, now).dropReason, "geo_location_mismatch");
+  // Drouot lot with no city: the location is the region, never the auction house's name
+  const lot = { site: "drouot" as const, id: "1", url: "https://drouot.com/fr/l/1", title: "Commode", currency: "EUR", house: "Ivoire – Galerie de Chartres – Maîtres Lelièvre" };
+  const dm = candidateToMatch({ lot, score: 1, premiumPct: 25, premiumAssumed: true, styleMatch: null, region: "France" }, { query: "commode" });
+  assert.equal(dm.location, "France");
+  assert.equal(dm.house, "Ivoire – Galerie de Chartres – Maîtres Lelièvre");
+});
+
 {
   // End-to-end direct search with the network mocked: Drouot answers, Interencheres blocks (as from Vercel)
   const realFetch = globalThis.fetch;
