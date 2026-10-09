@@ -1,17 +1,17 @@
 // Server side of "real auction comparables" (POST /api/comps): Gemini with Google Search proposes past results for a
 // maker's piece; every one is opened and verified from the page itself (compsMath.verifyComparable) before it is
 // returned. Nothing unverified is ever returned. Budget: Gemini <= 30 s, page checks <= 10 s, whole request <= 45 s.
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
-import { verifyComparable, type CompClaim, type Comparable, type CompsResponse } from "./compsMath.js";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { houseOf, verifyComparable, type CompClaim, type Comparable, type CompsResponse } from "./compsMath.js";
 import { findMaker, PIECES, fold } from "./makers.js";
 import { isGroundingRedirect } from "./huntValidation.js";
 
 const MODEL = "gemini-3.5-flash";
 /** Fast model for memory-based candidates (verified from their pages like everything else). */
 const FAST_MODEL = "gemini-3.1-flash-lite-preview";
-export const COMPS_GEMINI_TIMEOUT_MS = 30_000;
+export const COMPS_GEMINI_TIMEOUT_MS = 20_000;
 export const COMPS_VERIFY_BUDGET_MS = 10_000;
-export const COMPS_TOTAL_BUDGET_MS = 42_000;
+export const COMPS_TOTAL_BUDGET_MS = 32_000;
 const FETCH_TIMEOUT_MS = 6_000;
 const MAX_CANDIDATES = 15;
 export const MAX_COMPS = 6;
@@ -64,6 +64,31 @@ export const COMPS_SEARCH_SCOPES = [
   "European houses: Auctionet, Dorotheum, Koller, Lempertz, Bukowskis, Bruun Rasmussen",
 ]
 
+const schema = {
+  type: Type.OBJECT,
+  properties: {
+    results: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          url: { type: Type.STRING, description: "The lot page URL exactly as found (not a search page)." },
+          house: { type: Type.STRING },
+          sale_date: { type: Type.STRING, description: "YYYY-MM-DD" },
+          title: { type: Type.STRING },
+          pieces: { type: Type.NUMBER, description: "Number of chairs / pieces in the lot." },
+          stamp_status: { type: Type.STRING, enum: ["stamped", "attributed", "by"] },
+          price: { type: Type.NUMBER, description: "The sold price exactly as printed on the page." },
+          currency: { type: Type.STRING },
+          price_includes_fees: { type: Type.BOOLEAN },
+        },
+        required: ["url", "house", "title", "price", "currency"],
+      },
+    },
+  },
+  required: ["results"],
+};
+
 export const buildCompsPrompt = (r: CompsRequest, scope = COMPS_SEARCH_SCOPES.join('; ')): string => {
   const piece = PIECES.find(p => p.key === r.piece);
   const what = piece ? `${piece.en} (${piece.fr})` : 'furniture';
@@ -72,7 +97,7 @@ export const buildCompsPrompt = (r: CompsRequest, scope = COMPS_SEARCH_SCOPES.jo
 Prefer sales from 2018 onwards; include stamped ("estampillé", "stamped") and attributed ("attribué à") lots and say which.
 Where to look: ${scope}. Use Google searches such as: ${site}${r.maker} ${piece ? piece.fr.split(/[ ,/]/)[0] : ''} ; ${site}${r.maker} ${piece ? piece.en.split(/[ ,/]/)[0] : ''} sold. One or two searches are enough.
 Copy each URL EXACTLY from the search results - never construct or guess a lot number. If you are not sure of a URL, leave the result out.
-Return up to 6 results as JSON only: {"results":[{"url","house","sale_date" (YYYY-MM-DD),"title","pieces","stamp_status" (stamped|attributed|by),"price" (number as printed),"currency","price_includes_fees"}]}. Each must be ONE lot page URL that shows the sold price (not a search page, not a dealer's shop listing, not an unsold lot).
+Return up to 6 results. Each must be ONE lot page URL that shows the sold price (not a search page, not a dealer's shop listing, not an unsold lot).
 Give the price exactly as printed on the page, its currency, the sale date, the number of pieces in the lot, and whether the price includes the buyer's premium.
 Never invent a result: only return pages you actually found.`;
 };
@@ -104,8 +129,8 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
     const response: any = await ai.models.generateContent({
       model,
       contents: prompt,
-      // no responseSchema: with one, the preview runs came back with 0 grounding chunks (the real pages Google found)
-      config: { tools: [{ googleSearch: {} }], thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, abortSignal: signal } as any,
+      // with or without a schema the preview runs reported 0 grounding chunks / web queries; the schema gives more candidates
+      config: { tools: [{ googleSearch: {} }], thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, responseMimeType: 'application/json', responseSchema: schema, abortSignal: signal } as any,
     });
     const gm = response?.candidates?.[0]?.groundingMetadata || {};
     const chunks = gm.groundingChunks || [];
@@ -119,12 +144,9 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   let grounded: string[] = [];
   const g0 = Date.now();
   const searchMs: number[] = [];
-  // the fast model answers from memory (0 web searches in the preview runs) - cheap, and verification drops what is wrong;
-  // the search model really searches Google (slower): three grouped scopes
-  const jobs: Array<[string, string]> = [
-    ...COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]),
-    [COMPS_SEARCH_SCOPES.slice(0, 3).join('; '), MODEL], [COMPS_SEARCH_SCOPES.slice(3, 5).join('; '), MODEL], [COMPS_SEARCH_SCOPES.slice(5).join('; '), MODEL],
-  ];
+  // gemini-3.5-flash + search took 30 s+ (timed out) in every preview run, so only the fast model is used; it reported
+  // 0 web searches, so its candidates are treated as leads only: each is kept only if its own page verifies it.
+  const jobs: Array<[string, string]> = COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]);
   const run = (scope: string, model: string, i: number) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
     search(buildCompsPrompt(req, scope), signal, model),
     new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
@@ -169,6 +191,13 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   }));
   const comps: Comparable[] = [];
   const lotSeen = new Set<string>();
+  // houses whose pages refuse the server (bot protection) are reported, not silently skipped
+  cands.slice(0, MAX_CANDIDATES).forEach((c, i) => {
+    if ((results[i] as any).reason !== 'http_403') return;
+    const h = houseOf(c.url).house;
+    const label = h ? `${h} (pages blocked to our server)` : null;
+    if (label && !out.unreachable.includes(label)) out.unreachable.push(label);
+  });
   out.checked = cands.slice(0, MAX_CANDIDATES).map((c, i) => ({ url: c.url.slice(0, 200), result: (results[i] as any).comp ? 'verified' : String((results[i] as any).reason || 'unverified') }));
   for (const r of results as Array<{ comp?: Comparable; reason?: string }>) {
     if (!r.comp) { drop(r.reason || 'unverified'); continue; }

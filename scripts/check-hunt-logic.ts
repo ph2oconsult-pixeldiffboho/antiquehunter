@@ -1340,6 +1340,7 @@ await (async () => {
   assert.equal(res.comparables.length, 2);
   assert.deepEqual(res.comparables.map(c => c.house).sort(), ["Bonhams", "Christie's"]);
   assert.equal(res.stats.dropped.price_not_on_page, 1); assert.equal(res.stats.dropped.http_404, 1);
+  assert.ok(res.checked?.some(c => c.result === 'verified') && res.checked?.some(c => c.result === 'http_404'));
   passed++; console.log("ok - comps server function: only page-verified results are returned (invented or unreachable ones are dropped)");
   // parallel scoped searches: one failing scope does not lose the others; all failing reports the error
   const part = await findComparables({ maker: "Bellangé", piece: "armchair", material: "mahogany", pieces: 4 }, undefined, Date.now(), {
@@ -1354,6 +1355,11 @@ await (async () => {
   assert.equal(part.comparables.length, 2); assert.equal(part.error, undefined); assert.ok(part.partial?.length && part.partial.every(e => e === "boom"));
   const all = await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), { search: async () => { throw new Error("down"); }, fetchHtml: async (url) => ({ status: 404, finalUrl: url }) });
   assert.equal(all.error, "down"); assert.equal(all.comparables.length, 0);
+  const blocked = await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), {
+    search: async () => ({ text: JSON.stringify({ results: [{ url: "https://www.bonhams.com/auction/1/lot/2/", house: "Bonhams", title: "x", price: 1, currency: "USD" }] }), grounded: [] }),
+    fetchHtml: async (url) => ({ status: 403, finalUrl: url }),
+  });
+  assert.equal(blocked.comparables.length, 0); assert.ok(blocked.unreachable.some(u => /Bonhams/.test(u)));
   assert.equal(parseLooseJson('Here:\n```json\n{"results":[{"url":"u"}]}\n```').results[0].url, "u");
   assert.deepEqual(parseLooseJson("no json here"), {});
   passed++; console.log("ok - comps server function: scoped searches run in parallel; a failed scope keeps the others' verified results");
