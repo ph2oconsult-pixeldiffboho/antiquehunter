@@ -33,7 +33,7 @@ export interface CompsResponse {
   /** Sources that were searched, and those that could not be read (e.g. Drouot results need an account) */
   searched: string[];
   unreachable: string[];
-  stats: { candidates: number; verified: number; dropped: Record<string, number>; timingMs?: Record<string, number | number[]> };
+  stats: { candidates: number; verified: number; grounded?: number; claimed?: number; dropped: Record<string, number>; timingMs?: Record<string, number | number[]> };
   error?: string;
   partial?: string[];
   /** Every candidate page checked, with the verification outcome (transparency / debugging). */

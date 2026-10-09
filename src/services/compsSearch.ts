@@ -21,6 +21,7 @@ const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'en-GB,en;q=0.9,fr;q=0.8',
+  'Upgrade-Insecure-Requests': '1', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'none', 'Sec-Fetch-User': '?1',
 };
 
 export interface CompsRequest { maker: string; piece?: string; material?: string; pieces?: number; language?: string }
@@ -77,9 +78,10 @@ const schema = {
   required: ["results"],
 };
 
-/** Three narrower searches run in parallel (one long search often exceeds the budget). */
+/** Narrower searches run in parallel (one long search often exceeds the budget). */
 export const COMPS_SEARCH_SCOPES = [
-  "Christie's (christies.com and onlineonly.christies.com lot pages)",
+  "Christie's lot pages (christies.com/en/lot/..., onlineonly.christies.com)",
+  "Christie's and Sotheby's lot pages, searching in French (\"estampillé\", \"attribué à\", \"adjugé\")",
   "Bonhams (bonhams.com) and Sotheby's (sothebys.com) lot pages",
   "French and European houses: Artcurial, Ader, Tajan, Millon, Aguttes, Drouot, Interenchères, Auctionet, Dorotheum, Koller",
 ];
@@ -87,9 +89,11 @@ export const COMPS_SEARCH_SCOPES = [
 export const buildCompsPrompt = (r: CompsRequest, scope = COMPS_SEARCH_SCOPES.join('; ')): string => {
   const piece = PIECES.find(p => p.key === r.piece);
   const what = piece ? `${piece.en} (${piece.fr})` : 'furniture';
+  const site = /Christie/.test(scope) ? 'site:christies.com ' : /Bonhams/.test(scope) ? 'site:bonhams.com ' : '';
   return `Find past auction RESULTS (sold lots, with the price realised / hammer price) for ${what} by the French maker ${r.maker}${r.material ? `, ideally in ${r.material}` : ''}.
 Prefer sales from 2018 onwards; include stamped ("estampillé", "stamped") and attributed ("attribué à") lots and say which.
-Search: ${scope}. Be quick: one or two searches are enough.
+Where to look: ${scope}. Use Google searches such as: ${site}${r.maker} ${piece ? piece.fr.split(/[ ,/]/)[0] : ''} ; ${site}${r.maker} ${piece ? piece.en.split(/[ ,/]/)[0] : ''} sold. One or two searches are enough.
+Copy each URL EXACTLY from the search results - never construct or guess a lot number. If you are not sure of a URL, leave the result out.
 Return up to 6 results. Each must be ONE lot page URL that shows the sold price (not a search page, not a dealer's shop listing, not an unsold lot).
 Give the price exactly as printed on the page, its currency, the sale date, the number of pieces in the lot, and whether the price includes the buyer's premium.
 Never invent a result: only return pages you actually found.`;
@@ -183,6 +187,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   comps.sort((a, b) => (Number(b.material === req.material) - Number(a.material === req.material)) || String(b.date || '').localeCompare(String(a.date || '')));
   out.comparables = comps.slice(0, MAX_COMPS);
   out.stats.verified = out.comparables.length;
+  out.stats.grounded = grounded.length; out.stats.claimed = claims.length;
   out.stats.timingMs = { gemini: geminiMs, searches: searchMs, verify: Date.now() - v0, total: Date.now() - startedAt };
   out.ok = true;
   return out;

@@ -1344,8 +1344,9 @@ await (async () => {
   // parallel scoped searches: one failing scope does not lose the others; all failing reports the error
   const part = await findComparables({ maker: "Bellangé", piece: "armchair", material: "mahogany", pieces: 4 }, undefined, Date.now(), {
     search: async (prompt) => {
-      if (/Bonhams/.test(prompt) && !/Christie's \(christies/.test(prompt)) throw new Error("boom");
-      if (/Artcurial/.test(prompt) && !/Christie's \(christies/.test(prompt)) return { text: "not json", grounded: ["https://www.christies.com/en/lot/lot-6314500"] };
+      const scope = (prompt.match(/Where to look: ([^\n]*)/) || [])[1] || "";
+      if (scope.startsWith("Bonhams")) throw new Error("boom");
+      if (scope.startsWith("French")) return { text: "not json", grounded: ["https://www.christies.com/en/lot/lot-6314500"] };
       return { text: JSON.stringify({ results: [{ url: "https://www.bonhams.com/auction/31313/lot/152/x/", house: "Bonhams", title: "x", price: 4096, currency: "USD" }] }), grounded: [] };
     },
     fetchHtml: async (url) => pages[url] ? { status: 200, html: pages[url], finalUrl: url } : { status: 404, finalUrl: url },
