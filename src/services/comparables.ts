@@ -53,7 +53,7 @@ export const centuryOf = (text: string): SoldComparable['century'] => {
   return 0;
 };
 
-const LATER_RE = /(\bmodern\b|contemporary|mid[\s-]century|\bvintage\b|reproduction|\bstyle\b|-stil\b|\bstil\b|1900-tal|\bxx(e|eme)\b|20th)/i;
+const LATER_RE = /(\bmodern\b|contemporary|mid[\s-]century|\bvintage\b|reproduction|\brevival\b|in the manner of|in the taste of|\bcopy\b|\bkopia\b|\bstyle\b|-stil\b|\bstil\b|1900-tal|\bxx(e|eme)\b|20th)/i;
 const STAMP_RE = /(estampill|stamped|\bjme\b|sign[ée]|signed|attribu[ée]|attributed|ma[iî]tre|maker'?s mark)/i;
 
 /** Type of piece: from the words of the text (the first piece word of the title wins), else null. */

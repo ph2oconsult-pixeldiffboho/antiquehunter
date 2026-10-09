@@ -966,6 +966,7 @@ check("fix 4: comparables — same type and region first, style vs period kept a
   assert.match(txt, /Median hammer of these sales/);
   assert.equal(featuresOf("A GEORGE III STYLE WALNUT CHEST OF DRAWERS", "United Kingdom").later, 1);
   assert.equal(featuresOf("BYRÅ, gustaviansk, 1700-talets slut", "Sweden").later, 0);
+  assert.equal(featuresOf("A LOUIS XV REVIVAL BOMBE COMMODE.", "United Kingdom").later, 1); // a revival copy is not a period comparable
   assert.equal(featuresOf("BYRÅ, gustaviansk, 1700-talets slut", "Sweden").type, "commode");
   assert.equal(featuresOf("Grand miroir en bois doré", "Nice, France").type, "mirror");
   // band correction table: contiguous, positive, applied by the model's own midpoint

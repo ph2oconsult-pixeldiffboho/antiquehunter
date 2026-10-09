@@ -547,7 +547,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-sm">%</span>
             </div>
             <p className="text-[11px] text-amber-800/80 leading-tight">
-              Includes auction house surcharge + VAT. Total out-of-pocket cost = Hammer Price × (1 + {parseFloat(buyersPremium || '25') / 100}).
+              Includes auction house surcharge + VAT. Total out-of-pocket cost = Hammer Price × (1 + {Number((parseFloat(buyersPremium || '25') / 100).toFixed(4))}).
             </p>
           </div>
         )}

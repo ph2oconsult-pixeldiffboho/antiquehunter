@@ -367,6 +367,24 @@ ${getGlossaryPrompt(language)}`;
   });
 
   const result = JSON.parse(response.text);
+  return postProcessAppraisal(result, {
+    query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
+    comparables, lotFacts, fetchedEstimate, eurTo,
+  });
+};
+
+export interface PostProcessContext {
+  query: string; hasPhotos: boolean; askingPrice?: number; isAuction: boolean; premiumPct: number; targetCurrency: string;
+  currencySymbol: string; language: string; sellerType?: string; lotUrl?: string; comparables: ComparableMatch[];
+  lotFacts?: LotFacts | null; fetchedEstimate: boolean; eurTo: (eur: number) => number;
+}
+
+/**
+ * Everything the app does to the model's JSON (exported so the accuracy harness can re-apply it to a captured answer):
+ * band correction, consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
+ */
+export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, comparables, lotFacts, fetchedEstimate, eurTo } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
