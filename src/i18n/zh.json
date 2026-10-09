@@ -149,7 +149,9 @@
     "must_have_insight_fallback": "适合个人欣赏与收藏，请预留修复预算。",
     "resale_insight_fallback": "转售利润完全取决于能否以低于同行进货价买入。",
     "paddle_rule_label": "商家竞拍规则：",
-    "paddle_rule": "您的最高落槌出价（放弃价）为 {{hammer}}。加上 {{pct}}% 的买家佣金，总计 {{allIn}}。经验法则：最高落槌出价 = 总预算 ÷ {{mult}}。"
+    "paddle_rule": "您的最高落槌出价（放弃价）为 {{hammer}}。加上 {{pct}}% 的买家佣金，总计 {{allIn}}。经验法则：最高落槌出价 = 总预算 ÷ {{mult}}。",
+    "reason_hammer_suffix": " 落槌价（含{{pct}}%买家佣金约{{allIn}}）",
+    "hammer_word": "落槌价"
   },
   "results": {
     "title": "经销商发现",
