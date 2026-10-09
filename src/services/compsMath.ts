@@ -36,6 +36,8 @@ export interface CompsResponse {
   stats: { candidates: number; verified: number; dropped: Record<string, number>; timingMs?: Record<string, number | number[]> };
   error?: string;
   partial?: string[];
+  /** Every candidate page checked, with the verification outcome (transparency / debugging). */
+  checked?: Array<{ url: string; result: string }>;
 }
 
 /** Typical buyer's premium incl. VAT, used to move between hammer and all-in when a house publishes only one. */

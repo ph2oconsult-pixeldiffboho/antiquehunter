@@ -172,6 +172,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   }));
   const comps: Comparable[] = [];
   const lotSeen = new Set<string>();
+  out.checked = cands.slice(0, MAX_CANDIDATES).map((c, i) => ({ url: c.url.slice(0, 200), result: (results[i] as any).comp ? 'verified' : String((results[i] as any).reason || 'unverified') }));
   for (const r of results as Array<{ comp?: Comparable; reason?: string }>) {
     if (!r.comp) { drop(r.reason || 'unverified'); continue; }
     const k = `${r.comp.house}|${r.comp.title.slice(0, 40)}|${r.comp.price}`;
