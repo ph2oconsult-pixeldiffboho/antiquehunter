@@ -21,9 +21,11 @@ import { parseJsLiteralAfter, parseJsLiteralAt } from "../src/services/sources/j
 import { parseDrouotLotPage, parseDrouotSearch, stripLotNumber } from "../src/services/sources/drouot.ts";
 import { parseInterencheresSearch, parisDate } from "../src/services/sources/interencheres.ts";
 import { clearSourceCache, fetchSource, requestUrlFor } from "../src/services/sources/fetchSource.ts";
-import { candidateToMatch, crossListingKey, evaluateLot, finishDirect, searchDirectSites } from "../src/services/directSearch.ts";
+import { siteQueries } from "../src/services/directSearch.ts";
+import { candidateToMatch, crossListingKey, evaluateLot, periodProblemFor, finishDirect, searchDirectSites } from "../src/services/directSearch.ts";
 import { allIn, budgetMin } from "../src/services/budget.ts";
-import { frenchSiteQuery, localQueries } from "../src/services/huntGeo.ts";
+import { localQueries } from "../src/services/huntGeo.ts";
+import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
 import { applyRanking } from "../src/services/hunting.ts";
 
 let passed = 0;
@@ -777,6 +779,73 @@ check("optional fetch relay: only for the listed hosts, key sent as a header", (
   assert.equal(requestUrlFor("https://drouot.com/fr/s?query=x", { ...env, FETCH_RELAY_HOSTS: "interencheres.com,drouot.com" }).viaRelay, true);
 });
 
+// ---------------------------------------------------------------------------
+// Accuracy fixes (9 Oct 2026 road test)
+// ---------------------------------------------------------------------------
+
+check("fix 1: the site query keeps the user's own piece words", () => {
+  assert.equal(frenchSiteQuery("secrétaire à abattant"), "secretaire a abattant");
+  assert.equal(frenchSiteQuery("Louis XVI secrétaire à abattant"), "secretaire a abattant louis xvi");
+  assert.equal(frenchSiteQuery("drop-front secretary"), "secretaire a abattant");
+  assert.equal(frenchSiteQuery("buffet deux-corps"), "buffet deux corps");
+  assert.equal(frenchSiteQuery("buffet deux corps en noyer"), "buffet deux corps noyer");
+  assert.equal(frenchSiteQuery("bonnetière"), "bonnetiere");
+  assert.equal(frenchSiteQuery("armoire Louis XV"), "armoire louis xv");
+  assert.equal(frenchSiteQuery("vaisselier / Welsh dresser"), "vaisselier");
+  assert.equal(frenchSiteQuery("Louis XV commode up to 2000"), "commode louis xv");
+  assert.equal(frenchSiteQuery("George III chest of drawers"), "commode georgien");
+  assert.equal(subtypeInQuery("Louis XV commode")?.key, undefined);
+  assert.equal(subtypeInQuery("secretaire a abattant Louis XVI")?.key, "secretaire_abattant");
+});
+
+check("fix 1: chairs, lamps and writing accessories are not desks; a secrétaire search needs a secrétaire", () => {
+  const q = "secrétaire à abattant", t = ["desk"];
+  assert.equal(headType("Fauteuil de bureau en acajou et laiton doré"), "chair");
+  assert.equal(pieceProblem(q, t, "Fauteuil de bureau en acajou et laiton doré"), "not_requested_type");
+  assert.equal(pieceProblem(q, t, "Jean-Boris LACROIX - Lampe de bureau, structure en métal laqué"), "not_requested_type");
+  assert.equal(pieceProblem(q, t, "[ACCESSOIRES D'ÉCRITURE] Ensemble d'écritoires et accessoires de bureau"), "not_requested_type");
+  assert.equal(pieceProblem(q, t, "Bureau Davenporte en bois laqué noir, XIXe siècle"), "not_requested_subtype");
+  assert.equal(pieceProblem(q, t, "Secrétaire à abattant à doucine en bois de placage, découvrant un écritoire"), null);
+  assert.equal(pieceProblem(q, t, "Secrétaire en marqueterie de frisage à un abattant"), null);
+  assert.equal(pieceProblem("bureau Louis XV", t, "Bureau plat en placage, époque Louis XV"), null);
+  assert.equal(pieceProblem("bureau Louis XV", t, "Fauteuil de bureau canné"), "not_requested_type");
+  assert.equal(pieceProblem("buffet deux corps", ["dresser"], "Buffet bas en noyer"), "not_requested_subtype");
+  assert.equal(pieceProblem("buffet deux corps", ["dresser"], "Buffet deux corps en noyer, XVIIIe"), null);
+  assert.equal(pieceProblem("Louis XV commode", ["commode"], "Commode galbée en bois de placage"), null);
+  assert.equal(pieceProblem("chair", ["chair"], "Fauteuil cabriolet Louis XV"), null);
+  assert.equal(pieceProblem("anything", [], "Lampe"), null);
+});
+
+check("fix 2: several Drouot queries per search, with period and form words", () => {
+  assert.deepEqual(frenchSiteQueries("Louis XV commode"), ["commode louis xv", "commode xviiie", "commode epoque louis xv", "commode tombeau"]);
+  assert.deepEqual(frenchSiteQueries("Napoleon III mirror"), ["miroir napoleon iii", "miroir xixe", "miroir epoque napoleon iii", "miroir bois dore xixe"]);
+  assert.deepEqual(frenchSiteQueries("secrétaire à abattant", 3), ["secretaire a abattant", "secretaire a abattant xviiie", "secretaire a abattant xixe"]);
+  assert.equal(frenchSiteQueries("Louis XV commode walnut")[0], "commode louis xv noyer");
+  assert.equal(frenchSiteQueries("Louis XV commode walnut")[1], "commode louis xv");
+  assert.deepEqual(frenchSiteQueries("something old and nice"), []);
+  assert.equal(siteQueries("drouot", "something old and nice").length, 1);
+  assert.equal(siteQueries("interencheres", "Louis XV commode").length, 2);
+});
+
+check("fix 7: partly-period, old-parts and later 'de style <requested style>' lots are not period", () => {
+  assert.ok(partlyPeriodProblem("Commode en partie d'époque Louis XV"));
+  assert.ok(partlyPeriodProblem("Buffet deux corps, en partie XVIIIème"));
+  assert.ok(partlyPeriodProblem("Secrétaire composé d'éléments anciens"));
+  assert.ok(partlyPeriodProblem("Armoire, éléments anciens"));
+  assert.equal(partlyPeriodProblem("Commode en bois en partie doré, époque Louis XV"), null);
+  const q = "Louis XV commode";
+  assert.ok(requestedStyleOnlyProblem(q, "Commode de style Louis XV, piètement galbé. Époque XIXème"));
+  assert.ok(requestedStyleOnlyProblem(q, "Commode style Louis XV en noyer, fin du XIXe siècle"));
+  assert.equal(requestedStyleOnlyProblem(q, "Commode tombeau d'époque Louis XV en placage de palissandre"), null);
+  assert.equal(requestedStyleOnlyProblem(q, "Commode galbée, XVIIIe siècle"), null);
+  assert.equal(requestedStyleOnlyProblem("Napoleon III mirror", "Miroir Napoléon III de style Louis XV"), null);
+  assert.ok(requestedStyleOnlyProblem("Louis XVI commode", "Commode de style Louis XVI, époque Napoléon III"));
+  assert.equal(requestedStyleOnlyProblem("Louis XVI commode", "Commode de style Louis XV, époque Louis XVI"), null);
+  // whole rule, as used by the direct search
+  assert.ok(periodProblemFor(q, "Commode de style Louis XV", "piètement galbé, elle ouvre par trois tiroirs. Époque XIXème"));
+  assert.equal(periodProblemFor(q, "Commode tombeau", "d'époque Louis XV, estampillée"), null);
+});
+
 {
   // End-to-end direct search with the network mocked: Drouot answers, Interencheres blocks (as from Vercel)
   const realFetch = globalThis.fetch;
@@ -799,7 +868,9 @@ check("optional fetch relay: only for the listed hosts, key sent as a header", (
     assert.equal(drStat.status, 200);
     assert.equal(drStat.found, 7);
     assert.deepEqual(res.coveredDomains, ["drouot.com"]);
-    assert.equal(calls.filter(c => c.includes("/fr/s?query=")).length, 1, "one search page per site");
+    // fix 2: several Drouot queries (style + century + époque + form words); blocked Interencheres only once
+    assert.equal(calls.filter(c => c.includes("/fr/s?query=")).length, siteQueries("drouot", mirrorParams.query).length, "one page per Drouot query");
+    assert.ok(siteQueries("drouot", mirrorParams.query).length >= 3);
     assert.equal(calls.filter(c => c.includes("interencheres.com/recherche")).length, 1);
     const ids = res.candidates.map(c => c.lot.id);
     assert.ok(ids.includes("35219341"), ids.join());
@@ -810,7 +881,7 @@ check("optional fetch relay: only for the listed hosts, key sent as a header", (
     // a blocked site is remembered: the next hunt does not hit it again for a while
     const again = await fetchSource("https://www.interencheres.com/recherche/lots?search=miroir%20napoleon%20iii", { timeoutMs: 1000, ttlMs: 1000 });
     assert.equal(again.cached, true);
-    passed++; console.log("ok - direct search end-to-end (mocked network): Drouot lots verified + enriched, blocked Interencheres reported, one search page per site");
+    passed++; console.log("ok - direct search end-to-end (mocked network): Drouot lots verified + enriched, blocked Interencheres reported, several Drouot queries, one blocked Interencheres page");
   } finally {
     globalThis.fetch = realFetch;
     clearSourceCache();

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { pieceProblem } from "./pieceWords.js";
 import {
   allowedDomainsFor,
   auctionetFacts,
@@ -36,6 +37,7 @@ import {
   type Region,
 } from "./huntGeo.js";
 import {
+  periodProblemFor,
   candidateToMatch, DIRECT_ENRICH_BUDGET_MS, DIRECT_SEARCH_BUDGET_MS, directSitesFor, finishDirect, MAX_DIRECT_RESULTS,
   searchDirectSites, SITE_DOMAIN, type DirectCandidate, type DirectSearchResult, type DirectSourceStat,
 } from "./directSearch.js";
@@ -290,16 +292,17 @@ const responseSchema = {
   required: ["marketBrief", "matches", "dealerClosingTip"]
 };
 
-const periodProblem = (title?: string, description?: string): string | null =>
-  failsPeriodRule(title, description) || modernYearInTitle(title);
+const periodProblem = (query: string, title?: string, description?: string): string | null => periodProblemFor(query, title, description);
 
 /** Apply facts read from the lot page / API to a result. Returns a drop reason when the facts rule it out. */
 const applyFacts = (result: HuntMatch, facts: PageFacts, params: HuntParams, plan: HuntPlan): string | null => {
   if (facts.soldOrEnded) return 'sold_or_ended';
   if (facts.saleDate && facts.saleDate.getTime() < Date.now()) return 'past_sale';
-  if (params.periodOnly !== false && periodProblem(facts.title, facts.description)) return 'not_period';
+  if (params.periodOnly !== false && periodProblem(params.query, facts.title, facts.description)) return 'not_period';
   if (facts.title || facts.description) {
     if (!matchesItemType(plan.itemTypes, facts.title, facts.description)) return 'not_requested_type';
+    const piece = pieceProblem(params.query, plan.itemTypes, facts.title, facts.description);
+    if (piece) return piece;
   }
   if (facts.location) {
     const geo = checkGeography(result.url, [facts.location], plan.regions);
@@ -358,8 +361,9 @@ export const validateMatch = async (
   const title = cleanText(match.title);
   const description = cleanText(match.description);
   const modelLocation = cleanText(match.location);
-  if (params.periodOnly !== false && periodProblem(title, description)) return { dropReason: 'not_period' };
+  if (params.periodOnly !== false && periodProblem(params.query, title, description)) return { dropReason: 'not_period' };
   if (!matchesItemType(plan.itemTypes, title, description)) return { dropReason: 'not_requested_type' };
+  { const piece = pieceProblem(params.query, plan.itemTypes, title, description); if (piece) return { dropReason: piece }; }
   // Geography: country-specific sites are checked on the URL alone; multi-country sites need a matching location
   const siteGeo = checkGeography(url, [modelLocation], plan.regions);
   if (!siteGeo.ok && siteGeo.reason !== 'geo_location_unknown') return { dropReason: siteGeo.reason };
@@ -440,8 +444,9 @@ export const auctionetToMatch = (it: AuctionetItem, params: HuntParams, plan: Hu
   const f = auctionetFacts(it, now);
   if (!it.url || !/^https:\/\/auctionet\.com\//.test(it.url)) return { dropReason: 'no_url' };
   if (!f.live) return { dropReason: 'sold_or_ended' };
-  if (params.periodOnly !== false && periodProblem(f.title, f.description)) return { dropReason: 'not_period' };
+  if (params.periodOnly !== false && periodProblem(params.query, f.title, f.description)) return { dropReason: 'not_period' };
   if (!matchesItemType(plan.itemTypes, f.title, f.description)) return { dropReason: 'not_requested_type' };
+  { const piece = pieceProblem(params.query, plan.itemTypes, f.title, f.description); if (piece) return { dropReason: piece }; }
   const currencyRegion = auctionetCurrencyRegion(it.currency);
   const geo = checkGeography(it.url, [f.location, currencyRegion === 'Sweden' ? 'Sweden' : ''], plan.regions);
   if (!geo.ok) return { dropReason: geo.reason };
@@ -493,7 +498,7 @@ export const searchAuctionet = async (params: HuntParams, plan: HuntPlan, deadli
 // ---------------------------------------------------------------------------
 
 export const RANKER_TIMEOUT_MS = 15_000;
-const MAX_RANKER_CANDIDATES = 14;
+const MAX_RANKER_CANDIDATES = 20;
 
 const rankerSchema = {
   type: Type.OBJECT,
@@ -593,7 +598,7 @@ const lotKey = (u: string): string => {
   return u.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '');
 };
 
-const MAX_TOTAL_RESULTS = 8;
+const MAX_TOTAL_RESULTS = 18;
 
 export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults> => {
   const startedAt = Date.now();

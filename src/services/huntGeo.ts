@@ -311,27 +311,7 @@ export const localQueries = (query: string): LocalQueries => {
   return { fr: Array.from(new Set(out.fr)).slice(0, 3), sv: Array.from(new Set(out.sv)).slice(0, 3), en: Array.from(new Set(out.en)).slice(0, 3) };
 };
 
-/** Strip accents for site keyword searches (both sites ignore accents; plain ASCII keeps URLs simple). */
-const ascii = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-/**
- * The ONE keyword query sent to a French auction site's search page (Interencheres / Drouot): type + style + wood,
- * short, accent-free. Falls back to the user's own words when the dictionary knows nothing.
- * `fallback` drops the material (used only when the first search returns no lots at all).
- */
-export const frenchSiteQuery = (query: string, opts: { fallback?: boolean } = {}): string => {
-  const types = itemTypesInQuery(query);
-  const style = styleInQuery(query);
-  const material = opts.fallback ? undefined : materialsInQuery(query)[0];
-  const typeWord = types.length ? LOCAL_TERMS[types[0]]?.fr[0] : '';
-  const words = [typeWord, style?.fr, material?.fr].filter(Boolean) as string[];
-  if (!typeWord) {
-    // unknown type: user's own words (minus filler) + translated style / material
-    const own = query.replace(/\b(antique|period|french|authentic|old|vintage|for sale|a|an|the)\b/gi, ' ').replace(/\s+/g, ' ').trim();
-    return ascii(own || words.join(' ')).toLowerCase().slice(0, 80);
-  }
-  return ascii(words.join(' ')).toLowerCase();
-};
+// The French site query (frenchSiteQuery / frenchSiteQueries) lives in pieceWords.ts: it uses the user's own piece words.
 
 /** Does a lot text name the style asked for in the query? (null = no style in the query) */
 export const matchesStyle = (query: string, ...texts: Array<string | undefined | null>): boolean | null => {
