@@ -7,7 +7,10 @@ import { findMaker, PIECES, fold } from "./makers.js";
 import { isGroundingRedirect } from "./huntValidation.js";
 
 const MODEL = "gemini-3.5-flash";
+/** The fast model does the scoped searches (every result is verified from its own page anyway); the slower model runs one broad search alongside. */
+const FAST_MODEL = "gemini-3.1-flash-lite-preview";
 export const COMPS_GEMINI_TIMEOUT_MS = 36_000;
+const COMPS_SLOW_GRACE_MS = 4_000;
 export const COMPS_VERIFY_BUDGET_MS = 9_000;
 export const COMPS_TOTAL_BUDGET_MS = 46_000;
 const FETCH_TIMEOUT_MS = 6_000;
@@ -94,7 +97,7 @@ Never invent a result: only return pages you actually found.`;
 
 export interface CompsDeps {
   /** Gemini + Google Search (injectable for tests): the JSON text and the grounding page URLs */
-  search?: (prompt: string, signal: AbortSignal) => Promise<{ text: string; grounded: string[] }>;
+  search?: (prompt: string, signal: AbortSignal, model?: string) => Promise<{ text: string; grounded: string[] }>;
   fetchHtml?: (url: string, ms: number) => Promise<{ status: number; html?: string; finalUrl: string }>;
 }
 
@@ -105,10 +108,10 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   const out: CompsResponse = { ok: false, maker: maker?.name || req.maker, piece: piece?.key, comparables: [], searched: ["Christie's", "Bonhams", "Sotheby's", 'Artcurial', 'Auctionet', 'web search'], unreachable: ['Drouot (results need an account)'], stats: { candidates: 0, verified: 0, dropped: {} } };
   if (!maker) { out.error = 'unknown_maker'; return out; }
   if (!apiKey && !deps.search) { out.error = 'no_api_key'; return out; }
-  const search = deps.search || (async (prompt: string, signal: AbortSignal) => {
+  const search = deps.search || (async (prompt: string, signal: AbortSignal, model = MODEL) => {
     const ai = new GoogleGenAI({ apiKey: apiKey! });
     const response: any = await ai.models.generateContent({
-      model: MODEL,
+      model,
       contents: prompt,
       config: { tools: [{ googleSearch: {} }], thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, responseMimeType: 'application/json', responseSchema: schema, abortSignal: signal } as any,
     });
@@ -123,10 +126,22 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   let grounded: string[] = [];
   const g0 = Date.now();
   const searchMs: number[] = [];
-  const settled = await Promise.allSettled(COMPS_SEARCH_SCOPES.map((scope, i) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
-    search(buildCompsPrompt(req, scope), signal),
+  const jobs: Array<[string, string]> = [...COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]), [COMPS_SEARCH_SCOPES.join('; '), MODEL]];
+  // Once the fast scoped searches are back with enough candidates, the broad (slow) search gets only a short grace period.
+  let cutSlow: () => void = () => {};
+  const slowCut = new Promise<never>((_, rej) => { cutSlow = () => rej(Object.assign(new Error('cut'), { name: 'AbortError' })); });
+  slowCut.catch(() => {});
+  const run = (scope: string, model: string, i: number) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
+    search(buildCompsPrompt(req, scope), signal, model),
     new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
-  ])).finally(() => { searchMs[i] = Date.now() - g0; })));
+    ...(model === MODEL && i === jobs.length - 1 ? [slowCut] : []),
+  ])).finally(() => { searchMs[i] = Date.now() - g0; });
+  const promises = jobs.map(([scope, model], i) => run(scope, model, i));
+  Promise.allSettled(promises.slice(0, -1)).then(fast => {
+    const n = fast.reduce((a, f) => a + (f.status === 'fulfilled' ? (f.value.grounded?.length || 0) + ((() => { try { return (JSON.parse(f.value.text || '{}').results || []).length; } catch { return 0; } })()) : 0), 0);
+    if (n >= 4) setTimeout(cutSlow, COMPS_SLOW_GRACE_MS);
+  });
+  const settled = await Promise.allSettled(promises);
   const errors: string[] = [];
   for (const s of settled) {
     if (s.status === 'rejected') { const e: any = s.reason; errors.push(e?.name === 'AbortError' ? 'search_timeout' : String(e?.message || e).slice(0, 120)); continue; }
