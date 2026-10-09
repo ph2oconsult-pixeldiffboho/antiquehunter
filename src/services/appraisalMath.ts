@@ -481,13 +481,31 @@ export const evidenceAsks = (kind: PieceKind, opts: { hasPhotos: boolean; hasCat
   return asks;
 };
 
+/**
+ * The description states the period the way a catalogue does ("Époque Louis XV", "Restoration period", "circa 1780",
+ * "1700-tal"), not just a style or a century ("Louis XV style", "19th century").
+ */
+export const periodStatedIn = (text: string): boolean => {
+  const t = String(text || '');
+  if (/(d'?\s*[ée]poque|[ée]poque\s*[:A-Z]|\bvers\s+1[6-9]\d\d|\b(restoration|restauration|regency|georgian|victorian|empire|louis[\s-]*(xiv|xv|xvi|philippe)|napol[eé]on\s*iii|gustavian|directoire|transition)\s+period\b|\bperiod\s*:|\bcirca\s*1[6-9]\d\d|\bc\.\s?1[6-9]\d\d|\b1[6-9]\d\d\s*[-–]\s*1[6-9]\d\d\b|\b1[6-9]\d0[- ]?tal)/i.test(t)) return true;
+  return /\b(george\s+(i|ii|iii|iv)|william\s+iv|queen\s+anne)\b(?![\s-]*(style|revival))/i.test(t) && !/\bstyle\b/i.test(t);
+};
+
+/** A dating in a catalogue entry ("XVIIIe siècle", "fin du XIXe", "18th century", "1800-tal"), style pieces included. */
+export const centuryStatedIn = (text: string): boolean =>
+  /\b([xvi]+(e|[eè]me)\s+s(i[eè]cle|\.)|(1[6-9]|20)(th|st)\s+century|1[6-9]00\s*-?\s*tal|1[6-9]00-talet)/i.test(String(text || ''));
+
 export const evidenceCheck = (i: EvidenceCheckInput): EvidenceCheck => {
   const reasons: EvidenceReason[] = [];
   const pc = String(i.periodCertainty || '');
   if (pc === 'ambiguous') reasons.push('period_ambiguous');
-  // a possible later copy only matters when the piece is not already identified (and priced) as a later piece
-  if (i.reproductionRisk === true && pc !== 'later_style_or_revival') reasons.push('possible_reproduction');
+  // A possible later copy matters when the piece is not already identified (and priced) as a later piece, and the
+  // description does not already state the period (an auction catalogue entry "Restoration period" is the house's
+  // attribution; the model's generic "could be a copy" caution should not block the verdict then).
   const brief = isBriefInput(i.typedText, i.lotPageRead);
+  // A catalogue that already dates the piece, or declares it a "style" piece, has answered the period question.
+  const dated = periodStatedIn(i.typedText) || (!brief && (centuryStatedIn(i.typedText) || /\b(style|stil)\b/i.test(String(i.typedText || ''))));
+  if (i.reproductionRisk === true && pc !== 'later_style_or_revival' && !dated) reasons.push('possible_reproduction');
   if ((i.confidence === 'low' || i.confidence === 'very_low') && brief) reasons.push('low_confidence_brief');
   const pieceKind = pieceKindOf(i.category, i.title);
   return {

@@ -29,7 +29,7 @@ import { localQueries } from "../src/services/huntGeo.ts";
 import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
 import { applyRanking } from "../src/services/hunting.ts";
 import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
-import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceCheck, evidenceAsks, pieceKindOf, isBriefInput } from "../src/services/appraisalMath.ts";
+import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceCheck, evidenceAsks, pieceKindOf, isBriefInput, periodStatedIn, centuryStatedIn } from "../src/services/appraisalMath.ts";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => { fn(); passed++; console.log("ok -", name); };
@@ -966,7 +966,8 @@ check("need more evidence: when it triggers (ambiguous period, possible copy, lo
   // a piece correctly identified as a later style piece gets a normal verdict at its (later) price
   assert.equal(evidenceCheck({ ...base, periodCertainty: "later_style_or_revival", reproductionRisk: true }).required, false);
   assert.deepEqual(evidenceCheck({ ...base, periodCertainty: "ambiguous" }).reasons, ["period_ambiguous"]);
-  assert.deepEqual(evidenceCheck({ ...base, periodCertainty: "probable_period", reproductionRisk: true }).reasons, ["possible_reproduction"]);
+  const undated = { ...base, typedText: "" };
+  assert.deepEqual(evidenceCheck({ ...undated, periodCertainty: "probable_period", reproductionRisk: true, confidence: "high" }).reasons, ["possible_reproduction"]);
   // low confidence alone: only on a short note (a full catalogue entry has already said what it can)
   assert.equal(evidenceCheck({ ...base, periodCertainty: "probable_period", confidence: "low" }).required, false);
   const brief = evidenceCheck({ ...base, periodCertainty: "probable_period", confidence: "low", typedText: "four 19th century armchairs" });
@@ -974,6 +975,25 @@ check("need more evidence: when it triggers (ambiguous period, possible copy, lo
   assert.ok(brief.asks.includes("catalogue_or_link"));
   assert.equal(isBriefInput("", false), true);
   assert.equal(isBriefInput("", true), false); // lot page read = catalogue text
+});
+
+check("need more evidence: a catalogue that dates the piece (or calls it a style piece) is not sent back for a possible copy", () => {
+  assert.equal(periodStatedIn("Restoration period, minor restorations"), true);
+  assert.equal(periodStatedIn("Commode d'époque Louis XV"), true);
+  assert.equal(periodStatedIn("Travail français. Epoque: XVIIIème."), true);
+  assert.equal(periodStatedIn("A George III mahogany chest, circa 1780"), true);
+  assert.equal(periodStatedIn("A GEORGE III STYLE WALNUT CHEST"), false);
+  assert.equal(periodStatedIn("four 19th century armchairs"), false);
+  assert.equal(centuryStatedIn("Fin du XVIIIe siècle"), true);
+  assert.equal(centuryStatedIn("Début du XIXème siècle"), true);
+  const base = { confidence: "medium", periodCertainty: "probable_period", reproductionRisk: true, lotPageRead: false, hasPhotos: true, category: "furniture", title: "Commode" };
+  const long = "Commode en noyer ouvrant par trois tiroirs, plateau de bois, entrées de serrure en bronze. XVIIIe siècle. Haut. 88 cm";
+  assert.equal(evidenceCheck({ ...base, typedText: long }).required, false);
+  assert.equal(evidenceCheck({ ...base, typedText: "Commode dans le style Louis XVI en noyer ouvrant à trois rangs de tiroirs, plateau marqueté, poignées en laiton" }).required, false);
+  // a short note giving a century is not a catalogue dating: still asks
+  assert.deepEqual(evidenceCheck({ ...base, typedText: "four 19th century armchairs" }).reasons, ["possible_reproduction"]);
+  // an ambiguous period still asks, whatever the text says
+  assert.equal(evidenceCheck({ ...base, periodCertainty: "ambiguous", typedText: long }).required, true);
 });
 
 check("need more evidence: asks are specific to the kind of piece", () => {
