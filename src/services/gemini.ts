@@ -7,6 +7,10 @@ import {
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFetch";
 import { convertApprox } from "./budget";
+import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
+import { anchorOnComparables, type CompsResponse } from "./compsMath";
+import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
+import { pieceKindOf } from "./appraisalMath";
 
 /** Fixed seed + temperature 0: the same input gives the same appraisal (fix 9). */
 export const APPRAISAL_SEED = 20261009;
@@ -14,7 +18,31 @@ export const APPRAISAL_SEED = 20261009;
 export interface AppraisalExtra {
   /** What was read from the pasted lot link (server-side, /api/lot); null = a link was given but could not be read */
   lotFacts?: LotFacts | null;
+  /** Comparables already fetched (the accuracy harness re-applies captured ones); undefined = fetch when a maker is named */
+  comps?: CompsResponse | null;
+  /** The buyer's answers to the "Before you buy" checklist (re-run) */
+  checkAnswers?: CheckAnswers;
+  /** Injectable for tests; default POST /api/comps */
+  fetchComps?: (req: { maker: string; piece?: string; material?: string; pieces: number; language: string }) => Promise<CompsResponse | null>;
 }
+
+export const COMPS_CLIENT_TIMEOUT_MS = 50_000;
+
+/** POST /api/comps (server: Gemini search + page verification). null on any failure — the app then falls back. */
+export const fetchCompsFromApi = async (req: { maker: string; piece?: string; material?: string; pieces: number; language: string }): Promise<CompsResponse | null> => {
+  const c = new AbortController();
+  const timer = setTimeout(() => c.abort(), COMPS_CLIENT_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/comps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req), signal: c.signal });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return j && Array.isArray(j.comparables) ? j as CompsResponse : null;
+  } catch { return null; } finally { clearTimeout(timer); }
+};
+
+export const compsRequestFor = (m: MakerMatch, text: string, category: string | undefined, language: string) => ({
+  maker: m.search, piece: pieceOf(text, category)?.key, material: materialOf(text), pieces: countPieces(text), language,
+});
 
 // Antique assessment service using Gemini 3.1 Flash Lite
 const API_KEY = process.env.GEMINI_API_KEY || "";
@@ -104,7 +132,11 @@ You must speak with the authority of an expert who has seen thousands of pieces.
   * 18th c. provincial armoire: €100–€600 (or equivalent in ${targetCurrency})
   * Vaisselier/buffet deux-corps 18th–19th c.: €150–€900 (or equivalent in ${targetCurrency})
   * 20th c. reproductions: €50–€300 (or equivalent in ${targetCurrency})
-- NEVER multiply value because the user claims a stamp or "18th century" in their typed text. A user's text claim is unverified. Only raise value for a stamp when a photograph of the stamp is provided and it is clearly legible.
+- MAKER'S STAMPS AND ATTRIBUTIONS (fill item_summary.maker):
+  * A stamp the buyer says they have CONFIRMED ("stamped X, stamp confirmed"), a legible stamp in a photo, or a catalogue entry stating "estampillé X" / "stamped X" = a STAMPED piece by that maker: value it as stamped work by that maker, never call it "attributed" (the app anchors the range on verified auction results for that maker and piece).
+  * "Attribué à" / "attributed to" / "atelier de" = attributed: between unattributed and stamped values.
+  * A dealer's label, ticket or the dealer's word alone is NOT a stamp and NOT an attribution: value the piece as an unattributed piece of its period and say the label proves nothing.
+  * Otherwise NEVER multiply value because the text claims a maker or "18th century" without saying the stamp was seen or confirmed.
 - Reduce value for replaced marble, replaced/later bronzes, veneer losses, woodworm, restorations, and "partly period" or marriage pieces.
 - If a listing or auction estimate is given (typed by the user, or read from the lot page below), treat it as a strong anchor: your market range should normally sit within 0.7x–2.0x of that estimate unless you give a specific, documented reason.
 
@@ -202,6 +234,7 @@ ${getGlossaryPrompt(language)}`;
     Category: ${category}
     Currency Required: ${targetCurrency} (${currencySymbol})
     Visual Evidence: ${hasPhotos ? `${imagesBase64?.length} photographs attached` : 'NO IMAGES SUBMITTED - Text description only'}
+    ${checksPrompt(extra.checkAnswers)}
     
     Assess the item with the authority of a seasoned dealer. All prices in ${targetCurrency}.
     Return valid JSON only.
@@ -220,6 +253,12 @@ ${getGlossaryPrompt(language)}`;
       ...imageParts,
     ],
   };
+
+  // Maker named in the text: look up verified auction comparables in parallel with the appraisal
+  const makerFromText = detectMaker(query);
+  const getComps = extra.fetchComps || fetchCompsFromApi;
+  let compsP: Promise<CompsResponse | null> | null = extra.comps !== undefined ? Promise.resolve(extra.comps)
+    : makerFromText ? getComps(compsRequestFor(makerFromText, query, category, language)).catch(() => null) : null;
 
   const response = await ai.models.generateContent({
     model,
@@ -264,9 +303,19 @@ ${getGlossaryPrompt(language)}`;
                     evidence_gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
                     period_certainty: { type: Type.STRING, enum: ["confirmed_period", "probable_period", "ambiguous", "later_style_or_revival"] },
                     reproduction_risk: { type: Type.BOOLEAN },
-                    construction_evidence: { type: Type.STRING, description: "Construction details actually seen (joints, saw marks, nails/screws, oxidation), or 'none shown'." }
+                    construction_evidence: { type: Type.STRING, description: "Construction details actually seen (joints, saw marks, nails/screws, oxidation), or 'none shown'." },
+                    maker: {
+                      type: Type.OBJECT,
+                      description: "The maker (ébéniste / menuisier) if one is named or a stamp / label is visible; name '' and status 'none' otherwise.",
+                      properties: {
+                        name: { type: Type.STRING },
+                        status: { type: Type.STRING, enum: ["none", "stamped_stated", "stamp_visible_in_photo", "attributed", "dealer_label"] },
+                        evidence: { type: Type.STRING, description: "Where the name comes from (stamp on the seat rail seen in photo 2, buyer's text, dealer's label…)" }
+                      },
+                      required: ["name", "status", "evidence"]
+                    }
                   },
-                  required: ["title", "category", "likely_origin", "likely_style", "likely_period", "value_tier", "snap_judgement", "confidence", "confidence_score", "confidence_breakdown", "confidence_reason", "confidence_improvement_suggestions", "evidence_gaps", "period_certainty", "reproduction_risk", "construction_evidence"]
+                  required: ["title", "category", "likely_origin", "likely_style", "likely_period", "value_tier", "snap_judgement", "confidence", "confidence_score", "confidence_breakdown", "confidence_reason", "confidence_improvement_suggestions", "evidence_gaps", "period_certainty", "reproduction_risk", "construction_evidence", "maker"]
                 },
                 buy_decision: {
                   type: Type.OBJECT,
@@ -369,9 +418,15 @@ ${getGlossaryPrompt(language)}`;
   });
 
   const result = JSON.parse(response.text);
+  // A maker only the model found (a stamp read in a photo): look the comparables up now
+  if (!compsP) {
+    const m = combineMakerStatus(null, result?.items?.[0]?.item_summary?.maker);
+    if (m) compsP = getComps(compsRequestFor(m, `${query} ${result.items[0].item_summary.title || ''}`, category, language)).catch(() => null);
+  }
+  const comps = compsP ? await compsP : undefined;
   return postProcessAppraisal(result, {
     query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
-    lotFacts, fetchedEstimate, eurTo, category,
+    lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers: extra.checkAnswers,
   });
 };
 
@@ -380,6 +435,9 @@ export interface PostProcessContext {
   currencySymbol: string; language: string; sellerType?: string; lotUrl?: string;
   lotFacts?: LotFacts | null; fetchedEstimate: boolean; eurTo: (eur: number) => number;
   category?: string;
+  /** Verified auction comparables (null = lookup failed; undefined = not looked up) */
+  comps?: CompsResponse | null;
+  checkAnswers?: CheckAnswers;
 }
 
 /**
@@ -387,7 +445,7 @@ export interface PostProcessContext {
  * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
  */
 export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
-  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category } = ctx;
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
@@ -415,10 +473,30 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const nb = normaliseConfidence(c);
     Object.assign(c, nb);
     const words = query.trim().split(/\s+/).length;
+
+    // Maker: the buyer's words first, a stamp the model read in a photo next; the checklist answer on the stamp wins
+    const titleText = `${item.item_summary.title || ''}`;
+    const pieceText = `${query} ${titleText}`;
+    const pieces = countPieces(query) > 1 ? countPieces(query) : countPieces(titleText);
+    const pieceKind = pieceKindOf(category, `${titleText} ${query}`);
+    const fx = checksEffect(checkAnswers);
+    let maker = combineMakerStatus(detectMaker(query), item.item_summary.maker);
+    const makerAsClaimed = maker;
+    let stampAnswer: 'confirmed' | 'denied' | undefined = fx.stampOverride;
+    if (maker && stampAnswer === 'confirmed') maker = { ...maker, status: 'stamped_confirmed' };
+    if (maker && stampAnswer === 'denied') maker = { ...maker, status: 'mentioned' };
+    const compList = comps?.comparables || [];
+    const toTarget = (eur: number) => convertApprox(eur, 'EUR', targetCurrency) ?? eur;
+    const anchor = anchorOnComparables(compList, { status: maker?.status || null, pieces, material: materialOf(pieceText), isAuction, eurTo: toTarget });
+    const perPiece = anchor.used.map(x => isAuction ? x.perPieceHammerEur : x.perPieceAllInEur);
+    const spread = perPiece.length >= 2 ? Math.max(...perPiece) / Math.max(1, Math.min(...perPiece)) : undefined;
+
     let confScore = calibratedConfidence(nb, {
-      hasPhotos, fetchedEstimate, closeComparables: 0,
+      hasPhotos, fetchedEstimate, closeComparables: anchor.applied ? anchor.used.length : 0, comparableSpread: spread,
       vague: words <= 3 && !hasPhotos && !lotFacts?.ok,
     });
+    confScore += fx.confidenceDelta;
+    if (maker && maker.status === 'stamped_confirmed' && !stampAnswer && anchor.applied) confScore += 3;
     
     // Strict Evidence Grounding:
     // If NO photos were provided, confidence can NEVER be high, and evidence quality must be capped.
@@ -454,6 +532,33 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       styleText: `${item.item_summary.likely_style || ''} ${item.item_summary.likely_period || ''}`,
       constructionEvidence: item.item_summary.construction_evidence,
     });
+
+    if (fx.periodConfirmed && evidence.required) {
+      const keep = evidence.reasons.filter(r => r === 'low_confidence_brief' && confLabel !== 'medium' && confLabel !== 'high');
+      evidence.reasons = keep; evidence.required = keep.length > 0;
+    }
+
+    // Comparables anchor the market range (scaled to the number of pieces); the retail tier follows it
+    const pgA = item.price_guidance;
+    if (anchor.applied) {
+      pgA.estimated_market_range_low = anchor.low;
+      pgA.estimated_market_range_high = anchor.high;
+      pgA.fair_price_low = Math.round(anchor.low * 1.3);
+      pgA.fair_price_high = Math.round(anchor.high * 1.6);
+    }
+    // The buyer's checklist answers: denials lower the range, confirmations narrow it upwards
+    if (fx.rangeFactor !== 1 || fx.narrowLow > 0) {
+      const lo = Number(pgA.estimated_market_range_low) || 0, hi = Number(pgA.estimated_market_range_high) || lo;
+      const f = fx.rangeFactor;
+      const r = (x: number) => x >= 1000 ? Math.round(x / 50) * 50 : Math.round(x / 10) * 10;
+      pgA.estimated_market_range_low = r((lo + (hi - lo) * fx.narrowLow) * f);
+      pgA.estimated_market_range_high = r(hi * f);
+      pgA.fair_price_low = r((Number(pgA.fair_price_low) || lo) * f);
+      pgA.fair_price_high = r((Number(pgA.fair_price_high) || hi) * f);
+      if (Number(pgA.good_buy_below) > 0) pgA.good_buy_below = r(Number(pgA.good_buy_below) * f);
+    }
+    if (maker && (maker.status === 'stamped_confirmed' || maker.status === 'stamped_stated' || maker.status === 'stamp_in_photo'))
+      item.item_summary.title = String(item.item_summary.title || '').replace(/\(?\s*attributed\s+to\s+[^),]*\)?/i, `(stamped ${maker.name})`).replace(/\(?\s*attribu[ée]e?s?\s+[àa]\s+[^),]*\)?/i, `(estampillé ${maker.name})`).trim();
 
     // Value Tier Consistency Check:
     // If estimated market range is under 5000, it cannot be Tier A ("Investment")
@@ -579,10 +684,25 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const cleaned: any = align(sanitizeDeep(item));
     item = cleaned;
     if (evidence.required) item.price_guidance = { ...item.price_guidance, provisional: true };
+    if (anchor.applied) {
+      const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
+      item.price_guidance = { ...item.price_guidance, pricing_reasoning: `Anchored on ${anchor.used.length} verified auction results for ${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}). ${item.price_guidance.pricing_reasoning || ''}`.trim() };
+    }
+    const checklistItems = buildChecklist({
+      pieceKind, pieces, period: item.item_summary.likely_period, maker: makerAsClaimed ? { name: makerAsClaimed.name, status: makerAsClaimed.status } : null,
+      basis, text: `${query} ${titleText} ${item.item_summary.likely_style || ''} ${(item.walk_away_if || []).join(' ')}`, category,
+    });
 
     return {
       ...item,
       evidence_check: evidence,
+      maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
+      comparables: {
+        status: comps === undefined ? (maker ? 'not_searched' : 'no_maker') : comps === null || comps.ok === false ? 'error' : compList.length === 0 ? 'none_verified' : anchor.applied ? 'anchored' : 'shown',
+        reason: anchor.reason, group: anchor.group, pieces: anchor.pieces, per_piece_median_eur: anchor.perPieceMedianEur || null, basis: anchor.basis,
+        list: compList, used_urls: anchor.used.map(x => x.url), unreachable: comps?.unreachable || [],
+      },
+      checklist: { items: checklistItems, answers: checkAnswers || {}, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },
       appraisal_inputs: {
         lot_page_read: !!lotFacts?.ok, estimate_read: fetchedEstimate, band_factor: 1, raw_mid_eur: Math.round(rawMidEur),
       },

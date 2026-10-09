@@ -8,6 +8,9 @@
     },
     "api/lot.ts": {
       "maxDuration": 20
+    },
+    "api/comps.ts": {
+      "maxDuration": 60
     }
   }
 }

@@ -8,6 +8,9 @@ import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis } from '../services/appraisalMath';
 import { EvidenceStep } from './EvidenceStep';
+import { BeforeYouBuy } from './BeforeYouBuy';
+import { MakerAndComparables } from './Comparables';
+import type { CheckAnswers } from '../services/checklist';
 
 interface AnalysisViewProps {
   result: any; // Can be a single object or an array of objects
@@ -22,6 +25,7 @@ interface AnalysisViewProps {
   onAddMoreDetails: () => void;
   /** "Need more evidence": back to the details form with the earlier photos and inputs kept */
   onAddEvidence?: () => void;
+  onRerunWithChecks?: (answers: CheckAnswers) => void;
   iterationCount: number;
 }
 
@@ -247,7 +251,7 @@ const FeedbackSection = ({ currentItem, onBack }: { currentItem: any; onBack: ()
   );
 };
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onNewAppraisal, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, onAddEvidence, iterationCount }) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onNewAppraisal, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, onAddEvidence, onRerunWithChecks, iterationCount }) => {
   const { t, i18n } = useTranslation();
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [localResult, setLocalResult] = useState(result);
@@ -887,7 +891,19 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 3b. Need more evidence (period not established): shown on every plan, before any verdict */}
       {currentItem.evidence_check?.required && (
-        <EvidenceStep check={currentItem.evidence_check} constructionSeen={currentItem.item_summary?.construction_evidence} onAddEvidence={onAddEvidence || onAddMoreDetails} />
+        <EvidenceStep check={currentItem.evidence_check} constructionSeen={currentItem.item_summary?.construction_evidence} onAddEvidence={onAddEvidence || onAddMoreDetails}>
+          {currentItem.checklist?.items?.length > 0 && (
+            <BeforeYouBuy embedded items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />
+          )}
+        </EvidenceStep>
+      )}
+
+      {/* 3c. Maker attribution + verified auction comparables (public results; the anchored range itself is in the price card) */}
+      <MakerAndComparables item={currentItem} />
+
+      {/* 3d. Before you buy: what to check and confirm for this piece (answers re-run the appraisal) */}
+      {!currentItem.evidence_check?.required && currentItem.checklist?.items?.length > 0 && (
+        <BeforeYouBuy items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />
       )}
 
       {/* Buying Goal Selector - Moved here to clarify it's a setting that affects the analysis */}

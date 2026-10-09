@@ -7,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { handleHuntRequest } from "./src/services/huntHandler.ts";
 import { fetchLotFacts } from "./src/services/lotFetch.ts";
+import { handleCompsRequest } from "./src/services/compsSearch.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +28,12 @@ async function startServer() {
       .catch((e: any) => ({ ok: false, url: String(req.body?.url || ""), site: "other", imageUrls: [], error: String(e?.message || e).slice(0, 120) }));
     res.setHeader("Cache-Control", "no-store");
     res.json(facts);
+  });
+
+  app.post("/api/comps", async (req, res) => {
+    const { status, body } = await handleCompsRequest(req.body);
+    res.setHeader("Cache-Control", "no-store");
+    res.status(status).json(body);
   });
 
   app.post("/api/rerun-analysis", async (req, res) => {

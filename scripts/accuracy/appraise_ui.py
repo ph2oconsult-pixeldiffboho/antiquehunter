@@ -42,10 +42,14 @@ async def run(lot):
                     raw['request'] = r.request.post_data_json
                     raw['body'] = await r.json(); raw['status'] = r.status
                 except Exception as e: raw['err'] = str(e)
+            if r.url.endswith('/api/comps'):
+                try: raw['comps'] = await r.json(); raw['comps_status'] = r.status
+                except Exception as e: raw['comps'] = {'ok': False, 'error': 'harness:' + str(e)}
             if r.url.endswith('/api/lot'):
                 try: raw['lot'] = {k: v for k, v in (await r.json()).items() if k != 'images'}
                 except Exception: pass
         pg.on('response', lambda r: asyncio.ensure_future(on_resp(r)))
+        pg.on('request', lambda q: raw.__setitem__('comps_requested', True) if q.url.endswith('/api/comps') else None)
         await pg.goto(a.base + '/', wait_until='load'); await pg.wait_for_timeout(2500)
         await pg.click('text=SKIP'); await pg.wait_for_timeout(800)
         await pg.click('text=Appraise an Antique'); await pg.wait_for_timeout(800)
@@ -77,7 +81,7 @@ async def run(lot):
         await pg.click('button[type=submit]')
         for _ in range(150):
             await pg.wait_for_timeout(1000)
-            if 'body' in raw or 'err' in raw:
+            if ('body' in raw or 'err' in raw) and (not raw.get('comps_requested') or 'comps' in raw):
                 await pg.wait_for_timeout(3000); break
         el = time.time() - t0
         txt = await pg.inner_text('body')

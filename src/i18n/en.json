@@ -461,5 +461,89 @@
     "provisional_note": "Provisional until the period is confirmed.",
     "describe_banner": "Add the evidence asked for: new photos are added to the ones you already have.",
     "construction_seen": "Construction seen"
+  },
+  "checklist": {
+    "title": "Before you buy",
+    "title_embedded": "Check these, then re-run",
+    "intro": "Check each point on the piece itself, then tap Yes, No or Not sure. Re-running with your answers firms up the range and confidence (confirmations) or lowers them (denials).",
+    "yes": "Yes",
+    "no": "No",
+    "unsure": "Not sure",
+    "rerun": "Re-run with my answers ({{count}})",
+    "where": {
+      "seat_rail": "on the seat rail (under the seat, front or back rail)",
+      "carcass": "on the carcass (top of the uprights, back or inside)"
+    },
+    "invoice_with_maker": "« estampillé {{maker}}, époque {{period}} »",
+    "invoice_no_maker": "« époque {{period}} » (period, not « style »)",
+    "items": {
+      "stamp_every_piece": "The {{maker}} stamp is present and legible on each of the {{n}} pieces, {{where}}.",
+      "stamp_present": "The {{maker}} stamp is present and legible {{where}}.",
+      "label_is_not_stamp": "Beyond the dealer's label: is there a real {{maker}} stamp on the piece itself? A label proves nothing.",
+      "matching_set": "The {{n}} pieces match: same wood, carving, dimensions and construction (not a married or completed set).",
+      "joints_underneath": "Underneath: pegged joints, hand-cut joints and hand-saw marks, old oxidised wood — no machine cuts, screws or staples.",
+      "seat_rails_webbing": "Seat frame and rails are original under the fabric (no new rails, sound webbing).",
+      "mirror_glass_original": "The glass is original (old mercury or early silvering, slight waves and foxing — not modern float glass).",
+      "mirror_back_original": "The back is original: old wooden planks, hand-made nails, consistent oxidation.",
+      "crest_original": "The crest (fronton) is original to the frame: same wood, carving and gilding, old fixings.",
+      "gilding_original": "Gilding is old (water gilding, wear on the high points), not a recent re-gild or gold paint.",
+      "marble_original": "The marble top is original to the piece (fits exactly, old underside, no modern cut).",
+      "hardware_original": "Handles, mounts and escutcheons are original (old fixings, matching holes, no extra holes).",
+      "veneer_sound": "Veneer and marquetry are sound (no large losses, lifting or modern patches).",
+      "no_major_restoration": "No major restoration: replaced legs or rails, new elements, heavy refinishing.",
+      "invoice_wording": "The invoice will say {{wording}}, with a description of the piece and any restorations.",
+      "provenance_condition_report": "Ask the seller for provenance and a written condition report (restorations, replacements)."
+    }
+  },
+  "comps": {
+    "title": "Maker & auction comparables",
+    "status": {
+      "stamped_confirmed": "Stamped · confirmed by you",
+      "stamped_stated": "Stamped (stated)",
+      "stamp_in_photo": "Stamp seen in photo",
+      "attributed": "Attributed",
+      "dealer_label": "Dealer's label only",
+      "mentioned": "Maker named, no stamp"
+    },
+    "status_note": {
+      "stamped_confirmed": "Valued as a stamped piece by this maker.",
+      "stamped_stated": "Valued as a stamped piece, as stated — check it yourself.",
+      "stamp_in_photo": "A stamp is visible in your photos — confirm it is legible on every piece.",
+      "attributed": "An attribution, not a stamp: valued between an unattributed piece and a stamped one.",
+      "dealer_label": "A dealer's label is not a stamp: valued as an unattributed piece of the period.",
+      "mentioned": "No stamp confirmed: valued as an unattributed piece of the period."
+    },
+    "stamp_warning": "Check the {{maker}} stamp on EVERY piece yourself, and have it written on the invoice (« estampillé {{maker}} »). Without it, the maker premium does not apply.",
+    "anchored_all_in": "Range anchored on {{n}} verified auction results: median {{median}} per piece incl. fees, × {{pieces}}.",
+    "anchored_hammer": "Range anchored on {{n}} verified auction results: median {{median}} per piece (hammer), × {{pieces}}.",
+    "fallback": {
+      "too_few": "Too few verified results of the same kind to anchor the range — the range is the appraiser's estimate.",
+      "not_stamped": "Shown for reference only: without a stamp or attribution, these results do not set the range.",
+      "none_verified": "No verified auction results found for {{maker}} — the range is the appraiser's estimate.",
+      "error": "The auction results search failed — the range is the appraiser's estimate.",
+      "not_searched": "Auction results were not searched.",
+      "no_maker": ""
+    },
+    "pieces_one": "{{count}} piece",
+    "pieces_other": "{{count}} pieces",
+    "stamp": {
+      "stamped": "stamped",
+      "by": "by (house attribution)",
+      "attributed": "attributed"
+    },
+    "material": {
+      "mahogany": "mahogany",
+      "giltwood": "giltwood",
+      "walnut": "walnut",
+      "beech": "beech",
+      "veneer": "veneer",
+      "painted": "painted"
+    },
+    "with_fees": "with fees",
+    "hammer": "hammer",
+    "per_piece_all_in": "per piece incl. fees",
+    "not_used": "not used (other kind)",
+    "unreachable": "Not searchable: {{list}}.",
+    "verified_note": "Each result was opened and checked on the auction house's own page (maker, piece and sold price). Nothing unverified is shown."
   }
 }

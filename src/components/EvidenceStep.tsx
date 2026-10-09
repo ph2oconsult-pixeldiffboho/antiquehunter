@@ -24,7 +24,7 @@ export const EvidenceChecklist: React.FC<{ check: EvidenceCheck; compact?: boole
   );
 };
 
-export const EvidenceStep: React.FC<{ check: EvidenceCheck; constructionSeen?: string; onAddEvidence?: () => void }> = ({ check, constructionSeen, onAddEvidence }) => {
+export const EvidenceStep: React.FC<{ check: EvidenceCheck; constructionSeen?: string; onAddEvidence?: () => void; children?: React.ReactNode }> = ({ check, constructionSeen, onAddEvidence, children }) => {
   const { t } = useTranslation();
   if (!check?.required) return null;
   return (
@@ -43,6 +43,7 @@ export const EvidenceStep: React.FC<{ check: EvidenceCheck; constructionSeen?: s
         <p className="text-xs text-muted"><span className="font-bold">{t('evidence.construction_seen')}:</span> {constructionSeen}</p>
       )}
       <EvidenceChecklist check={check} />
+      {children}
       {onAddEvidence && (
         <button
           onClick={(e) => { e.preventDefault(); onAddEvidence(); }}
