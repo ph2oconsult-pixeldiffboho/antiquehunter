@@ -2,7 +2,7 @@
 // Usage: npx tsx scripts/build-comparables.ts --exclude exclude.json <drouot_or_auctionet_json>...
 //  - Drouot harvest files: { id: { id, description, result, low, high, currency, city, house, date, url } }
 //  - Auctionet files: { id: { id, title, description, currency, estimate, upper_estimate, bids:[{amount}], state, ends_at, house, location, url } }
-//  - exclude.json: { ids: ["drouot-…"], sales: [["house", "YYYY-MM-DD"]] } – the accuracy-test lots and their sales are kept out,
+//  - exclude.json: { ids: ["drouot-…"], sales: [["house", "YYYY-MM-DD"]], drouot_sale_ids: ["182146"] } – the accuracy-test lots and their sales are kept out,
 //    so the test never sees itself (or a sister lot of the same sale) as a comparable.
 import { readFileSync, writeFileSync } from "node:fs";
 import { featuresOf, type SoldComparable } from "../src/services/comparables.ts";
@@ -16,6 +16,7 @@ const exclude = exIdx >= 0 ? JSON.parse(readFileSync(args[exIdx + 1], "utf8")) :
 const files = args.filter((_, i) => i !== exIdx && i !== exIdx + 1);
 const exIds = new Set<string>(exclude.ids);
 const exSales = new Set<string>((exclude.sales as string[][]).map(([h, d]) => `${h}|${d}`));
+const exSaleIds = new Set<string>((exclude.drouot_sale_ids || []).map(String));
 
 // Auctionet categories that hold furniture and mirrors (others: clarinets "Buffet Crampon", lamps, books…)
 const AUCTIONET_FURNITURE = new Set([17, 18, 19, 20, 22, 23, 24, 42, 47, 122, 279]);
@@ -39,7 +40,8 @@ for (const f of files) {
     const date = day(isAuctionet ? r.ends_at : r.date);
     const house = String(r.house || "").trim();
     if (exIds.has(id)) { skipped.excluded++; continue; }
-    if (exSales.has(`${house}|${date}`)) { skipped.sameSale++; continue; }
+    if (exSales.has(`${house}|${date}`) || (!isAuctionet && r.saleId != null && exSaleIds.has(String(Math.round(Number(r.saleId)))))) { skipped.sameSale++; continue; }
+    if (!isAuctionet && !(Number(r.date) > 0)) { skipped.noPrice++; continue; } // undated Drouot lot: cannot be checked against the test sales
     if (isAuctionet && r.category_id != null && !AUCTIONET_FURNITURE.has(Number(r.category_id))) { skipped.noType++; continue; }
     const fullText = isAuctionet ? `${strip(r.title)} ${strip(r.description)}` : String(r.description || "");
     const title = short(isAuctionet ? strip(r.title).replace(/\.\.$/, ".") : firstPart(String(r.description || "")));
