@@ -33,8 +33,9 @@ export interface CompsResponse {
   /** Sources that were searched, and those that could not be read (e.g. Drouot results need an account) */
   searched: string[];
   unreachable: string[];
-  stats: { candidates: number; verified: number; dropped: Record<string, number>; timingMs?: Record<string, number> };
+  stats: { candidates: number; verified: number; dropped: Record<string, number>; timingMs?: Record<string, number | number[]> };
   error?: string;
+  partial?: string[];
 }
 
 /** Typical buyer's premium incl. VAT, used to move between hammer and all-in when a house publishes only one. */

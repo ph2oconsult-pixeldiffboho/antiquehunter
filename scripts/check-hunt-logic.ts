@@ -1309,7 +1309,7 @@ check("checklist and comparables texts exist in EN and FR (every item, status an
 });
 
 check("comps server function: within the 50 s budget; never returns an unverified result; says so when nothing is verified", () => {
-  assert.ok(COMPS_TOTAL_BUDGET_MS <= 45_000 && COMPS_GEMINI_TIMEOUT_MS + COMPS_VERIFY_BUDGET_MS <= COMPS_TOTAL_BUDGET_MS);
+  assert.ok(COMPS_TOTAL_BUDGET_MS <= 47_000 && COMPS_GEMINI_TIMEOUT_MS + COMPS_VERIFY_BUDGET_MS <= COMPS_TOTAL_BUDGET_MS);
   assert.ok(COMPS_CLIENT_TIMEOUT_MS <= 50_000);
   const vj = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
   assert.equal(vj.functions["api/comps.ts"].maxDuration, 60);
@@ -1341,6 +1341,19 @@ await (async () => {
   assert.deepEqual(res.comparables.map(c => c.house).sort(), ["Bonhams", "Christie's"]);
   assert.equal(res.stats.dropped.price_not_on_page, 1); assert.equal(res.stats.dropped.http_404, 1);
   passed++; console.log("ok - comps server function: only page-verified results are returned (invented or unreachable ones are dropped)");
+  // parallel scoped searches: one failing scope does not lose the others; all failing reports the error
+  const part = await findComparables({ maker: "Bellangé", piece: "armchair", material: "mahogany", pieces: 4 }, undefined, Date.now(), {
+    search: async (prompt) => {
+      if (/Bonhams/.test(prompt) && !/Christie's \(christies/.test(prompt)) throw new Error("boom");
+      if (/Artcurial/.test(prompt) && !/Christie's \(christies/.test(prompt)) return { text: "not json", grounded: ["https://www.christies.com/en/lot/lot-6314500"] };
+      return { text: JSON.stringify({ results: [{ url: "https://www.bonhams.com/auction/31313/lot/152/x/", house: "Bonhams", title: "x", price: 4096, currency: "USD" }] }), grounded: [] };
+    },
+    fetchHtml: async (url) => pages[url] ? { status: 200, html: pages[url], finalUrl: url } : { status: 404, finalUrl: url },
+  });
+  assert.equal(part.comparables.length, 2); assert.equal(part.error, undefined); assert.deepEqual(part.partial, ["boom"]);
+  const all = await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), { search: async () => { throw new Error("down"); }, fetchHtml: async (url) => ({ status: 404, finalUrl: url }) });
+  assert.equal(all.error, "down"); assert.equal(all.comparables.length, 0);
+  passed++; console.log("ok - comps server function: scoped searches run in parallel; a failed scope keeps the others' verified results");
 })();
 
 console.log(`\n${passed} checks passed`);

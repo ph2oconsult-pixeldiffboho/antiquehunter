@@ -7,11 +7,11 @@ import { findMaker, PIECES, fold } from "./makers.js";
 import { isGroundingRedirect } from "./huntValidation.js";
 
 const MODEL = "gemini-3.5-flash";
-export const COMPS_GEMINI_TIMEOUT_MS = 30_000;
-export const COMPS_VERIFY_BUDGET_MS = 10_000;
-export const COMPS_TOTAL_BUDGET_MS = 45_000;
+export const COMPS_GEMINI_TIMEOUT_MS = 36_000;
+export const COMPS_VERIFY_BUDGET_MS = 9_000;
+export const COMPS_TOTAL_BUDGET_MS = 46_000;
 const FETCH_TIMEOUT_MS = 6_000;
-const MAX_CANDIDATES = 12;
+const MAX_CANDIDATES = 15;
 export const MAX_COMPS = 6;
 
 const HEADERS = {
@@ -74,13 +74,20 @@ const schema = {
   required: ["results"],
 };
 
-export const buildCompsPrompt = (r: CompsRequest): string => {
+/** Three narrower searches run in parallel (one long search often exceeds the budget). */
+export const COMPS_SEARCH_SCOPES = [
+  "Christie's (christies.com and onlineonly.christies.com lot pages)",
+  "Bonhams (bonhams.com) and Sotheby's (sothebys.com) lot pages",
+  "French and European houses: Artcurial, Ader, Tajan, Millon, Aguttes, Drouot, Interenchères, Auctionet, Dorotheum, Koller",
+];
+
+export const buildCompsPrompt = (r: CompsRequest, scope = COMPS_SEARCH_SCOPES.join('; ')): string => {
   const piece = PIECES.find(p => p.key === r.piece);
   const what = piece ? `${piece.en} (${piece.fr})` : 'furniture';
   return `Find past auction RESULTS (sold lots, with the price realised / hammer price) for ${what} by the French maker ${r.maker}${r.material ? `, ideally in ${r.material}` : ''}.
 Prefer sales from 2018 onwards; include stamped ("estampillé", "stamped") and attributed ("attribué à") lots and say which.
-Search Christie's (christies.com, onlineonly.christies.com), Sotheby's, Bonhams, Artcurial, Drouot, Interenchères, Auctionet, Dorotheum, Koller and other auction houses.
-Return up to ${MAX_CANDIDATES} results. Each must be ONE lot page URL that shows the sold price (not a search page, not a dealer's shop listing, not an unsold lot).
+Search: ${scope}. Be quick: one or two searches are enough.
+Return up to 6 results. Each must be ONE lot page URL that shows the sold price (not a search page, not a dealer's shop listing, not an unsold lot).
 Give the price exactly as printed on the page, its currency, the sale date, the number of pieces in the lot, and whether the price includes the buyer's premium.
 Never invent a result: only return pages you actually found.`;
 };
@@ -115,23 +122,26 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   let claims: CompClaim[] = [];
   let grounded: string[] = [];
   const g0 = Date.now();
-  try {
-    const r = await withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
-      search(buildCompsPrompt(req), signal),
-      new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
-    ]));
-    try { claims = (JSON.parse(r.text || '{}').results || []).filter((c: any) => c && c.url); } catch { claims = []; }
-    grounded = r.grounded || [];
-  } catch (e: any) {
-    out.error = e?.name === 'AbortError' ? 'search_timeout' : String(e?.message || e).slice(0, 120);
+  const searchMs: number[] = [];
+  const settled = await Promise.allSettled(COMPS_SEARCH_SCOPES.map((scope, i) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
+    search(buildCompsPrompt(req, scope), signal),
+    new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
+  ])).finally(() => { searchMs[i] = Date.now() - g0; })));
+  const errors: string[] = [];
+  for (const s of settled) {
+    if (s.status === 'rejected') { const e: any = s.reason; errors.push(e?.name === 'AbortError' ? 'search_timeout' : String(e?.message || e).slice(0, 120)); continue; }
+    try { claims.push(...(JSON.parse(s.value.text || '{}').results || []).filter((c: any) => c && c.url)); } catch { /* unparsable answer: grounding pages still checked */ }
+    grounded.push(...(s.value.grounded || []));
   }
+  if (errors.length === settled.length) out.error = errors[0];
+  else if (errors.length) out.partial = errors;
   const geminiMs = Date.now() - g0;
 
   // 2. Verify every candidate from its own page (claimed URLs first, then grounding pages not already claimed)
   const deadline = Math.min(Date.now() + COMPS_VERIFY_BUDGET_MS, startedAt + COMPS_TOTAL_BUDGET_MS);
   const remaining = () => deadline - Date.now();
   const v0 = Date.now();
-  const resolved = await Promise.all(grounded.slice(0, MAX_CANDIDATES).map(u => resolveRedirect(u, remaining())));
+  const resolved = await Promise.all(grounded.slice(0, MAX_CANDIDATES * 2).map(u => resolveRedirect(u, remaining())));
   const norm = (u: string) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/\/$/, '');
   const seen = new Set<string>();
   const cands: Array<{ url: string; claim: CompClaim | null }> = [];
@@ -157,7 +167,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   comps.sort((a, b) => (Number(b.material === req.material) - Number(a.material === req.material)) || String(b.date || '').localeCompare(String(a.date || '')));
   out.comparables = comps.slice(0, MAX_COMPS);
   out.stats.verified = out.comparables.length;
-  out.stats.timingMs = { gemini: geminiMs, verify: Date.now() - v0, total: Date.now() - startedAt };
+  out.stats.timingMs = { gemini: geminiMs, searches: searchMs, verify: Date.now() - v0, total: Date.now() - startedAt };
   out.ok = true;
   return out;
 };
