@@ -1,7 +1,7 @@
 // Accuracy harness, part B (fix 10): re-apply the app's own post-processing (postProcessAppraisal in src/services/gemini.ts)
 // to each raw model answer captured by appraise_ui.py, with the actual hammer typed as the price, so the verdict the app
 // WOULD show at the hammer can be scored.
-//   npx tsx scripts/accuracy/postprocess.mts <runs dir> <out.json>
+//   npx tsx scripts/accuracy/postprocess.mts <runs dir> <out.json> [--no-comps]   (--no-comps = the original valuation, no comparables blend)
 import { readFileSync, readdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -10,6 +10,9 @@ import { postProcessAppraisal } from '../../src/services/gemini.ts';
 const here = dirname(fileURLToPath(import.meta.url));
 const runsDir = process.argv[2] || 'runs';
 const outFile = process.argv[3] || 'appraisal_results.json';
+const useComps = !process.argv.includes('--no-comps');
+const comparables = useComps ? JSON.parse(readFileSync(join(here, '../../src/data/soldComparables.json'), 'utf8')) : undefined;
+const compIds = new Set((comparables || []).map((c: any) => c.id));
 const lots: any[] = JSON.parse(readFileSync(join(here, 'lots_split.json'), 'utf8')).lots;
 const byId = Object.fromEntries(lots.map(l => [l.lot_id, l]));
 const testIds = new Set(lots.map(l => l.lot_id));
@@ -40,7 +43,7 @@ for (const f of readdirSync(runsDir).filter(f => f.endsWith('.json')).sort()) {
   const pp = postProcessAppraisal(result, {
     query, hasPhotos, askingPrice: lot.hammer_eur, isAuction: true, premiumPct, targetCurrency: 'EUR', currencySymbol: '€',
     language: 'en', sellerType: 'Auction', lotUrl: mode === 'url' ? lot.url : undefined, lotFacts: lf,
-    fetchedEstimate, eurTo: (e: number) => e,
+    fetchedEstimate, eurTo: (e: number) => e, comparables, location,
   });
   const item: any = pp[0], pg = item.price_guidance, ns = item.negotiation_strategy, bd = item.buy_decision;
   out.push({
@@ -54,7 +57,7 @@ for (const f of readdirSync(runsDir).filter(f => f.endsWith('.json')).sort()) {
     app_confidence: item.item_summary.confidence, appraisal_inputs: item.appraisal_inputs,
     prompt_has_estimate_claim: /anchor(ed)? to the (catalogue )?estimate/i.test(JSON.stringify(result)),
     lot_page: lf ? { ok: lf.ok, estimateLow: lf.estimateLow, estimateHigh: lf.estimateHigh, premiumPct: lf.premiumPct, currency: lf.currency } : null,
-    reasoning: pg.pricing_reasoning,
+    reasoning: pg.pricing_reasoning, comparables_leak: compIds.has(r.lot_id),
   });
 }
 writeFileSync(outFile, JSON.stringify(out, null, 1));

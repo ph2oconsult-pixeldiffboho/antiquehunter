@@ -7,6 +7,7 @@ import {
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFetch";
 import { convertApprox } from "./budget";
+import { blendFactor, comparableStats, comparablesConfidenceCap, findComparables, loadComparables, COMP_N, type SoldComparable } from "./comparables";
 
 /** Fixed seed + temperature 0: the same input gives the same appraisal (fix 9). */
 export const APPRAISAL_SEED = 20261009;
@@ -354,9 +355,12 @@ ${getGlossaryPrompt(language)}`;
   });
 
   const result = JSON.parse(response.text);
+  // Step 2: sold comparables (loaded lazily); the appraisal still works without them
+  let comparables: SoldComparable[] | undefined;
+  try { comparables = await loadComparables(); } catch { comparables = undefined; }
   return postProcessAppraisal(result, {
     query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
-    lotFacts, fetchedEstimate, eurTo,
+    lotFacts, fetchedEstimate, eurTo, comparables, location: location || lotFacts?.city || undefined,
   });
 };
 
@@ -364,14 +368,20 @@ export interface PostProcessContext {
   query: string; hasPhotos: boolean; askingPrice?: number; isAuction: boolean; premiumPct: number; targetCurrency: string;
   currencySymbol: string; language: string; sellerType?: string; lotUrl?: string;
   lotFacts?: LotFacts | null; fetchedEstimate: boolean; eurTo: (eur: number) => number;
+  comparables?: SoldComparable[]; location?: string;
 }
+
+/** Text used to find comparables: what the user typed (or the lot page) plus what the model identified. */
+export const comparableQueryText = (query: string, item: any, lotFacts?: LotFacts | null) =>
+  [query, lotFacts?.ok ? `${lotFacts.title || ''}\n${lotFacts.description || ''}` : '', item?.item_summary?.title,
+    item?.item_summary?.likely_style, item?.item_summary?.likely_period, item?.item_summary?.likely_origin].filter(Boolean).join('\n');
 
 /**
  * Everything the app does to the model's JSON (exported so the accuracy harness can re-apply it to a captured answer):
  * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
  */
 export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
-  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo } = ctx;
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, comparables, location } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
@@ -395,6 +405,20 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     
     // Confidence (fix 6): the breakdown back on its fixed scales, then calibrated with what the app knows about the
     // evidence (real estimate read from the lot page, photos)
+    // Step 2: the model's range (original fixed price ranges) moved towards the median hammer of close sold comparables,
+    // by how many there are and how well they agree; their agreement also caps the confidence.
+    const pg0 = item.price_guidance;
+    const lowIn = Math.max(0, Number(pg0.estimated_market_range_low) || 0);
+    const highIn = Math.max(lowIn, Number(pg0.estimated_market_range_high) || lowIn * 1.5);
+    const toEur = (v: number) => convertApprox(v, targetCurrency, 'EUR') ?? v;
+    const compStats = comparables?.length
+      ? comparableStats(findComparables(comparables, comparableQueryText(query, item, lotFacts), location, COMP_N))
+      : null;
+    const compFactor = compStats ? blendFactor(toEur(lowIn), toEur(highIn), compStats) : 1;
+    if (compFactor !== 1 && lowIn > 0) {
+      pg0.estimated_market_range_low = Math.round(lowIn * compFactor);
+      pg0.estimated_market_range_high = Math.round(highIn * compFactor);
+    }
     const nb = normaliseConfidence(c);
     Object.assign(c, nb);
     const words = query.trim().split(/\s+/).length;
@@ -421,6 +445,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       item.price_guidance.pricing_reasoning = `Speculative valuation: A generic '${query}' can range from a modern utility piece to fine period antique. Inspect construction before relying on numbers. ${item.price_guidance.pricing_reasoning}`;
     }
 
+    if (compStats) confScore = Math.min(confScore, comparablesConfidenceCap(compStats, toEur(lowIn) * compFactor, toEur(highIn) * compFactor));
     const finalConfScore = Math.max(1, Math.min(100, Math.round(confScore)));
     const confLabel = confidenceLabel(finalConfScore);
 
@@ -453,7 +478,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // Ensure positive numbers
     pg.estimated_market_range_low = Math.max(0, Number(pg.estimated_market_range_low) || 0);
     pg.estimated_market_range_high = Math.max(pg.estimated_market_range_low, Number(pg.estimated_market_range_high) || pg.estimated_market_range_low * 1.5);
-    const rawMidEur = convertApprox((pg.estimated_market_range_low + pg.estimated_market_range_high) / 2, targetCurrency, 'EUR') ?? 0;
+    const rawMidEur = toEur((lowIn + highIn) / 2);
     
     // Retail bounds: fair_price_low <= fair_price_high
     pg.fair_price_low = Math.max(pg.estimated_market_range_low, Number(pg.fair_price_low) || Math.round(pg.estimated_market_range_low * 1.5));
@@ -551,6 +576,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       ...item,
       appraisal_inputs: {
         lot_page_read: !!lotFacts?.ok, estimate_read: fetchedEstimate, band_factor: 1, raw_mid_eur: Math.round(rawMidEur),
+        comparables: compStats ? { n: compStats.n, median_eur: Math.round(compStats.median), spread: Number.isFinite(compStats.spread) ? Math.round(compStats.spread * 10) / 10 : null, blend_factor: Math.round(compFactor * 1000) / 1000 } : null,
       },
       seller_context: {
         sellerType: sellerType || 'Market/Fair',
