@@ -7,11 +7,11 @@ import { findMaker, PIECES, fold } from "./makers.js";
 import { isGroundingRedirect } from "./huntValidation.js";
 
 const MODEL = "gemini-3.5-flash";
-/** Scoped searches run in parallel on the fast model (gemini-3.5-flash with search took >36 s); every result is verified from its own page anyway. */
+/** Fast model for memory-based candidates (verified from their pages like everything else). */
 const FAST_MODEL = "gemini-3.1-flash-lite-preview";
-export const COMPS_GEMINI_TIMEOUT_MS = 22_000;
+export const COMPS_GEMINI_TIMEOUT_MS = 30_000;
 export const COMPS_VERIFY_BUDGET_MS = 10_000;
-export const COMPS_TOTAL_BUDGET_MS = 34_000;
+export const COMPS_TOTAL_BUDGET_MS = 42_000;
 const FETCH_TIMEOUT_MS = 6_000;
 const MAX_CANDIDATES = 15;
 export const MAX_COMPS = 6;
@@ -119,7 +119,12 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   let grounded: string[] = [];
   const g0 = Date.now();
   const searchMs: number[] = [];
-  const jobs: Array<[string, string]> = COMPS_SEARCH_SCOPES.map(sc => [sc, process.env.COMPS_MODEL || FAST_MODEL] as [string, string]);
+  // the fast model answers from memory (0 web searches in the preview runs) - cheap, and verification drops what is wrong;
+  // the search model really searches Google (slower): three grouped scopes
+  const jobs: Array<[string, string]> = [
+    ...COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]),
+    [COMPS_SEARCH_SCOPES.slice(0, 3).join('; '), MODEL], [COMPS_SEARCH_SCOPES.slice(3, 5).join('; '), MODEL], [COMPS_SEARCH_SCOPES.slice(5).join('; '), MODEL],
+  ];
   const run = (scope: string, model: string, i: number) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
     search(buildCompsPrompt(req, scope), signal, model),
     new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
