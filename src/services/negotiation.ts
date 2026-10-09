@@ -27,6 +27,7 @@ export interface NegotiationInput {
   walkAway: number;            // the app's walk-away (dealer: all-in price; auction: max hammer)
   openingOffer?: number;       // the app's reconciled opening offer (<= smart buy)
   targetHigh?: number;         // the app's reconciled target high (<= walk-away)
+  dealerLow?: number;          // dealer mode: the bottom of the dealer range (offers are anchored toward it)
   premiumPct?: number;         // auction buyer's premium
   checklist?: CheckItem[]; answers?: CheckAnswers;
   maker?: string | null; period?: string; text?: string; pieces?: number; pieceKind?: string;
@@ -63,7 +64,16 @@ export const buildNegotiationPlan = (i: NegotiationInput): NegotiationPlan => {
   // Suggested opening offer and "happy at" price: from the app's own figures, NEVER above the walk-away.
   const ask = Number(i.askingPrice) > 0 ? Number(i.askingPrice) : undefined;
   let happy: number, opening: number;
-  if (ask && ask <= walk) {
+  const dLow = Number(i.dealerLow) > 0 ? Math.min(walk, Number(i.dealerLow)) : 0;
+  if (dLow && ask && ask <= walk) {
+    // dealer range known and the asking price within the walk-away: aim between the dealer low and the asking price
+    happy = Math.min(walk, ask * 0.93, Math.max(dLow, (dLow + ask) / 2));
+    opening = Math.min(happy * 0.95, Math.max(dLow, ask * 0.8));
+  } else if (dLow) {
+    // asking above the dealer high (or no price): anchor on the dealer low
+    happy = Math.min(walk, i.targetHigh && i.targetHigh > 0 ? i.targetHigh : (dLow + walk) / 2);
+    opening = Math.min(happy * 0.95, Math.max(i.openingOffer && i.openingOffer > 0 ? i.openingOffer : 0, dLow));
+  } else if (ask && ask <= walk) {
     // the asking price is already within the app's range: negotiate down from it
     happy = Math.min(walk, ask * 0.93);
     opening = ask * 0.85;
