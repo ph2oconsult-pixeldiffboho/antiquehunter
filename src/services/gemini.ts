@@ -12,6 +12,7 @@ import { anchorOnComparables, type CompsResponse } from "./compsMath";
 import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
+import { calibrateMirrorRange, type MirrorCalibration } from "./mirrorCalibration";
 
 /** Fixed seed + temperature 0: the same input gives the same appraisal (fix 9). */
 export const APPRAISAL_SEED = 20261009;
@@ -553,6 +554,19 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       pgA.fair_price_low = Math.round(anchor.low * 1.3);
       pgA.fair_price_high = Math.round(anchor.high * 1.6);
     }
+    // Mirrors: the frame size moves the range towards real sold results for mirrors of that size (mirrorCalibration.ts);
+    // only from the dimensions written by the buyer or on the lot page, one mirror (not a pair), not when comparables anchor it
+    let mirrorCal: MirrorCalibration | null = null;
+    if (pieceKind === 'mirror' && pieces <= 1 && !anchor.applied) {
+      const sizeText = `${query} ${lotFacts?.ok ? `${lotFacts.title || ''} ${lotFacts.description || ''}` : ''}`;
+      mirrorCal = calibrateMirrorRange({ low: Number(pgA.estimated_market_range_low) || 0, high: Number(pgA.estimated_market_range_high) || 0,
+        fairLow: Number(pgA.fair_price_low) || undefined, fairHigh: Number(pgA.fair_price_high) || undefined }, sizeText, targetCurrency);
+      if (mirrorCal.applied) {
+        pgA.estimated_market_range_low = mirrorCal.low; pgA.estimated_market_range_high = mirrorCal.high;
+        pgA.fair_price_low = mirrorCal.fair_low; pgA.fair_price_high = mirrorCal.fair_high;
+        if (Number(pgA.good_buy_below) > 0) pgA.good_buy_below = Math.round(Number(pgA.good_buy_below) * (mirrorCal.factor || 1));
+      }
+    }
     // A re-run with answers starts from the range the checklist was shown with (the model's new numbers would otherwise
     // move it at random), unless the answers changed the stamp basis or verified comparables now anchor it
     const stampedNow = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
@@ -705,6 +719,14 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
       item.price_guidance = { ...item.price_guidance, pricing_reasoning: `Anchored on ${anchor.used.length} verified auction results for ${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}). ${item.price_guidance.pricing_reasoning || ''}`.trim() };
     }
+    if (mirrorCal?.applied && mirrorCal.features.dims) {
+      const d = mirrorCal.features.dims;
+      const size = d.widthCm ? `${d.heightCm} × ${d.widthCm} cm` : `${d.heightCm} cm high`;
+      const note = String(language || '').toLowerCase().startsWith('fr')
+        ? `Fourchette ajustée à la taille (${size}) d'après des miroirs comparables réellement adjugés.`
+        : `Range adjusted for size (${size}) using real sold results for mirrors of that size.`;
+      item.price_guidance = { ...item.price_guidance, pricing_reasoning: `${note} ${item.price_guidance.pricing_reasoning || ''}`.trim() };
+    }
     const checklistItems = buildChecklist({
       pieceKind, pieces, period: item.item_summary.likely_period, maker: makerAsClaimed ? { name: makerAsClaimed.name, status: makerAsClaimed.status } : null,
       basis, text: `${query} ${titleText} ${item.item_summary.likely_style || ''} ${(item.walk_away_if || []).join(' ')}`, category,
@@ -732,6 +754,8 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       checklist: { items: checklistItems, answers: checkAnswers || {}, base: checklistBase, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },
       appraisal_inputs: {
         lot_page_read: !!lotFacts?.ok, estimate_read: fetchedEstimate, band_factor: 1, raw_mid_eur: Math.round(rawMidEur),
+        mirror_calibration: mirrorCal ? { applied: mirrorCal.applied, reason: mirrorCal.reason, dims: mirrorCal.features.dims, area_m2: mirrorCal.features.areaM2 && Math.round(mirrorCal.features.areaM2 * 100) / 100,
+          reference_eur: mirrorCal.reference_eur ?? null, factor: mirrorCal.factor ?? null } : null,
       },
       seller_context: {
         sellerType: sellerType || 'Market/Fair',

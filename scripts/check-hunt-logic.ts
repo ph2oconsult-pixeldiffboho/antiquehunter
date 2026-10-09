@@ -36,6 +36,7 @@ import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anch
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS } from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
+import { parseDimensionsCm, mirrorFeatures, mirrorSizeReferenceEur, calibrateMirrorRange } from "../src/services/mirrorCalibration.ts";
 import { COMPS_CLIENT_TIMEOUT_MS } from "../src/services/gemini.ts";
 
 let passed = 0;
@@ -1230,6 +1231,36 @@ check("comparables anchor the range, scaled to the number of pieces (stamped on 
   assert.equal(anchorOnComparables([], { status: "stamped_confirmed", pieces: 4, isAuction: false, eurTo: (e) => e }).reason, "none");
 });
 
+check("mirrors: dimensions are read from catalogue lines and the buyer's words; the range moves towards the size reference", () => {
+  const D = (t: string) => { const d = parseDimensionsCm(t); return d && [d.heightCm, d.widthCm]; };
+  assert.deepEqual(D("Large Louis-Philippe mirror, 1.7 m × 1.2 m, painted cream frame"), [170, 120]);
+  assert.deepEqual(D("Trumeau d'époque Louis XVI H. 168 cm L. 124 cm"), [168, 124]);
+  assert.deepEqual(D("Miroir Louis Philippe en bois et stuc doré. 134 x 96 cm"), [134, 96]);
+  assert.deepEqual(D("Epoque Louis XVI. 164 x 91cm Accidents"), [164, 91]);
+  assert.deepEqual(D("with beaded detail, 107cm w x 149 cm t. Condition: good"), [149, 107]);
+  assert.deepEqual(D("measuring 75cm high, 45cm wide"), [75, 45]);
+  assert.deepEqual(D("XVIIIe siècle Haut. 60 cm (accident)"), [60, null]);
+  assert.deepEqual(D("H. : 81,5 cm, L. : 55 cm"), [82, 55]);
+  assert.deepEqual(D("gilt mirror 60 x 40 in"), [152, 102]);
+  assert.equal(parseDimensionsCm("Louis XV giltwood mirror, glass replaced"), null);
+  assert.equal(parseDimensionsCm("Mirror, 5 x 3 cm"), null);
+  const f = mirrorFeatures("Miroir à fronton et parcloses d'époque Louis XV en bois sculpté et doré, glace remplacée, 115 x 74 cm");
+  assert.ok(f.period && f.carved && f.gilt && f.crest && f.parcloses); assert.equal(f.glass, "replaced"); assert.equal(f.areaM2, 0.851);
+  assert.equal(mirrorFeatures("painted cream frame, original mercury glass, 1.7 m x 1.2 m").glass, "original");
+  // reference rises with size (about area^0.87), clamped outside the data
+  assert.ok(mirrorSizeReferenceEur(0.5) < mirrorSizeReferenceEur(1) && mirrorSizeReferenceEur(1) < mirrorSizeReferenceEur(2));
+  assert.equal(Math.round(mirrorSizeReferenceEur(1)), 236); assert.equal(mirrorSizeReferenceEur(10), mirrorSizeReferenceEur(4));
+  // a small mirror valued high comes down, a big one valued low goes up, the width is kept, the retail tier follows
+  const small = calibrateMirrorRange({ low: 400, high: 1200, fairLow: 1300, fairHigh: 2000 }, "Miroir Louis XV, 75 x 57 cm", "EUR");
+  assert.ok(small.applied && small.high! < 1200 && small.low! < 400); assert.ok(Math.abs(small.high! / small.low! - 3) < 0.2); assert.ok(small.fair_low! >= small.low! && small.fair_high! >= small.high!);
+  const big = calibrateMirrorRange({ low: 150, high: 450 }, "Grand miroir en chêne sculpté, 160 x 148 cm", "EUR");
+  assert.ok(big.applied && big.low! > 150 && big.high! > 450);
+  assert.equal(calibrateMirrorRange({ low: 150, high: 450 }, "carved oak mirror", "EUR").reason, "no_size");
+  // GBP: the EUR reference is converted
+  const gbp = calibrateMirrorRange({ low: 150, high: 450 }, "overmantel 160 x 148 cm", "GBP");
+  assert.ok(gbp.applied && gbp.high! < big.high!);
+});
+
 const bellRaw = () => ({ items: [{
   item_summary: { title: "Set of Four Empire Mahogany Fauteuils (Attributed to P. Bellangé)", category: "Chairs", likely_origin: "France", likely_style: "Empire", likely_period: "Early 19th Century", value_tier: "B", snap_judgement: "Standard Empire form.", confidence: "low", confidence_score: 40, confidence_breakdown: { evidence_quality: 20, identification_certainty: 15, risk_factors: 15 }, confidence_reason: "Photos of the chairs.", confidence_improvement_suggestions: [], evidence_gaps: [], period_certainty: "probable_period", reproduction_risk: false, construction_evidence: "none shown", maker: { name: "Pierre-Antoine Bellangé", status: "stamped_stated", evidence: "buyer's text" } },
   buy_decision: { score: 20, label: "Walk Away", confidence: "low", decision_summary: [], investment_insight: "", must_have_insight: "", resale_insight: "" },
@@ -1241,6 +1272,29 @@ const bellRaw = () => ({ items: [{
 }] });
 const dealerCtx = (query: string, extra: any = {}) => ({ query, hasPhotos: true, askingPrice: 12000, isAuction: false, premiumPct: 0, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Antique Shop", fetchedEstimate: false, eurTo: (e: number) => e, category: "chairs", ...extra });
 const COMPS_RESP = { ok: true, comparables: BELL_COMPS, searched: [], unreachable: ["Drouot (results need an account)"], stats: { candidates: 5, verified: 5, dropped: {} } };
+
+check("mirrors: the size calibration is wired into the appraisal (one mirror with dimensions; not for pairs, other pieces or a re-run base)", () => {
+  const mirrorRaw = () => { const r: any = bellRaw(); const it = r.items[0];
+    it.item_summary.title = "Louis XV Giltwood Mirror"; it.item_summary.category = "Mirrors"; it.item_summary.maker = null;
+    Object.assign(it.price_guidance, { estimated_market_range_low: 400, estimated_market_range_high: 1200, good_buy_below: 600, fair_price_low: 1300, fair_price_high: 2000, pricing_reasoning: "A small period mirror at EUR 400–1,200." });
+    Object.assign(it.negotiation_strategy, { opening_offer: 300, target_price_low: 400, target_price_high: 800, walk_away_price: 1200 }); return r; };
+  const ctx = (query: string, extra: any = {}) => ({ ...dealerCtx(query), category: "mirrors", isAuction: true, premiumPct: 25, sellerType: "Auction", askingPrice: undefined, ...extra });
+  const a: any = postProcessAppraisal(mirrorRaw(), ctx("Miroir en bois sculpté et doré, époque Louis XV, 75 x 57 cm"))[0];
+  assert.equal(a.appraisal_inputs.mirror_calibration.applied, true); assert.deepEqual(a.appraisal_inputs.mirror_calibration.dims, { heightCm: 75, widthCm: 57 });
+  assert.ok(a.price_guidance.estimated_market_range_high < 1200); assert.match(a.price_guidance.pricing_reasoning, /adjusted for size \(75 × 57 cm\)/);
+  assert.ok(a.negotiation_strategy.walk_away_price <= a.price_guidance.estimated_market_range_high);
+  assert.equal(a.checklist.base.high, a.price_guidance.estimated_market_range_high); // the re-run starts from the calibrated range
+  const fr: any = postProcessAppraisal(mirrorRaw(), ctx("Miroir Louis XV, 75 x 57 cm", { language: "fr" }))[0];
+  assert.match(fr.price_guidance.pricing_reasoning, /ajustée à la taille/);
+  const noSize: any = postProcessAppraisal(mirrorRaw(), ctx("Miroir Louis XV en bois doré"))[0];
+  assert.equal(noSize.appraisal_inputs.mirror_calibration.applied, false); assert.equal(noSize.price_guidance.estimated_market_range_high, 1200);
+  const pair: any = postProcessAppraisal(mirrorRaw(), ctx("Paire de miroirs Louis XV, 75 x 57 cm"))[0];
+  assert.equal(pair.appraisal_inputs.mirror_calibration, null);
+  const chairs: any = postProcessAppraisal(bellRaw(), dealerCtx("four chairs 90 x 50 cm", { comps: null }))[0];
+  assert.equal(chairs.appraisal_inputs.mirror_calibration, null);
+  const rerun: any = postProcessAppraisal(mirrorRaw(), ctx("Miroir Louis XV, 75 x 57 cm", { checkAnswers: { glass_original: "yes" }, previousBase: a.checklist.base }))[0];
+  assert.ok(rerun.price_guidance.estimated_market_range_high <= a.checklist.base.high); // not calibrated twice
+});
 
 check("a confirmed Bellangé stamp changes the valuation: comps-anchored range, 'Overpriced' (slightly) not 'Walk Away' at €12k; a dealer's label stays plain Empire", () => {
   const conf: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: COMPS_RESP }))[0];
