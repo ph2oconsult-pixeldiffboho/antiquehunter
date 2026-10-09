@@ -33,6 +33,7 @@ import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceChe
 
 import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker } from "../src/services/makers.ts";
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
+import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS } from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
 import { COMPS_CLIENT_TIMEOUT_MS } from "../src/services/gemini.ts";
@@ -1304,6 +1305,55 @@ check("checklist re-run: starts from the range the checklist was shown with (a f
   assert.equal(no.price_guidance.estimated_market_range_high, 1600);
   const t: any = bellRaw(); t.items[0].item_summary.title = "Set of four Empire mahogany armchairs, attributed to Pierre-Antoine Bellangé";
   assert.equal((postProcessAppraisal(t, dealerCtx(BELL_CONF, { comps: null }))[0] as any).item_summary.title, "Set of four Empire mahogany armchairs (stamped Bellangé)");
+});
+
+check("negotiate: opening / happy-at from the app's own figures, never above the walk-away; cash only where French law allows (art. D112-3)", () => {
+  // mirror asked €950 at a dealer, app walk-away €1,200: opening near €800, cash allowed (≤ €1,000)
+  const m = buildNegotiationPlan({ sellerType: "Antique Shop", isAuction: false, askingPrice: 950, currency: "EUR", walkAway: 1200, openingOffer: 600, targetHigh: 1000 });
+  assert.equal(m.kind, "dealer"); assert.equal(m.opening_offer, 810); assert.equal(m.happy_at, 880);
+  assert.equal(m.payment?.mode, "cash"); assert.deepEqual(m.payment?.discount_amount, [40, 90]);
+  // asking above the walk-away: the suggestions stay at or below it
+  const m2 = buildNegotiationPlan({ sellerType: "Antique Shop", isAuction: false, askingPrice: 950, currency: "EUR", walkAway: 700, openingOffer: 400, targetHigh: 630 });
+  assert.ok(m2.happy_at! <= 700 && m2.opening_offer! <= m2.happy_at!); assert.equal(m2.asking_over_walk_pct, 36);
+  // Bellangé chairs €12k at a dealer: no cash (over €1,000 to a professional), pay by instant transfer / card
+  const b = buildNegotiationPlan({ sellerType: "Antique Shop", isAuction: false, askingPrice: 12000, currency: "EUR", walkAway: 8000, openingOffer: 3200, targetHigh: 7200, maker: "Bellangé", text: "fauteuils acajou" });
+  assert.equal(b.payment?.mode, "transfer"); assert.equal(b.payment?.discount_amount, undefined); assert.ok(b.happy_at! <= 8000);
+  assert.equal(CASH_CAP_FR_RESIDENT_EUR, 1000); assert.equal(CASH_CAP_FR_NON_RESIDENT_EUR, 15000);
+  assert.ok(b.invoice.terms.includes("estampille") && b.invoice.terms.includes("epoque"));
+  // private seller: cash is fine with a receipt (flag when a trader would be over the cap)
+  const p = buildNegotiationPlan({ sellerType: "Market/Fair", isAuction: false, askingPrice: 2500, currency: "EUR", walkAway: 3000 });
+  assert.equal(p.kind, "private"); assert.equal(p.payment?.mode, "cash_private_receipt"); assert.equal(p.payment?.over_cap, true);
+  // in another currency the cap is checked in EUR
+  assert.equal(buildNegotiationPlan({ sellerType: "Antique Shop", isAuction: false, askingPrice: 1000, currency: "GBP", walkAway: 1200 }).payment?.mode, "transfer"); // £930 ≈ €1,088
+  assert.equal(buildNegotiationPlan({ sellerType: "Antique Shop", isAuction: false, askingPrice: 1000, currency: "EUR", walkAway: 1200 }).payment?.mode, "cash"); // €930
+  // a 'No' in the checklist becomes a lever
+  const f = buildNegotiationPlan({ sellerType: "Antique Shop", isAuction: false, askingPrice: 3000, currency: "EUR", walkAway: 3000, pieceKind: "mirror", text: "carved giltwood mirror",
+    checklist: [{ id: "mirror_glass_original", important: true }, { id: "invoice_wording", important: true }], answers: { mirror_glass_original: "no", invoice_wording: "no" } });
+  assert.equal(f.levers[0].id, "flaws"); assert.deepEqual(f.levers[0].flaws, ["mirror_glass_original"]);
+  assert.ok(f.invoice.terms.includes("glace") && !f.invoice.terms.includes("bronzes"));
+  assert.ok(buildNegotiationPlan({ isAuction: false, currency: "EUR", walkAway: 5000, text: "commode tombeau, bronzes dorés, marbre" }).invoice.terms.includes("bronzes"));
+  // auction: bidding tips (max incl. fees), no cash
+  const a = buildNegotiationPlan({ sellerType: "Auction", isAuction: true, askingPrice: 850, currency: "EUR", walkAway: 1400, premiumPct: 28 });
+  assert.equal(a.kind, "auction"); assert.equal(a.payment, undefined); assert.equal(a.opening_offer, undefined); assert.deepEqual(a.bidding, { max_hammer: 1400, max_all_in: 1792, premium_pct: 28 });
+  // property: never above the walk-away
+  for (const walk of [90, 450, 999, 1001, 5500, 12000]) for (const ask of [undefined, 50, walk * 0.8, walk, walk * 1.5]) for (const th of [undefined, walk * 0.5, walk * 2]) {
+    const x = buildNegotiationPlan({ sellerType: "Antique Shop", isAuction: false, askingPrice: ask, currency: "EUR", walkAway: walk, targetHigh: th, openingOffer: th });
+    assert.ok(x.happy_at! <= walk && x.opening_offer! <= x.happy_at!, `${walk} ${ask} ${th}`);
+  }
+  // wired into the appraisal (dealer mode)
+  const pp: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: null }))[0];
+  assert.equal(pp.negotiation_plan.kind, "dealer"); assert.equal(pp.negotiation_plan.payment.mode, "transfer");
+  assert.ok(pp.negotiation_plan.happy_at <= pp.negotiation_strategy.walk_away_price);
+  // texts in EN and FR
+  for (const lang of ["en", "fr"]) {
+    const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8")).negotiate;
+    for (const k of ["title", "bidding_title", "opening", "happy_at", "suggestion_note", "pay_cash", "pay_cash_private", "pay_transfer", "invoice", "bid_absentee", "bid_max_prefix", "bid_max_locked"]) assert.ok(j[k], `${lang} ${k}`);
+    assert.match(j.pay_transfer, /D112-3/); assert.match(j.pay_transfer, /\{\{cap\}\}/);
+    for (const id of ["bundle", "flaws", "delivery", "timing"]) assert.ok(j.levers[id]);
+    for (const id of ["epoque", "estampille", "bronzes", "marbre", "glace", "restaurations"]) assert.ok(j.invoice_terms[id]);
+  }
+  const view = readFileSync(new URL("../src/components/AnalysisView.tsx", import.meta.url), "utf8");
+  assert.match(view, /<Negotiate embedded/); assert.match(view, /<Negotiate plan=/);
 });
 
 check("checklist and comparables texts exist in EN and FR (every item, status and fallback)", () => {

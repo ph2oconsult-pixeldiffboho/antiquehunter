@@ -545,5 +545,58 @@
     "not_used": "non retenu (autre type)",
     "unreachable": "Non consultable : {{list}}.",
     "verified_note": "Chaque résultat a été ouvert et vérifié sur la page de la maison de ventes (ébéniste, pièce, prix d'adjudication). Rien de non vérifié n'est affiché."
+  },
+  "negotiate": {
+    "title": "Négocier",
+    "bidding_title": "Conseils pour enchérir",
+    "locked": "Débloquer",
+    "opening": "Première offre suggérée",
+    "happy_at": "Prix « satisfaisant » suggéré",
+    "suggestion_note": "Suggestions issues de cette estimation, pas une garantie de ce que le vendeur acceptera.",
+    "walk_note": "Ne dépassez jamais votre prix plafond de {{walk}}.",
+    "asking_over": "Le prix demandé dépasse ce plafond de {{pct}} % : soyez prêt à partir.",
+    "payment_title": "Levier du paiement",
+    "pay_cash": "Proposez un paiement en espèces pour conclure vite : les marchands accordent souvent {{lo}} à {{hi}} %{{amount}}. En France, un résident fiscal peut payer un professionnel en espèces jusqu'à {{cap}} (art. D112-3 CMF) ; demandez une facture.",
+    "pay_cash_private": "Avec un particulier, les espèces aident souvent ({{lo}} à {{hi}} % de remise{{amount}}). Faites-vous remettre un reçu signé avec la description, la date et le prix.",
+    "pay_private_trader": "Si le vendeur est en réalité un professionnel (brocanteur, marchand), la loi plafonne les espèces à {{cap}} : payez par virement.",
+    "pay_transfer": "Pas d'espèces ici : en France, le paiement en espèces à un professionnel est plafonné à {{cap}} pour les résidents fiscaux français ({{capNr}} pour les non-résidents achetant à titre privé, art. D112-3 CMF). Proposez plutôt de payer aujourd'hui par virement instantané ou carte et d'emporter la pièce tout de suite : une vente sûre et immédiate est votre levier.",
+    "levers": {
+      "bundle": "Vous achetez plusieurs pièces ? Demandez un prix pour l'ensemble.",
+      "flaws": "Signalez ce que vous avez constaté : {{flaws}}.",
+      "delivery": "Demandez que la livraison (ou l'emballage) soit incluse dans le prix.",
+      "timing": "Fin de journée, fin de salon ou fin de saison : de bons moments pour négocier."
+    },
+    "flaw": {
+      "stamp_every_piece": "l'estampille n'est pas sur chaque pièce",
+      "stamp_present": "aucune estampille trouvée",
+      "label_is_not_stamp": "seulement une étiquette de marchand, pas d'estampille",
+      "matching_set": "la suite n'est pas homogène (rapportée)",
+      "joints_underneath": "la construction dessous n'est pas d'époque",
+      "seat_rails_webbing": "ceintures / sanglage remplacés",
+      "mirror_glass_original": "la glace n'est pas d'origine",
+      "mirror_back_original": "le parquet du dos n'est pas d'origine",
+      "crest_original": "le fronton n'est pas d'origine",
+      "gilding_original": "la dorure est refaite",
+      "marble_original": "le marbre n'est pas d'origine",
+      "hardware_original": "quincaillerie / bronzes remplacés",
+      "veneer_sound": "manques ou soulèvements de placage",
+      "no_major_restoration": "restaurations importantes"
+    },
+    "invoice": "Faites rédiger la facture avec précision : {{terms}}.",
+    "invoice_terms": {
+      "epoque": "« époque » + la période (et non « style »)",
+      "estampille": "« estampillé » + l'ébéniste",
+      "bronzes": "« bronzes d'origine »",
+      "marbre": "« marbre d'origine »",
+      "glace": "« glace d'origine »",
+      "restaurations": "les restaurations décrites"
+    },
+    "bid_max_prefix": "Fixez votre maximum avant la vente, frais compris : une adjudication de",
+    "bid_max_suffix": "vous coûte environ",
+    "bid_absentee": "Vous ne pouvez pas venir ? Laissez un ordre d'achat à votre maximum ou enchérissez en ligne ; la maison n'enchérit pour vous qu'autant que nécessaire.",
+    "bid_discipline": "Ne dépassez pas votre maximum dans l'ambiance de la salle ; une autre occasion viendra.",
+    "bid_costs": "Ajoutez les frais : TVA sur les frais, frais d'enchères en ligne et transport.",
+    "bid_max_note": "avec {{pct}} % de frais acheteur",
+    "bid_max_locked": "Fixez votre maximum avant la vente, frais acheteur de {{pct}} % compris. Votre enchère maximale suggérée :"
   }
 }

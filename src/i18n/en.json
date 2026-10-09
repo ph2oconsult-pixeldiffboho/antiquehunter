@@ -545,5 +545,58 @@
     "not_used": "not used (other kind)",
     "unreachable": "Not searchable: {{list}}.",
     "verified_note": "Each result was opened and checked on the auction house's own page (maker, piece and sold price). Nothing unverified is shown."
+  },
+  "negotiate": {
+    "title": "Negotiate",
+    "bidding_title": "Bidding tips",
+    "locked": "Unlock",
+    "opening": "Suggested opening offer",
+    "happy_at": "Suggested 'happy at' price",
+    "suggestion_note": "Suggestions from this appraisal, not a guarantee of what the seller will accept.",
+    "walk_note": "Never go above your walk-away of {{walk}}.",
+    "asking_over": "The asking price is {{pct}}% above that walk-away: be ready to walk.",
+    "payment_title": "Payment leverage",
+    "pay_cash": "Offer cash for a quick sale: dealers often take {{lo}}–{{hi}}% off{{amount}}. In France, a French tax resident may pay a professional in cash up to {{cap}} (art. D112-3 CMF); ask for an invoice.",
+    "pay_cash_private": "Cash usually helps with a private seller ({{lo}}–{{hi}}% off is typical{{amount}}). Get a signed receipt with the description, date and price.",
+    "pay_private_trader": "If the seller is in fact a trader (brocanteur, market professional), French law caps cash at {{cap}}: pay by transfer instead.",
+    "pay_transfer": "No cash here: in France, cash payments to a professional are capped at {{cap}} for French tax residents ({{capNr}} for non-residents buying privately, art. D112-3 CMF). Offer instead to pay today by instant transfer or card and take it away now: a sure, immediate sale is your lever.",
+    "levers": {
+      "bundle": "Buying several pieces? Ask for a price for the lot.",
+      "flaws": "Point out what you found: {{flaws}}.",
+      "delivery": "Ask for delivery (or packing) to be included in the price.",
+      "timing": "End of the day, the end of a fair or the end of the season are good moments to negotiate."
+    },
+    "flaw": {
+      "stamp_every_piece": "the stamp is not on every piece",
+      "stamp_present": "no stamp found",
+      "label_is_not_stamp": "only a dealer's label, no stamp",
+      "matching_set": "the set is not matching (married)",
+      "joints_underneath": "construction underneath is not period",
+      "seat_rails_webbing": "seat rails / webbing replaced",
+      "mirror_glass_original": "the glass is not original",
+      "mirror_back_original": "the backboards are not original",
+      "crest_original": "the crest is not original to the frame",
+      "gilding_original": "the gilding is redone",
+      "marble_original": "the marble top is not original",
+      "hardware_original": "hardware / bronzes replaced",
+      "veneer_sound": "veneer losses or lifting",
+      "no_major_restoration": "major restorations"
+    },
+    "invoice": "Get the invoice worded precisely: {{terms}}.",
+    "invoice_terms": {
+      "epoque": "« époque » + the period (not « style »)",
+      "estampille": "« estampillé » + the maker",
+      "bronzes": "« bronzes d'origine »",
+      "marbre": "« marbre d'origine »",
+      "glace": "« glace d'origine »",
+      "restaurations": "any restorations described"
+    },
+    "bid_max_prefix": "Set your maximum before the sale, fees included: a hammer bid of",
+    "bid_max_suffix": "costs you about",
+    "bid_absentee": "Can't attend? Leave an absentee bid (ordre d'achat) at your maximum or bid live online; the house bids for you only as far as needed.",
+    "bid_discipline": "Don't bid above your maximum in the heat of the room; the next one will come.",
+    "bid_costs": "Add the costs: VAT on the premium, online-bidding fees and transport.",
+    "bid_max_note": "with the {{pct}}% buyer's premium",
+    "bid_max_locked": "Set your maximum before the sale, including the {{pct}}% buyer's premium. Your suggested maximum bid:"
   }
 }

@@ -9,6 +9,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis } from '../services/appraisalMath';
 import { EvidenceStep } from './EvidenceStep';
 import { BeforeYouBuy } from './BeforeYouBuy';
+import { Negotiate } from './Negotiate';
 import { MakerAndComparables } from './Comparables';
 import type { CheckAnswers } from '../services/checklist';
 
@@ -895,6 +896,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           {currentItem.checklist?.items?.length > 0 && (
             <BeforeYouBuy embedded items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />
           )}
+          <Negotiate embedded plan={currentItem.negotiation_plan} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
         </EvidenceStep>
       )}
 
@@ -904,6 +906,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       {/* 3d. Before you buy: what to check and confirm for this piece (answers re-run the appraisal) */}
       {!currentItem.evidence_check?.required && currentItem.checklist?.items?.length > 0 && (
         <BeforeYouBuy items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />
+      )}
+
+      {/* 3e. Negotiate (dealer / private) or bidding tips (auction), part of "Before you buy" */}
+      {!currentItem.evidence_check?.required && (
+        <Negotiate plan={currentItem.negotiation_plan} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
       )}
 
       {/* Buying Goal Selector - Moved here to clarify it's a setting that affects the analysis */}

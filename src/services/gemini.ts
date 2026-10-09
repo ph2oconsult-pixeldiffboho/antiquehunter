@@ -9,6 +9,7 @@ import { lotFactsPrompt, type LotFacts } from "./lotFetch";
 import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
+import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
 
@@ -709,8 +710,18 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       basis, text: `${query} ${titleText} ${item.item_summary.likely_style || ''} ${(item.walk_away_if || []).join(' ')}`, category,
     });
 
+    const nsF = item.negotiation_strategy || {};
+    const negotiationPlan = buildNegotiationPlan({
+      sellerType, isAuction, askingPrice: Number(askingPrice) || undefined, currency: targetCurrency,
+      walkAway: Number(nsF.walk_away_price) || Number(item.price_guidance?.estimated_market_range_high) || 0,
+      openingOffer: Number(nsF.opening_offer) || undefined, targetHigh: Number(nsF.target_price_high) || undefined, premiumPct,
+      checklist: checklistItems, answers: checkAnswers, maker: makerAsClaimed && !['mentioned', 'dealer_label'].includes(makerAsClaimed.status) ? makerAsClaimed.name : null,
+      period: item.item_summary.likely_period, text: `${query} ${titleText}`, pieces, pieceKind,
+    });
+
     return {
       ...item,
+      negotiation_plan: negotiationPlan,
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
       comparables: {
