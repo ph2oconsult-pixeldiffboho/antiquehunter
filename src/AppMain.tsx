@@ -1,3 +1,4 @@
+import type { LotFacts } from "./services/lotFetch";
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
@@ -107,6 +108,16 @@ export default function Main() {
     return () => clearInterval(interval);
   }, [isAnalyzing]);
 
+  const readLot = async (url: string): Promise<LotFacts> => {
+    try {
+      const r = await fetch('/api/lot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      if (r.ok) return await r.json();
+      return { ok: false, url, site: 'other', imageUrls: [], error: `status_${r.status}` };
+    } catch (e: any) {
+      return { ok: false, url, site: 'other', imageUrls: [], error: 'network' };
+    }
+  };
+
   const handleAnalyze = async (input: string, details: any, inputIsImage = false, additionalImages: string[] = []) => {
     setIsAnalyzing(true);
     setLastDetails(details);
@@ -127,18 +138,31 @@ export default function Main() {
     setCurrentScreen('analysis');
     
     try {
+      // Fix 5: a pasted lot link is read on the server (catalogue text, estimate, fees, photos); nothing is guessed
+      const lotFacts: LotFacts | null = details.lotUrl ? await readLot(details.lotUrl) : null;
+      if (lotFacts?.ok && allImages.length === 0 && lotFacts.images?.length) {
+        allImages = lotFacts.images;
+        setCapturedImages(allImages);
+      }
+      const typed = inputIsImage ? "Analyze this antique from the images provided." : String(input || '').trim();
+      const text = typed || (lotFacts?.ok ? [lotFacts.title, lotFacts.description].filter(Boolean).join('\n') : `Auction lot: ${details.lotUrl}`);
+      const isAuctionSite = !!(lotFacts && ['drouot', 'auctionet', 'interencheres'].includes(lotFacts.site));
+      const sellerType = details.sellerType || (isAuctionSite ? 'Auction' : undefined);
+      // The fee published by the sale wins over the default 25% (but not over a figure the user typed)
+      const premium = details.premiumTouched ? details.buyerPremiumRate : (lotFacts?.ok && lotFacts.premiumPct ? lotFacts.premiumPct : details.buyerPremiumRate);
       const result = await searchAntiques(
-        inputIsImage ? "Analyze this antique from the images provided." : input,
+        text,
         allImages.length > 0 ? allImages : undefined,
         details.askingPrice,
         details.currency || currency, // Use provided currency or fallback to global
-        details.sellerType,
+        sellerType,
         i18n.language,
         details.priceType,
         details.category,
-        details.location,
+        details.location || (lotFacts?.ok ? [lotFacts.city].filter(Boolean).join(', ') : undefined),
         details.lotUrl,
-        details.buyerPremiumRate
+        premium,
+        { lotFacts }
       );
       
       if (result) {

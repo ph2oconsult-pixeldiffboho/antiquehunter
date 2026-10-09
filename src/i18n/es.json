@@ -149,7 +149,9 @@
     "market_insight_points": "• Nitidez de tallas y ensambles\n• Superficie original vs restaurada\n• Época auténtica vs reproducción posterior",
     "market_pulse": "Pulso del Mercado",
     "paddle_rule_label": "Regla de puja del anticuario:",
-    "paddle_rule": "Su puja máxima a martillo (precio límite) es {{hammer}}. Con la prima del comprador del {{pct}} % son {{allIn}} en total. Regla práctica: puja máxima = presupuesto total ÷ {{mult}}."
+    "paddle_rule": "Su puja máxima a martillo (precio límite) es {{hammer}}. Con la prima del comprador del {{pct}} % son {{allIn}} en total. Regla práctica: puja máxima = presupuesto total ÷ {{mult}}.",
+    "reason_hammer_suffix": " de remate (≈ {{allIn}} con {{pct}} % de prima del comprador)",
+    "hammer_word": "de remate"
   },
   "results": {
     "title": "Hallazgos del anticuario",

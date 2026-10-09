@@ -27,6 +27,9 @@ import { allIn, budgetMin } from "../src/services/budget.ts";
 import { localQueries } from "../src/services/huntGeo.ts";
 import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
 import { applyRanking } from "../src/services/hunting.ts";
+import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
+import { comparablesPrompt, featuresOf, findComparables, type SoldComparable } from "../src/services/comparables.ts";
+import { BAND_CORRECTION, bandFactor, calibratedConfidence, confidenceLabel, normaliseConfidence } from "../src/services/appraisalMath.ts";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => { fn(); passed++; console.log("ok -", name); };
@@ -113,11 +116,11 @@ check("buy score bands", () => {
 // ("cannot verify without photos"): that used to cap every score at 40 and show "Walk Away".
 const roadTest = [
   { name: "auction EUR80, market 50-150, retail 200-400", in: { askingPrice: 80, isAuction: true, premiumPct: 25, marketLow: 50, marketHigh: 150, retailHigh: 400 },
-    basis: ["good_buy"], min: 65, max: 80 },  // all-in 100 = market mid
+    basis: ["good_buy"], min: 65, max: 80 },  // hammer 80 in the lower half of the hammer range (all-in 100 shown separately)
   { name: "private GBP900, market 300-900, retail 800-1600", in: { askingPrice: 900, isAuction: false, premiumPct: 0, marketLow: 300, marketHigh: 900, retailHigh: 1600 },
     basis: ["fair"], min: 45, max: 60 },
   { name: "auction EUR2000, market 1200-2000, retail 2000-3500", in: { askingPrice: 2000, isAuction: true, premiumPct: 25, marketLow: 1200, marketHigh: 2000, retailHigh: 3500 },
-    basis: ["overpriced"], min: 15, max: 34 }, // all-in 2500 > market high
+    basis: ["fair"], min: 45, max: 64 }, // fix 3: hammer 2000 = top of the hammer range -> fair (all-in 2500 shown separately)
   { name: "dealer EUR4500, market 2000-4000, retail 3500-5000", in: { askingPrice: 4500, isAuction: false, premiumPct: 0, marketLow: 2000, marketHigh: 4000, retailHigh: 5000 },
     basis: ["overpriced"], min: 15, max: 34 },
   { name: "1950s repro EUR600, market 80-350, retail 150-500", in: { askingPrice: 600, isAuction: false, premiumPct: 0, marketLow: 80, marketHigh: 350, retailHigh: 500 },
@@ -167,15 +170,16 @@ check("smart buy / negotiation figures are consistent", () => {
   assert.ok(a.good_buy_below >= 300 && a.good_buy_below <= 600, JSON.stringify(a));
   assert.ok(a.opening_offer <= a.good_buy_below && a.good_buy_below <= a.walk_away_price && a.walk_away_price <= 900, JSON.stringify(a));
   assert.ok(a.opening_offer <= a.target_price_low && a.target_price_low <= a.target_price_high && a.target_price_high <= a.walk_away_price, JSON.stringify(a));
-  // auction, market 50-150, 25%: smart buy all-in within [50, 100]; walk-away all-in <= 150
-  const b = reconcileNegotiation({ good_buy_below: 30, opening_offer: 60, walk_away_price: 150 }, 50, 150, 25, true);
+  // auction, market (hammer) 50-150: smart buy hammer within [50, 100]; walk-away = top of the range (fix 3)
+  const b = reconcileNegotiation({ good_buy_below: 30, opening_offer: 60, walk_away_price: 120 }, 50, 150, 25, true);
   const allIn = (h: number) => allInCost(h, 25, true);
-  assert.ok(allIn(b.good_buy_below) >= 50 && allIn(b.good_buy_below) <= 100, JSON.stringify(b));
-  assert.ok(allIn(b.walk_away_price) <= 150, JSON.stringify(b));
+  assert.ok(b.good_buy_below >= 50 && b.good_buy_below <= 100, JSON.stringify(b));
+  assert.equal(b.walk_away_price, 150, JSON.stringify(b));
   assert.ok(b.opening_offer <= b.good_buy_below && b.good_buy_below <= b.walk_away_price, JSON.stringify(b));
   // smart buy at its upper limit still scores as a good buy (or better)
   const c = reconcileNegotiation({ good_buy_below: 99999 }, 1200, 2000, 25, true);
-  assert.ok(["strong_buy", "good_buy"].includes(priceBandScore(allIn(c.good_buy_below), 1200, 2000, 3500)!.basis), JSON.stringify(c));
+  assert.ok(["strong_buy", "good_buy"].includes(priceBandScore(c.good_buy_below, 1200, 2000, 3500)!.basis), JSON.stringify(c));
+  assert.ok(allIn(c.walk_away_price) > 2000); // all-in is shown separately, above the hammer range
 });
 
 check("raw JSON field names never reach the prose", () => {
@@ -520,11 +524,11 @@ check("price bands are contiguous; overpaying threshold = walk-away", () => {
 // 5. Smart buy never above market mid (and never above market high)
 check("smart buy is clamped within [market low, market mid]", () => {
   for (const auction of [false, true]) {
-    const f = auction ? 1.25 : 1;
-    const r = reconcileNegotiation({ good_buy_below: 350, walk_away_price: 400 }, 80, 300, 25, auction);
-    assert.ok(r.good_buy_below * f <= 190 + 1, JSON.stringify(r));          // mid = 190
-    assert.ok(r.good_buy_below * f >= 80 - 1, JSON.stringify(r));
-    assert.ok(r.walk_away_price * f <= 300, JSON.stringify(r));
+    // like with like (fix 3): hammer figures against the hammer range, no ÷1.25
+    const r = reconcileNegotiation({ good_buy_below: 350, walk_away_price: 250 }, 80, 300, 25, auction);
+    assert.ok(r.good_buy_below <= 190, JSON.stringify(r));          // mid = 190
+    assert.ok(r.good_buy_below >= 80, JSON.stringify(r));
+    assert.equal(r.walk_away_price, 300, JSON.stringify(r));        // walk-away = top of the range
     assert.ok(r.good_buy_below <= r.walk_away_price);
   }
 });
@@ -871,6 +875,118 @@ check("fix 8: UK searches use Auctionet's UK houses; fix 9: Auctionet all-in, lo
   const dm = candidateToMatch({ lot, score: 1, premiumPct: 25, premiumAssumed: true, styleMatch: null, region: "France" }, { query: "commode" });
   assert.equal(dm.location, "France");
   assert.equal(dm.house, "Ivoire – Galerie de Chartres – Maîtres Lelièvre");
+});
+
+check("fix 3: hammer compared with the hammer range, all-in shown separately, walk-away = top of the range", () => {
+  // Real lot that sold for €2,600 hammer (28.8% fees) with a market range of €2,000–3,000: a fair price, not "Walk Away"
+  const nf = reconcileNegotiation({ good_buy_below: 2200, walk_away_price: 2300 }, 2000, 3000, 28.8, true);
+  assert.equal(nf.walk_away_price, 3000);
+  const d = decideBuy({ askingPrice: 2600, isAuction: true, premiumPct: 28.8, hasPhotos: true, marketLow: 2000, marketHigh: 3000, retailHigh: 5000, smartBuy: nf.good_buy_below, walkAway: nf.walk_away_price });
+  assert.equal(d.basis, "fair");
+  assert.equal(d.comparePrice, 2600);
+  assert.equal(d.effectivePrice, 3349);       // all-in, shown alongside
+  assert.equal(d.walkAwayAllIn, 3864);
+  assert.equal(decideBuy({ askingPrice: 3001, isAuction: true, premiumPct: 28.8, hasPhotos: true, marketLow: 2000, marketHigh: 3000, retailHigh: 5000, smartBuy: nf.good_buy_below, walkAway: nf.walk_away_price }).basis, "overpriced");
+  const en = JSON.parse(readFileSync(new URL("../src/i18n/en.json", import.meta.url), "utf8"));
+  assert.match(en.analysis.reason_hammer_suffix, /\{\{allIn\}\} all-in/);
+  for (const lang of ["fr", "de", "es", "ja", "zh"]) {
+    const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8"));
+    assert.ok(j.analysis.reason_hammer_suffix && j.analysis.hammer_word, lang);
+  }
+});
+
+check("fix 5: a pasted lot link gives the real catalogue, estimate, fees and photos — never the result; unread links claim nothing", () => {
+  const html = fixture("drouot_lot_35127780.html");
+  const photos = drouotPhotoUrls(html);
+  assert.ok(photos.length >= 2 && photos.every(u => u.startsWith("https://cdn.drouot.com/d/lot/ftall/")), photos.join());
+  const desc = drouotFullDescription(html) || "";
+  assert.match(desc, /Hache à Grenoble/);
+  assert.match(desc, /XVIIIème siècle/);
+  const facts = { ok: true, url: "https://drouot.com/fr/l/35127780", site: "drouot" as const, title: "Hache à Grenoble, commode sauteuse", description: desc,
+    estimateLow: 1000, estimateHigh: 1200, currency: "EUR", premiumPct: 27, house: "Conan Belleville Hôtel d'Ainay", city: "Lyon", imageUrls: photos, ended: true };
+  const p = lotFactsPrompt(facts);
+  assert.match(p, /Auction house estimate: 1000 EUR – 1200 EUR \(hammer, before fees\)/);
+  assert.match(p, /Buyer's premium published by the sale: 27%/);
+  assert.ok(!/1800/.test(p), "the hammer result must never reach the appraisal");
+  const none = lotFactsPrompt({ ...facts, estimateLow: undefined, estimateHigh: undefined });
+  assert.match(none, /Auction house estimate: none published on the page/);
+  const unread = lotFactsPrompt({ ok: false, url: "https://www.interencheres.com/x/lot-1.html", site: "interencheres", imageUrls: [], error: "status_403" });
+  assert.match(unread, /could NOT be read/);
+  assert.match(unread, /do not mention, guess or "anchor to" any catalogue estimate/);
+  assert.equal(auctionetItemId("https://auctionet.com/en/5401614-a-george-iii-mahogany-chest-of-drawers"), "5401614");
+  assert.equal(auctionetItemId("https://auctionet.com/en/events/1273-the-lord-christopher-sale/345-a-george-iii"), null);
+  const api = JSON.parse(readFileSync(new URL("./fixtures/auctionet_george_iii_chest.json", import.meta.url), "utf8"));
+  assert.equal(pickAuctionetItem(api, "5401614")?.estimate, 200);
+  assert.equal(pickAuctionetItem(api, "1"), null);
+  // the appraisal prompt no longer tells the model to fetch / anchor to an estimate it never saw
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  assert.ok(!/prioritize fetching/i.test(gem));
+  assert.ok(!/Anchored to auction house catalog estimate for this lot/i.test(gem));
+  // a link alone can be submitted; decimal fees are accepted
+  const form = readFileSync(new URL("../src/components/DescriptionInput.tsx", import.meta.url), "utf8");
+  assert.match(form, /disabled=\{isAnalyzing \|\| \(!description\.trim\(\) && !\/\^https\?/);
+  assert.match(form, /step="0\.01"/);
+});
+
+check("fix 6: confidence inputs on fixed scales, calibrated with the app's own evidence", () => {
+  assert.deepEqual(normaliseConfidence({ evidence_quality: 0.9, identification_certainty: 0.9, risk_factors: 0.8 }), { evidence_quality: 36, identification_certainty: 27, risk_factors: 24 });
+  assert.deepEqual(normaliseConfidence({ evidence_quality: 80, identification_certainty: 85, risk_factors: 90 }), { evidence_quality: 32, identification_certainty: 26, risk_factors: 27 });
+  assert.deepEqual(normaliseConfidence({ evidence_quality: 8, identification_certainty: 9, risk_factors: 7 }), { evidence_quality: 8, identification_certainty: 9, risk_factors: 7 });
+  assert.deepEqual(normaliseConfidence({ evidence_quality: 35, identification_certainty: 25, risk_factors: 20 }), { evidence_quality: 35, identification_certainty: 25, risk_factors: 20 });
+  assert.deepEqual(normaliseConfidence({ evidence_quality: 9, identification_certainty: 8, risk_factors: 40 }), { evidence_quality: 9, identification_certainty: 8, risk_factors: 30 });
+  // the same model answer on different scales gives the same confidence
+  const ev = { hasPhotos: true, fetchedEstimate: false, closeComparables: 3, comparableSpread: 2, vague: false };
+  assert.equal(calibratedConfidence(normaliseConfidence({ evidence_quality: 0.75, identification_certainty: 0.8, risk_factors: 0.7 }), ev),
+               calibratedConfidence(normaliseConfidence({ evidence_quality: 75, identification_certainty: 80, risk_factors: 70 }), ev));
+  // a real estimate and close comparables raise it; text-only and vague queries cap it
+  const b = normaliseConfidence({ evidence_quality: 25, identification_certainty: 20, risk_factors: 20 });
+  assert.ok(calibratedConfidence(b, { ...ev, fetchedEstimate: true }) > calibratedConfidence(b, ev));
+  assert.ok(calibratedConfidence(b, { ...ev, closeComparables: 0 }) < calibratedConfidence(b, ev));
+  assert.ok(calibratedConfidence(normaliseConfidence({ evidence_quality: 40, identification_certainty: 30, risk_factors: 30 }), { ...ev, hasPhotos: false }) < 60);
+  assert.ok(calibratedConfidence(b, { ...ev, hasPhotos: false, vague: true }) <= 35);
+  assert.equal(confidenceLabel(80), "high"); assert.equal(confidenceLabel(60), "medium"); assert.equal(confidenceLabel(40), "low"); assert.equal(confidenceLabel(10), "very_low");
+});
+
+check("fix 4: comparables — same type and region first, style vs period kept apart; band correction", () => {
+  const data: SoldComparable[] = [
+    { id: "a", url: "", title: "Commode tombeau en noyer, époque Louis XV", hammer: 900, date: "2026-09-01", house: "H1", region: "France", type: "commode", style: "Louis XV", later: 0, century: 18, stamped: 0, mats: ["noyer"] },
+    { id: "b", url: "", title: "Commode de style Louis XV, XXe siècle", hammer: 120, date: "2026-09-02", house: "H2", region: "France", type: "commode", style: "Louis XV", later: 1, century: 20, stamped: 0, mats: [] },
+    { id: "c", url: "", title: "BYRÅ, rokoko, 1700-tal", hammer: 1500, date: "2026-09-03", house: "H3", region: "Sweden", type: "commode", style: "Louis XV", later: 0, century: 18, stamped: 0, mats: [] },
+    { id: "d", url: "", title: "Miroir en bois doré, époque Louis XV", hammer: 700, date: "2026-09-04", house: "H4", region: "France", type: "mirror", style: "Louis XV", later: 0, century: 18, stamped: 0, mats: ["doré"] },
+    { id: "e", url: "", title: "Commode galbée estampillée JME, époque Louis XV", hammer: 2600, date: "2026-09-05", house: "H5", region: "France", type: "commode", style: "Louis XV", later: 0, century: 18, stamped: 1, mats: [] },
+  ];
+  const m = findComparables(data, "Commode galbée en noyer d'époque Louis XV, estampillée", "Lyon, France", 3);
+  assert.deepEqual(m.map(x => x.comp.id).sort(), ["a", "c", "e"].sort());
+  assert.ok(!m.some(x => x.comp.type !== "commode"));
+  assert.equal(findComparables(data, "Commode de style Louis XV, XXe siècle", "France", 1)[0].comp.id, "b");
+  assert.equal(findComparables(data, "BYRÅ, rokoko, 1700-tal", "Sweden", 1)[0].comp.id, "c");
+  assert.equal(findComparables(data, "Commode", "France", 5, new Set(["a", "b", "e"])).map(x => x.comp.id).join(), "c");
+  const txt = comparablesPrompt(m, eur => eur, n => `€${n}`);
+  assert.match(txt, /HAMMER €/);
+  assert.match(txt, /Median hammer of these sales/);
+  assert.equal(featuresOf("A GEORGE III STYLE WALNUT CHEST OF DRAWERS", "United Kingdom").later, 1);
+  assert.equal(featuresOf("BYRÅ, gustaviansk, 1700-talets slut", "Sweden").later, 0);
+  assert.equal(featuresOf("BYRÅ, gustaviansk, 1700-talets slut", "Sweden").type, "commode");
+  assert.equal(featuresOf("Grand miroir en bois doré", "Nice, France").type, "mirror");
+  // band correction table: contiguous, positive, applied by the model's own midpoint
+  for (const b of BAND_CORRECTION) assert.ok(b.factor > 0.3 && b.factor < 3);
+  assert.equal(BAND_CORRECTION[BAND_CORRECTION.length - 1].upToEur, Infinity);
+  assert.equal(bandFactor(0), 1);
+  // the fixed reference price ranges are gone from the prompt
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  assert.ok(!/Provincial walnut commode, 18th c\.: €300/.test(gem));
+  assert.match(gem, /comparablesPrompt\(/);
+  // the bundled dataset holds none of the accuracy-test lots
+  const dataset = JSON.parse(readFileSync(new URL("../src/data/soldComparables.json", import.meta.url), "utf8"));
+  const testIds = JSON.parse(readFileSync(new URL("./accuracy/lots_split.json", import.meta.url), "utf8")).lots.map((l: any) => l.lot_id);
+  const ids = new Set(dataset.map((c: any) => c.id));
+  for (const id of testIds) assert.ok(!ids.has(id), id);
+});
+
+check("fix 9: appraisals are repeatable (temperature 0, fixed seed)", () => {
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  assert.match(gem, /temperature: 0,/);
+  assert.match(gem, /seed: APPRAISAL_SEED/);
 });
 
 {

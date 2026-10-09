@@ -149,7 +149,9 @@
     "market_insight_points": "• Schärfe der Schnitzereien\n• Originale Patina vs. restauriert\n• Zeitgenössisch vs. spätere Reproduktion",
     "market_pulse": "Marktpuls",
     "paddle_rule_label": "Bieterregel des Händlers:",
-    "paddle_rule": "Ihr maximales Zuschlagsgebot (Schmerzgrenze) liegt bei {{hammer}}. Mit {{pct}} % Aufgeld sind das {{allIn}} insgesamt. Faustregel: maximales Gebot = Gesamtbudget ÷ {{mult}}."
+    "paddle_rule": "Ihr maximales Zuschlagsgebot (Schmerzgrenze) liegt bei {{hammer}}. Mit {{pct}} % Aufgeld sind das {{allIn}} insgesamt. Faustregel: maximales Gebot = Gesamtbudget ÷ {{mult}}.",
+    "reason_hammer_suffix": " Zuschlag (≈ {{allIn}} inkl. {{pct}} % Aufgeld)",
+    "hammer_word": "Zuschlag"
   },
   "results": {
     "title": "Händler-Funde",

@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { handleHuntRequest } from "./src/services/huntHandler.ts";
+import { fetchLotFacts } from "./src/services/lotFetch.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,13 @@ async function startServer() {
   app.post("/api/hunt", async (req, res) => {
     const { status, body } = await handleHuntRequest(req.body);
     res.status(status).json(body);
+  });
+
+  app.post("/api/lot", async (req, res) => {
+    const facts = await fetchLotFacts(String(req.body?.url || ""), { withImages: req.body?.images !== false, timeoutMs: 9_000 })
+      .catch((e: any) => ({ ok: false, url: String(req.body?.url || ""), site: "other", imageUrls: [], error: String(e?.message || e).slice(0, 120) }));
+    res.setHeader("Cache-Control", "no-store");
+    res.json(facts);
   });
 
   app.post("/api/rerun-analysis", async (req, res) => {
