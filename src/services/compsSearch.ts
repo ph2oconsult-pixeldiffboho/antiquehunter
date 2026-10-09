@@ -7,12 +7,11 @@ import { findMaker, PIECES, fold } from "./makers.js";
 import { isGroundingRedirect } from "./huntValidation.js";
 
 const MODEL = "gemini-3.5-flash";
-/** The fast model does the scoped searches (every result is verified from its own page anyway); the slower model runs one broad search alongside. */
+/** Scoped searches run in parallel on the fast model (gemini-3.5-flash with search took >36 s); every result is verified from its own page anyway. */
 const FAST_MODEL = "gemini-3.1-flash-lite-preview";
-export const COMPS_GEMINI_TIMEOUT_MS = 36_000;
-const COMPS_SLOW_GRACE_MS = 4_000;
-export const COMPS_VERIFY_BUDGET_MS = 9_000;
-export const COMPS_TOTAL_BUDGET_MS = 46_000;
+export const COMPS_GEMINI_TIMEOUT_MS = 22_000;
+export const COMPS_VERIFY_BUDGET_MS = 10_000;
+export const COMPS_TOTAL_BUDGET_MS = 34_000;
 const FETCH_TIMEOUT_MS = 6_000;
 const MAX_CANDIDATES = 15;
 export const MAX_COMPS = 6;
@@ -82,9 +81,12 @@ const schema = {
 export const COMPS_SEARCH_SCOPES = [
   "Christie's lot pages (christies.com/en/lot/..., onlineonly.christies.com)",
   "Christie's and Sotheby's lot pages, searching in French (\"estampillé\", \"attribué à\", \"adjugé\")",
-  "Bonhams (bonhams.com) and Sotheby's (sothebys.com) lot pages",
-  "French and European houses: Artcurial, Ader, Tajan, Millon, Aguttes, Drouot, Interenchères, Auctionet, Dorotheum, Koller",
-];
+  "Christie's lot pages for pairs and sets (\"pair of\", \"set of four\", \"paire de\", \"suite de\")",
+  "Bonhams (bonhams.com) lot pages",
+  "Sotheby's (sothebys.com) lot pages",
+  "French houses: Artcurial, Ader, Tajan, Millon, Aguttes, Drouot, Interenchères",
+  "European houses: Auctionet, Dorotheum, Koller, Lempertz, Bukowskis, Bruun Rasmussen",
+]
 
 export const buildCompsPrompt = (r: CompsRequest, scope = COMPS_SEARCH_SCOPES.join('; ')): string => {
   const piece = PIECES.find(p => p.key === r.piece);
@@ -130,21 +132,12 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   let grounded: string[] = [];
   const g0 = Date.now();
   const searchMs: number[] = [];
-  const jobs: Array<[string, string]> = [...COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]), [COMPS_SEARCH_SCOPES.join('; '), MODEL]];
-  // Once the fast scoped searches are back with enough candidates, the broad (slow) search gets only a short grace period.
-  let cutSlow: () => void = () => {};
-  const slowCut = new Promise<never>((_, rej) => { cutSlow = () => rej(Object.assign(new Error('cut'), { name: 'AbortError' })); });
-  slowCut.catch(() => {});
+  const jobs: Array<[string, string]> = COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]);
   const run = (scope: string, model: string, i: number) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
     search(buildCompsPrompt(req, scope), signal, model),
     new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
-    ...(model === MODEL && i === jobs.length - 1 ? [slowCut] : []),
   ])).finally(() => { searchMs[i] = Date.now() - g0; });
   const promises = jobs.map(([scope, model], i) => run(scope, model, i));
-  Promise.allSettled(promises.slice(0, -1)).then(fast => {
-    const n = fast.reduce((a, f) => a + (f.status === 'fulfilled' ? (f.value.grounded?.length || 0) + ((() => { try { return (JSON.parse(f.value.text || '{}').results || []).length; } catch { return 0; } })()) : 0), 0);
-    if (n >= 4) setTimeout(cutSlow, COMPS_SLOW_GRACE_MS);
-  });
   const settled = await Promise.allSettled(promises);
   const errors: string[] = [];
   for (const s of settled) {
@@ -160,7 +153,11 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   const deadline = Math.min(Date.now() + COMPS_VERIFY_BUDGET_MS, startedAt + COMPS_TOTAL_BUDGET_MS);
   const remaining = () => deadline - Date.now();
   const v0 = Date.now();
-  const resolved = await Promise.all(grounded.slice(0, MAX_CANDIDATES * 2).map(u => resolveRedirect(u, remaining())));
+  const isAsset = (u: string) => /\.(jpe?g|png|gif|webp|svg|pdf|css|js)(\?|#|$)/i.test(u) || /\/_next\/image|\/CatCache\/|\/image\?src=/i.test(u);
+  // the model sometimes copies the grounding redirect itself: resolve those too
+  const claimUrls = await Promise.all(claims.map(c => resolveRedirect(c.url, remaining())));
+  claims = claims.map((c, i) => ({ ...c, url: claimUrls[i] })).filter(c => !isAsset(c.url) && !isGroundingRedirect(c.url));
+  const resolved = (await Promise.all(grounded.slice(0, MAX_CANDIDATES * 2).map(u => resolveRedirect(u, remaining())))).filter(u => !isAsset(u));
   const norm = (u: string) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/\/$/, '');
   const seen = new Set<string>();
   const cands: Array<{ url: string; claim: CompClaim | null }> = [];
