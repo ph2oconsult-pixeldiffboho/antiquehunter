@@ -133,7 +133,9 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   const settled = await Promise.allSettled(promises);
   const errors: string[] = [];
   let webQueries = 0;
+  const perJob: number[] = [];
   for (const s of settled) {
+    perJob.push(s.status === 'fulfilled' ? (parseLooseJson(s.value.text).results || []).length : -1);
     if (s.status === 'rejected') { const e: any = s.reason; errors.push(e?.name === 'AbortError' ? 'search_timeout' : String(e?.message || e).slice(0, 120)); continue; }
     try { claims.push(...(parseLooseJson(s.value.text).results || []).filter((c: any) => c && c.url)); } catch { /* unparsable answer: grounding pages still checked */ }
     grounded.push(...(s.value.grounded || []));
@@ -179,7 +181,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   out.comparables = comps.slice(0, MAX_COMPS);
   out.stats.verified = out.comparables.length;
   out.stats.grounded = grounded.length; out.stats.webQueries = webQueries; out.stats.claimed = claims.length;
-  out.stats.timingMs = { gemini: geminiMs, searches: searchMs, verify: Date.now() - v0, total: Date.now() - startedAt };
+  out.stats.timingMs = { claimsPerSearch: perJob, gemini: geminiMs, searches: searchMs, verify: Date.now() - v0, total: Date.now() - startedAt };
   out.ok = true;
   return out;
 };
