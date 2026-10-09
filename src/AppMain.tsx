@@ -61,6 +61,9 @@ export default function Main() {
   const [iterationCount, setIterationCount] = useState(0);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [lastDetails, setLastDetails] = useState<any>(null);
+  // "Need more evidence" re-run: the text typed last time (not the default photo prompt) and the evidence asked for
+  const [lastTyped, setLastTyped] = useState('');
+  const [evidenceRequest, setEvidenceRequest] = useState<any>(null);
   const [isFromCollection, setIsFromCollection] = useState(false);
   const [autoStartListening, setAutoStartListening] = useState(false);
   const [showResetPrompt, setShowResetPrompt] = useState(false);
@@ -121,6 +124,8 @@ export default function Main() {
   const handleAnalyze = async (input: string, details: any, inputIsImage = false, additionalImages: string[] = []) => {
     setIsAnalyzing(true);
     setLastDetails(details);
+    setLastTyped(inputIsImage || input === t('upload_choice.default_prompt', "Analyze this antique from the images provided.") ? '' : String(input || ''));
+    setEvidenceRequest(null);
     setIsFromCollection(false);
     setIterationCount(prev => prev + 1);
     
@@ -429,9 +434,12 @@ export default function Main() {
               setCapturedImages([]);
               setCurrentScreen('home');
             }} 
-            onAnalyze={(desc, details) => handleAnalyze(desc, details)}
+            onAnalyze={(desc, details) => handleAnalyze(desc || t('upload_choice.default_prompt', "Analyze this antique from the images provided."), details)}
             isAnalyzing={isAnalyzing}
             images={capturedImages}
+            initialDescription={evidenceRequest ? lastTyped : undefined}
+            initialDetails={evidenceRequest ? lastDetails : undefined}
+            evidenceRequest={evidenceRequest}
             isDetailedScan={isDetailedScan}
             onAddImage={() => fileInputRef.current?.click()}
             onRemoveImage={(index) => setCapturedImages(prev => prev.filter((_, i) => i !== index))}
@@ -498,6 +506,12 @@ export default function Main() {
                 plan={plan}
                 currency={currency}
                 onAddMoreDetails={() => setCurrentScreen('upload-choice')}
+                onAddEvidence={() => {
+                  // keep the photos (capturedImages) and the last inputs; the form opens pre-filled with the checklist
+                  const items = analysisItems(analysisResult);
+                  setEvidenceRequest(items.find((it: any) => it?.evidence_check?.required)?.evidence_check || null);
+                  setCurrentScreen('describe');
+                }}
                 iterationCount={iterationCount}
               />
             )}

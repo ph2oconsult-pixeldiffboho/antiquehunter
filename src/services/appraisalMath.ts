@@ -10,6 +10,7 @@ export type PriceBasis =
   | 'overpriced'   // above the walk-away price / market high (up to retail high)
   | 'walk_away'    // above retail high
   | 'high_risk'    // serious authenticity/condition risk seen in photos caps the verdict
+  | 'need_evidence' // period vs style/revival unclear: no buy verdict until more evidence is added
   | 'no_price';    // no asking price given: no deal verdict
 
 export interface PriceScore {
@@ -18,7 +19,7 @@ export interface PriceScore {
   basis: PriceBasis;
 }
 
-export const PRICE_BANDS: Record<Exclude<PriceBasis, 'high_risk' | 'no_price'>, ScoreBand> = {
+export const PRICE_BANDS: Record<Exclude<PriceBasis, 'high_risk' | 'no_price' | 'need_evidence'>, ScoreBand> = {
   strong_buy: { min: 80, max: 95 },
   good_buy: { min: 65, max: 80 },
   fair: { min: 45, max: 65 },
@@ -237,6 +238,8 @@ export interface BuyDecisionInput {
   riskPenalty?: number;      // model's scoring_inputs.risk_penalty (0 .. -40)
   itemScore?: number;        // sum of the model's scoring_inputs (used only when no price is given)
   valueTier?: string;
+  /** The period is not established (see evidenceCheck): never Strong Buy / Good Buy / Fair, show "Need more evidence" */
+  needsEvidence?: boolean;
 }
 
 /** Why the market band was overridden: the price is above the smart-buy or the walk-away price. */
@@ -300,6 +303,11 @@ export const decideBuy = (i: BuyDecisionInput): BuyDecision => {
     // "cannot verify without photos" (shown as low confidence), and capping it made every text appraisal "Walk Away".
     if (i.hasPhotos && num(i.riskPenalty) <= -25 && ps.score > 40) {
       return { score: 40, band: { min: 40, max: 40 }, basis: 'high_risk', effectivePrice: effective, ...extra };
+    }
+    // Period not established: a price that only looks good if the piece is period gets no buy verdict.
+    // Overpriced / Walk Away stay (they hold whatever the period turns out to be).
+    if (i.needsEvidence && ['strong_buy', 'good_buy', 'fair'].includes(ps.basis)) {
+      return { score: 50, band: { min: 50, max: 50 }, basis: 'need_evidence', effectivePrice: effective, ...extra };
     }
     return { score: ps.score, band: ps.band, basis: ps.basis, effectivePrice: effective, cap, ...extra };
   }
@@ -407,3 +415,119 @@ export const calibratedConfidence = (b: ConfidenceBreakdown, e: ConfidenceEviden
 
 export const confidenceLabel = (score: number): 'high' | 'medium' | 'low' | 'very_low' =>
   score >= 75 ? 'high' : score >= 55 ? 'medium' : score >= 35 ? 'low' : 'very_low';
+
+// ---------------------------------------------------------------------------
+// "Need more evidence": when the period is not established (period vs style / revival ambiguous, a possible
+// reproduction, or low confidence on a bare description), no firm buy verdict; ask for the evidence that settles it.
+// ---------------------------------------------------------------------------
+
+export type PeriodCertainty = 'confirmed_period' | 'probable_period' | 'ambiguous' | 'later_style_or_revival';
+export type EvidenceReason = 'period_ambiguous' | 'possible_reproduction' | 'low_confidence_brief' | 'period_not_confirmed';
+export type EvidenceAsk = 'underside_back' | 'drawer_joints' | 'hardware_mounts' | 'seat_frame_webbing' | 'stamp_label' | 'catalogue_or_link' | 'photos';
+export type PieceKind = 'case' | 'seating' | 'mirror' | 'table' | 'other';
+
+export interface EvidenceCheckInput {
+  periodCertainty?: string;          // model's item_summary.period_certainty
+  reproductionRisk?: boolean;        // model's item_summary.reproduction_risk
+  confidence: string;                // app's calibrated label (high / medium / low / very_low)
+  typedText: string;                 // what the user typed (not the default photo prompt)
+  lotPageRead: boolean;
+  hasPhotos: boolean;
+  category?: string;
+  title?: string;
+  styleText?: string;                // model's likely_style + likely_period
+  constructionEvidence?: string;     // model's item_summary.construction_evidence
+}
+
+/** A concrete sign of later manufacture named by the model (replaced upholstery alone is not one). */
+export const laterSignIn = (text: string): boolean =>
+  /(staple|screw|machine[- ]?(cut|made|carv)|circular[- ]saw|band[- ]?saw|plywood|wire nail|phillips|mdf|chipboard|particle ?board|router|agrafe|\bvis\b|contre-?plaqu|scie circulaire|scie m[ée]canique|clous? (de )?tr[ée]fil|agglom[ée]r)/i.test(String(text || ''));
+
+export interface EvidenceCheck {
+  required: boolean;
+  reasons: EvidenceReason[];
+  pieceKind: PieceKind;
+  asks: EvidenceAsk[];
+}
+
+/** A short note ("four 19th century armchairs") rather than a catalogue entry. */
+export const isBriefInput = (typed: string, lotPageRead: boolean): boolean =>
+  !lotPageRead && String(typed || '').trim().split(/\s+/).filter(Boolean).length < 12;
+
+const KIND_WORDS: [PieceKind, RegExp][] = [
+  ['seating', /(arm\s?chair|chair|fauteuil|chaise|berg[eè]re|sofa|settee|canap[eé]|banquette|stool|tabouret|bench|marquise|cabriolet|stol\b|stolar|f[åa]t[öo]lj|soffa)/i],
+  ['case', /(commode|chest|drawers|armoire|wardrobe|buffet|bahut|vaisselier|dresser|secr[eé]taire|secretary|bureau|desk|cabinet|chiffonni|semainier|bonneti|encoignure|cupboard|sideboard|byr[åa]|sk[åa]p|sk[äa]nk|linen press|tallboy|bookcase|biblioth)/i],
+  ['mirror', /(mirror|miroir|trumeau|glace|spegel|looking glass)/i],
+  ['table', /(table|gu[eé]ridon|console|bord\b)/i],
+];
+
+/** Kind of piece (decides which evidence to ask for): from the app category, else from the title words. */
+export const pieceKindOf = (category?: string, title?: string): PieceKind => {
+  if (category === 'chairs') return 'seating';
+  if (category === 'mirrors') return 'mirror';
+  const t = String(title || '');
+  // the first piece word of the title wins ("Commode with mirror" is a case piece)
+  let best: { kind: PieceKind; pos: number } | null = null;
+  for (const [kind, re] of KIND_WORDS) {
+    const m = re.exec(t);
+    if (m && (!best || m.index < best.pos)) best = { kind, pos: m.index };
+  }
+  return best ? best.kind : 'other';
+};
+
+/** What to ask for, specific to the kind of piece. */
+export const evidenceAsks = (kind: PieceKind, opts: { hasPhotos: boolean; hasCatalogue: boolean }): EvidenceAsk[] => {
+  const asks: EvidenceAsk[] = [];
+  if (!opts.hasPhotos) asks.push('photos');
+  asks.push('underside_back');
+  if (kind === 'case') asks.push('drawer_joints');
+  if (kind === 'seating') asks.push('seat_frame_webbing');
+  asks.push('hardware_mounts', 'stamp_label');
+  if (!opts.hasCatalogue) asks.push('catalogue_or_link');
+  return asks;
+};
+
+/**
+ * The description states the period the way a catalogue does ("Époque Louis XV", "Restoration period", "circa 1780",
+ * "1700-tal"), not just a style or a century ("Louis XV style", "19th century").
+ */
+export const periodStatedIn = (text: string): boolean => {
+  const t = String(text || '');
+  if (/(d'?\s*[ée]poque|[ée]poque\s*[:A-Z]|\bvers\s+1[6-9]\d\d|\b(restoration|restauration|regency|georgian|victorian|empire|louis[\s-]*(xiv|xv|xvi|philippe)|napol[eé]on\s*iii|gustavian|directoire|transition)\s+period\b|\bperiod\s*:|\bcirca\s*1[6-9]\d\d|\bc\.\s?1[6-9]\d\d|\b1[6-9]\d\d\s*[-–]\s*1[6-9]\d\d\b|\b1[6-9]\d0[- ]?tal)/i.test(t)) return true;
+  return /\b(george\s+(i|ii|iii|iv)|william\s+iv|queen\s+anne)\b(?![\s-]*(style|revival))/i.test(t) && !/\bstyle\b/i.test(t);
+};
+
+/** A dating in a catalogue entry ("XVIIIe siècle", "fin du XIXe", "18th century", "1800-tal"), style pieces included. */
+export const centuryStatedIn = (text: string): boolean =>
+  /\b([xvi]+(e|[eè]me)\s+s(i[eè]cle|\.)|(1[6-9]|20)(th|st)\s+century|1[6-9]00\s*-?\s*tal|1[6-9]00-talet)/i.test(String(text || ''));
+
+export const evidenceCheck = (i: EvidenceCheckInput): EvidenceCheck => {
+  const reasons: EvidenceReason[] = [];
+  const pc = String(i.periodCertainty || '');
+  // A possible later copy matters when the piece is not already identified (and priced) as a later piece, and the
+  // description does not already state the period (an auction catalogue entry "Restoration period" is the house's
+  // attribution; the model's generic "could be a copy" caution should not block the verdict then).
+  const brief = isBriefInput(i.typedText, i.lotPageRead);
+  // A catalogue that already dates the piece, or declares it a "style" piece, has answered the period question.
+  const dated = periodStatedIn(i.typedText) || (!brief && (centuryStatedIn(i.typedText) || /\b(style|stil)\b/i.test(String(i.typedText || ''))));
+  // A catalogue entry that states the period ("Restoration period", "d'époque", "circa 1780") is the auction house's
+  // attribution: the model's doubt sends it back only when it names a concrete later sign (staples, screws, machine
+  // cuts...), not on the general look.
+  const catalogueDated = !brief && periodStatedIn(i.typedText);
+  if (pc === 'ambiguous' && !(catalogueDated && !laterSignIn(i.constructionEvidence || ''))) reasons.push('period_ambiguous');
+  if (i.reproductionRisk === true && pc !== 'later_style_or_revival' && !dated) reasons.push('possible_reproduction');
+  if ((i.confidence === 'low' || i.confidence === 'very_low') && brief) reasons.push('low_confidence_brief');
+  // Photos (or a short note) only: a period call, or a "revival of a historic style" call, cannot be confirmed from the
+  // look of the piece alone (the same photos are read one day as period, the next as a later revival). Ask, unless the
+  // model already flagged it for another reason.
+  const historicStyle = /(revival|\bstyle\b|\bn[ée]o|\bneo-|in the manner|napol[eé]on\s*iii|second empire|empire|restoration|restauration|regency|louis|georgian|george|victorian|gustavian|gustaviansk|directoire|baroque|rococo|renaissance|queen anne|william|charles x|transition)/i;
+  if (!reasons.length && brief && (pc === 'probable_period' || (pc === 'later_style_or_revival' && historicStyle.test(String(i.styleText || '')))))
+    reasons.push('period_not_confirmed');
+  const pieceKind = pieceKindOf(i.category, i.title);
+  return {
+    required: reasons.length > 0,
+    reasons,
+    pieceKind,
+    asks: evidenceAsks(pieceKind, { hasPhotos: i.hasPhotos, hasCatalogue: !brief }),
+  };
+};

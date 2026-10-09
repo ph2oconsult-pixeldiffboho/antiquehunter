@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis } from '../services/appraisalMath';
+import { EvidenceStep } from './EvidenceStep';
 
 interface AnalysisViewProps {
   result: any; // Can be a single object or an array of objects
@@ -19,6 +20,8 @@ interface AnalysisViewProps {
   plan?: 'free' | 'pro' | 'dealer' | string;
   currency: string;
   onAddMoreDetails: () => void;
+  /** "Need more evidence": back to the details form with the earlier photos and inputs kept */
+  onAddEvidence?: () => void;
   iterationCount: number;
 }
 
@@ -244,7 +247,7 @@ const FeedbackSection = ({ currentItem, onBack }: { currentItem: any; onBack: ()
   );
 };
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onNewAppraisal, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, iterationCount }) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onNewAppraisal, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, onAddEvidence, iterationCount }) => {
   const { t, i18n } = useTranslation();
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [localResult, setLocalResult] = useState(result);
@@ -882,6 +885,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </section>
 
+      {/* 3b. Need more evidence (period not established): shown on every plan, before any verdict */}
+      {currentItem.evidence_check?.required && (
+        <EvidenceStep check={currentItem.evidence_check} constructionSeen={currentItem.item_summary?.construction_evidence} onAddEvidence={onAddEvidence || onAddMoreDetails} />
+      )}
+
       {/* Buying Goal Selector - Moved here to clarify it's a setting that affects the analysis */}
       <section className="px-2">
         <BuyingGoalSelector />
@@ -976,10 +984,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-              <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.value_insight', 'Market Range')}</p>
+              <p className={`text-[9px] uppercase tracking-widest font-bold ${currentItem.price_guidance.provisional ? 'text-amber-700' : 'text-muted'}`}>
+                {currentItem.price_guidance.provisional ? t('evidence.provisional_range') : t('analysis.value_insight', 'Market Range')}
+              </p>
               <p className="text-xl font-medium text-ink">
                 {formatPrice(currentItem.price_guidance.estimated_market_range_low)} - {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
               </p>
+              {currentItem.price_guidance.provisional && (
+                <p className="text-[10px] text-amber-700 italic">{t('evidence.provisional_note')}</p>
+              )}
             </div>
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">{t('analysis.smart_buy', 'Smart Buy')}</p>
