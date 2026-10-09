@@ -9,15 +9,16 @@ import { drouotSearchUrl, parseDrouotLotPage, parseDrouotSearch, DROUOT_COUNTRIE
 import { interencheresSearchUrl, parseInterencheresSearch } from "./sources/interencheres.js";
 import type { DirectLot, DirectSite } from "./sources/directTypes.js";
 import { failsPeriodRule, formatEstimate, formatSaleDate, interencheresItemApiUrl, modernYearInTitle, parseInterencheresItem } from "./huntValidation.js";
-import { frenchSiteQuery, materialsInQuery, matchesItemType, matchesStyle, normalise, regionsInLocation, type Region } from "./huntGeo.js";
+import { materialsInQuery, matchesItemType, matchesStyle, normalise, regionsInLocation, type Region } from "./huntGeo.js";
+import { frenchSiteQueries, frenchSiteQuery, impliedStyleMatch, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem } from "./pieceWords.js";
 import { allIn, budgetMax, budgetMin, convertApprox, DEFAULT_PREMIUM_PCT } from "./budget.js";
 
 export const DIRECT_SEARCH_BUDGET_MS = 6_000;   // search pages
 export const DIRECT_ENRICH_BUDGET_MS = 4_000;   // lot pages / lot JSON
 const SEARCH_TTL_MS = 15 * 60_000;
 const LOT_TTL_MS = 6 * 60 * 60_000;
-const MAX_ENRICH = 8;
-export const MAX_DIRECT_RESULTS = 6;
+const MAX_ENRICH = 24;
+export const MAX_DIRECT_RESULTS = 15;
 const LIVE_SALE_GRACE_MS = 6 * 3600_000; // a live sale that started a few hours ago may not have reached the lot yet
 
 export const SITE_DOMAIN: Record<DirectSite, string> = { drouot: 'drouot.com', interencheres: 'interencheres.com' };
@@ -42,7 +43,9 @@ export interface DirectCandidate {
   region?: Region | null; // null = not known yet (needs the lot page)
 }
 
-const periodProblem = (title?: string, description?: string) => failsPeriodRule(title, description) || modernYearInTitle(title);
+/** Not a period piece for this request: "style", XXe, copies, partly period / old parts, or "de style <requested 18th-c. style>" made later. */
+export const periodProblemFor = (query: string, title?: string, description?: string) =>
+  failsPeriodRule(title, description) || modernYearInTitle(title) || partlyPeriodProblem(title, description) || requestedStyleOnlyProblem(query, title, description);
 
 /** Sites to search directly for this plan (only the auction sites the user's platforms/regions include). */
 export const directSitesFor = (plan: DirectPlan): DirectSite[] =>
@@ -75,9 +78,12 @@ export const evaluateLot = (lot: DirectLot, params: DirectParams, plan: DirectPl
     if (t < cutoff) return { dropReason: 'past_sale' };
   }
   if (!matchesItemType(plan.itemTypes, lot.title, firstSentence(lot.description))) return { dropReason: 'not_requested_type' };
+  // "Fauteuil de bureau", "Lampe de bureau" for a desk; a plain "bureau" for "secrétaire à abattant"
+  const piece = pieceProblem(params.query, plan.itemTypes, lot.title, firstSentence(lot.description));
+  if (piece) return { dropReason: piece };
   // Doll's-house / toy / miniature furniture ("JOUETS. Ensemble de 6 meubles de poupée : un buffet…")
   if (plan.itemTypes.length && TOY_WORDS.test(`${lot.title} ${firstSentence(lot.description)}`)) return { dropReason: 'not_requested_type' };
-  if (params.periodOnly !== false && periodProblem(lot.title, lot.description)) return { dropReason: 'not_period' };
+  if (params.periodOnly !== false && periodProblemFor(params.query, lot.title, lot.description)) return { dropReason: 'not_period' };
 
   const region = lotRegion(lot);
   if (plan.regions) {
@@ -103,7 +109,7 @@ export const evaluateLot = (lot: DirectLot, params: DirectParams, plan: DirectPl
   const normText = normalise(text);
   let score = 0;
   if (styleMatch === true) score += 3;
-  if (styleMatch === false) score -= 1;
+  if (styleMatch === false) score += impliedStyleMatch(params.query, text) ? 1.5 : -1;
   if (materialsInQuery(params.query).some(m => m.match.some(w => normText.includes(w)))) score += 1;
   if (PERIOD_HINT.test(text)) score += 1;
   if (hasEstimate) score += 1; else if (lot.startingPrice) score += 0.3; else score -= 1;
@@ -123,19 +129,45 @@ const SEARCHERS: Record<DirectSite, { url: (q: string) => string; parse: (html: 
   interencheres: { url: interencheresSearchUrl, parse: (html, now) => ({ lots: parseInterencheresSearch(html, now), from: 'cards' }) },
 };
 
+// Fix 2: several keyword queries per site (the user's piece word + style, + century, + "époque", + form words),
+// run in parallel and merged. Interencheres often blocks the server: its other queries only run when the first one answers.
+export const SITE_QUERY_COUNT: Record<DirectSite, number> = { drouot: 6, interencheres: 2 };
+
+export const siteQueries = (site: DirectSite, query: string): string[] => {
+  const qs = frenchSiteQueries(query, SITE_QUERY_COUNT[site]);
+  return qs.length ? qs : [frenchSiteQuery(query)];
+};
+
 const searchSite = async (site: DirectSite, params: DirectParams, deadline: number): Promise<{ lots: DirectLot[]; stat: DirectSourceStat }> => {
-  const queries = Array.from(new Set([frenchSiteQuery(params.query), frenchSiteQuery(params.query, { fallback: true })]));
-  let stat: DirectSourceStat = { site, query: queries[0], status: 0, ms: 0, found: 0, kept: 0, viaRelay: false, cached: false };
-  for (const q of queries) {
+  const queries = siteQueries(site, params.query);
+  const one = async (q: string) => {
     const left = deadline - Date.now();
-    if (left < 300) break;
+    if (left < 300) return null;
     const res: SourceResponse = await fetchSource(SEARCHERS[site].url(q), { timeoutMs: Math.min(5_000, left), ttlMs: SEARCH_TTL_MS });
     const parsed = res.body ? SEARCHERS[site].parse(res.body, Date.now()) : { lots: [], from: 'none' };
-    stat = { site, query: q, status: res.status, ms: stat.ms + res.ms, found: parsed.lots.length, kept: 0, viaRelay: res.viaRelay, cached: res.cached, parsedFrom: parsed.from, ...(res.error ? { error: res.error } : {}) };
-    // Only retry (with the shorter query) when the site answered but found nothing
-    if (parsed.lots.length > 0 || !(res.status >= 200 && res.status < 300)) return { lots: parsed.lots, stat };
+    return { q, res, parsed };
+  };
+  const ok = (r: Awaited<ReturnType<typeof one>>) => !!r && r.res.status >= 200 && r.res.status < 300;
+  let outs: Array<Awaited<ReturnType<typeof one>>>;
+  if (site === 'interencheres') {
+    const first = await one(queries[0]);
+    outs = [first, ...(ok(first) ? await Promise.all(queries.slice(1).map(one)) : [])];
+  } else {
+    outs = await Promise.all(queries.map(one));
   }
-  return { lots: [], stat };
+  const done = outs.filter(Boolean) as Array<NonNullable<Awaited<ReturnType<typeof one>>>>;
+  const seen = new Set<string>();
+  const lots: DirectLot[] = [];
+  for (const o of done) for (const l of o.parsed.lots) if (!seen.has(l.id)) { seen.add(l.id); lots.push(l); }
+  const good = done.find(o => o.res.status >= 200 && o.res.status < 300);
+  const ref = good || done[0];
+  const stat: DirectSourceStat = {
+    site, query: done.map(o => o.q).join(' | ') || queries[0], status: ref?.res.status ?? 0,
+    ms: Math.max(0, ...done.map(o => o.res.ms)), found: lots.length, kept: 0,
+    viaRelay: done.some(o => o.res.viaRelay), cached: done.length > 0 && done.every(o => o.res.cached),
+    parsedFrom: ref?.parsed.from, ...(ref?.res.error && !good ? { error: ref.res.error } : {}),
+  };
+  return { lots, stat };
 };
 
 // Drouot house -> sale country cache (from lot pages), so lots from known foreign houses are not fetched again
@@ -318,7 +350,8 @@ export const candidateToMatch = (c: DirectCandidate, params: DirectParams, analy
     url: l.url,
     platform: SITE_LABEL[l.site],
     price,
-    location: [l.city, country].filter(Boolean).join(', ') || (l.house || ''),
+    // Never the house name as a location (fix 9): city + country, else the region the lot was placed in
+    location: [l.city, country].filter(Boolean).join(', ') || (c.region || ''),
     date: l.saleDate ? (l.dateOnly ? formatSaleDay(l.saleDate) : formatSaleDate(l.saleDate)) : undefined,
     description: l.description && l.description !== l.title ? l.description : undefined,
     dealerAnalysis: analysis || templateAnalysis(c, params.query),

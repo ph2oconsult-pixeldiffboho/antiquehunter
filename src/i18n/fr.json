@@ -176,7 +176,9 @@
     "reason_above_walk_away": "{{price}}{{premium}} dépasse votre prix plafond ({{walkAway}}) – trop cher, plus de marge. Ne dépassez pas {{walkAway}}.",
     "reason_above_smart_buy": "{{price}}{{premium}} dépasse le prix d'achat malin ({{smartBuy}}) mais reste sous votre plafond ({{walkAway}}) – correct, peu de marge.",
     "overpaying_value": "Au-delà de {{price}}",
-    "overpaying_all_in": "{{allIn}} frais compris"
+    "overpaying_all_in": "{{allIn}} frais compris",
+    "reason_hammer_suffix": " au marteau (≈ {{allIn}} frais compris, {{pct}} % de frais acheteur)",
+    "hammer_word": "au marteau"
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",

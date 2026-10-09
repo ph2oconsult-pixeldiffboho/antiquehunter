@@ -304,14 +304,27 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const isAuction = !!rawItem.seller_context?.isAuction;
     const pct = Number(rawItem.seller_context?.buyerPremiumRate) || 0;
     const effective = Number(originalDecision.effective_price || rawItem.seller_context?.allInPrice) || 0;
+    // Like with like (fix 3): the hammer / asking price is compared with the market range; all-in shown alongside.
+    // Older saved appraisals have no compare_price: they keep the all-in wording.
+    const compare = Number(originalDecision.compare_price) || 0;
+    const hammerMode = isAuction && compare > 0;
     const low = Number(pg.estimated_market_range_low) || 0;
     const high = Number(pg.estimated_market_range_high) || 0;
-    // Smart-buy / walk-away in the same (all-in) units as the effective price
     const ns = rawItem.negotiation_strategy || {};
     const smartAllIn = Number(originalDecision.smart_buy_all_in) || allInCost(Number(pg.good_buy_below) || 0, pct, isAuction);
     const walkAllIn = Number(originalDecision.walk_away_all_in) || allInCost(Number(ns.walk_away_price) || 0, pct, isAuction);
+    const smartHammer = Number(pg.good_buy_below) || 0;
+    const walkHammer = Number(ns.walk_away_price) || Number(pg.overpaying_above) || 0;
     const reason = (effective > 0 || basis === 'high_risk' || basis === 'no_price')
-      ? t(`analysis.${reasonKeyFor(basis, originalDecision.price_cap || undefined)}`, {
+      ? t(`analysis.${reasonKeyFor(basis, originalDecision.price_cap || undefined)}`, hammerMode ? {
+          price: formatMoney(compare, pg.currency),
+          premium: pct > 0 ? t('analysis.reason_hammer_suffix', { pct, allIn: formatMoney(effective, pg.currency) }) : '',
+          low: formatMoney(low, pg.currency),
+          high: formatMoney(high, pg.currency),
+          retailHigh: formatMoney(Number(pg.fair_price_high) || 0, pg.currency),
+          smartBuy: formatMoney(smartHammer, pg.currency) + ' ' + t('analysis.hammer_word'),
+          walkAway: formatMoney(walkHammer, pg.currency) + ' ' + t('analysis.hammer_word'),
+        } : {
           price: formatMoney(effective, pg.currency),
           premium: isAuction && pct > 0 ? t('analysis.reason_premium_suffix', { pct }) : '',
           low: formatMoney(low, pg.currency),

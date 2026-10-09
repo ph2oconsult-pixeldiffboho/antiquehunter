@@ -1,8 +1,13 @@
 {
-  "regions": ["cdg1"],
+  "regions": [
+    "cdg1"
+  ],
   "functions": {
     "api/hunt.ts": {
       "maxDuration": 60
+    },
+    "api/lot.ts": {
+      "maxDuration": 20
     }
   }
 }
