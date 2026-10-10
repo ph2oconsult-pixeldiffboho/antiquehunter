@@ -7,15 +7,28 @@ import type { IllustrationId } from '../../content/fieldNotes';
  * illustration id on each note still equals the note id (1:1); missing here means no image.
  */
 const IMAGE_IDS = [
+  'cabinet-cornice',
   'chair-legs',
+  'chair-nails-screws',
+  'chair-pegged',
   'chair-seat-rail',
   'commode-dovetails',
+  'commode-saw-marks',
   'mirror-backboards',
   'mirror-mercury',
+  'mirror-regilding',
+  'per-empire',
+  'per-georgian',
+  'per-gustavian',
   'per-louis-xv',
   'per-louis-xv-style',
   'per-louis-xvi',
+  'per-lp-mirror',
+  'per-regence',
+  'per-regence-trap',
   'per-restauration-gondole',
+  'sec-stamp-location',
+  'stamp-where-case',
   'stamp-where-chairs',
 ] as const satisfies readonly IllustrationId[];
 

@@ -1581,11 +1581,16 @@ check("field notes: illustration ids are 1:1; images optional and never shared",
     assert.notEqual(n!.illustration, "buy-scam-listings");
   }
   // Priority notes that currently have accepted AI engravings
-  for (const id of ["per-louis-xv", "commode-dovetails", "mirror-mercury", "chair-seat-rail", "mirror-backboards", "per-louis-xvi", "per-restauration-gondole"]) {
+  for (const id of [
+    "per-louis-xv", "commode-dovetails", "mirror-mercury", "chair-seat-rail",
+    "mirror-backboards", "per-louis-xvi", "per-restauration-gondole",
+    "per-empire", "per-lp-mirror", "per-regence-trap", "chair-pegged",
+    "stamp-where-case", "mirror-regilding", "commode-saw-marks",
+  ]) {
     assert.ok(hasIllustration(id), `priority note needs image: ${id}`);
   }
-  // Rejected / unavailable subjects must not get a wrong placeholder
-  for (const id of ["per-regence-trap", "per-empire", "per-lp-mirror", "chair-pegged", "stamp-jme"]) {
+  // Still no accepted image for these subjects
+  for (const id of ["stamp-jme", "sec-fall-front", "buy-scam-listings"]) {
     assert.ok(!hasIllustration(id), `no inaccurate image for ${id}`);
   }
 });
