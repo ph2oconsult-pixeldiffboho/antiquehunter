@@ -189,7 +189,11 @@
     "reason_dealer_good_buy": "{{price}} is at or below {{goodTop}} (the lower of the auction high and the dealer low) – a good shop price.",
     "reason_dealer_fair": "{{price}} is within the dealer range ({{dealerLow}}–{{dealerHigh}}) – a fair shop price.",
     "reason_dealer_overpriced": "{{price}} is above the dealer high ({{dealerHigh}}) – overpriced, even for a shop. Don't go above {{dealerHigh}}.",
-    "reason_dealer_walk_away": "{{price}} is well above the dealer range (over {{overTop}}) – walk away."
+    "reason_dealer_walk_away": "{{price}} is well above the dealer range (over {{overTop}}) – walk away.",
+    "no_dealer_evidence": "No dealer-retail evidence — shown range is the auction/market band, not an invented shop margin.",
+    "dealer_assumption": "Dealer range is a labelled assumption from the appraiser (not comps).",
+    "buyer_cost_label": "Buyer cost (all-in)",
+    "max_bid_label": "Max bid (hammer)"
   },
   "results": {
     "title": "Dealer's Findings",

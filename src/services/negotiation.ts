@@ -29,6 +29,9 @@ export interface NegotiationInput {
   targetHigh?: number;         // the app's reconciled target high (<= walk-away)
   dealerLow?: number;          // dealer mode: the bottom of the dealer range (offers are anchored toward it)
   premiumPct?: number;         // auction buyer's premium
+  /** From the valuation object — auction bidding tips must not recompute fees. */
+  maxBidHammer?: number;
+  maxBidAllIn?: number;
   checklist?: CheckItem[]; answers?: CheckAnswers;
   maker?: string | null; period?: string; text?: string; pieces?: number; pieceKind?: string;
 }
@@ -58,7 +61,9 @@ export const buildNegotiationPlan = (i: NegotiationInput): NegotiationPlan => {
 
   if (kind === 'auction') {
     const prem = Number(i.premiumPct) || 0;
-    return { kind, walk_away: walk, levers: [], invoice, bidding: { max_hammer: walk, max_all_in: Math.round(walk * (1 + prem / 100)), premium_pct: prem } };
+    const maxH = Number(i.maxBidHammer) > 0 ? Math.round(Number(i.maxBidHammer)) : walk;
+    const maxA = Number(i.maxBidAllIn) > 0 ? Math.round(Number(i.maxBidAllIn)) : Math.round(maxH * (1 + prem / 100));
+    return { kind, walk_away: walk, levers: [], invoice, bidding: { max_hammer: maxH, max_all_in: maxA, premium_pct: prem } };
   }
 
   // Suggested opening offer and "happy at" price: from the app's own figures, NEVER above the walk-away.

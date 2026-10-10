@@ -34,7 +34,7 @@ import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceChe
 
 import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker, hasJmeMention, anchorGroupFor, MAKERS } from "../src/services/makers.ts";
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
-import { buildValuation, validateValuation, allInFromHammer, hammerFromAllIn } from "../src/services/valuation.ts";
+import { buildValuation, validateValuation, assertValuationAgreement, allInFromHammer, hammerFromAllIn } from "../src/services/valuation.ts";
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS , knownLotSeeds} from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
@@ -532,7 +532,10 @@ check("price bands are contiguous; overpaying threshold = walk-away", () => {
   let prev = 100;
   for (let p = 500; p <= 8000; p += 50) { const s = at(p).score; assert.ok(s <= prev, `score rises at ${p}`); prev = s; }
   const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
-  assert.match(gem, /pg\.overpaying_above = nf\.walk_away_price/);
+  assert.match(gem, /pg\.overpaying_above = valuation\.overpayingAbove/);
+  assert.match(gem, /buildValuation\(/);
+  assert.match(gem, /assertValuationAgreement\(valuation\)/);
+  assert.ok(!/×\s*1\.3|\*\s*1\.3|\*\s*1\.6|x1\.3|x1\.6/.test(gem.replace(/\/\*.*?\*\//gs,"").replace(/\/\/.*$/gm,"")), "no invented ×1.3/×1.6 dealer margins");
 });
 
 // 5. Smart buy never above market mid (and never above market high)
@@ -1373,8 +1376,12 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   for (const ask of [950, 800]) {
     const a: any = postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: ask, category: "mirrors" }))[0];
     assert.equal(a.buy_decision.label, "Fair Price", String(ask)); assert.equal(a.buy_decision.price_scale, "dealer");
+    assert.equal(a.buy_decision.dealer_evidence, "assumption");
     assert.deepEqual([a.price_guidance.estimated_market_range_low, a.price_guidance.estimated_market_range_high, a.price_guidance.fair_price_low, a.price_guidance.fair_price_high], [300, 700, 700, 1100]);
     assert.equal(a.negotiation_strategy.walk_away_price, 1100); assert.equal(a.price_guidance.overpaying_above, 1100);
+    assert.equal(a.valuation.walkAway, a.valuation.overpayingAbove);
+    assert.equal(a.negotiation_plan.walk_away, a.valuation.walkAway);
+    assert.equal(a.price_guidance.overpaying_above, a.valuation.walkAway);
     const np = a.negotiation_plan; assert.ok(np.opening_offer <= np.happy_at && np.happy_at <= 1100 && np.happy_at < ask, JSON.stringify(np));
     assert.ok(np.opening_offer >= 700 - 1, String(np.opening_offer)); // anchored toward the dealer low
     assert.equal(np.payment.mode, "cash");
@@ -1390,14 +1397,18 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   // the model's dealer range out of line: clamped (low >= auction mid, high >= auction high)
   const bad = lpRaw(); Object.assign(bad.items[0].price_guidance, { fair_price_low: 320, fair_price_high: 650 });
   const c: any = postProcessAppraisal(bad, dealerCtx(q, { askingPrice: 950, category: "mirrors" }))[0];
-  assert.deepEqual([c.price_guidance.fair_price_low, c.price_guidance.fair_price_high], [500, 700]); assert.equal(c.buy_decision.label, "Overpriced");
+  // Model fair below market×1.05 → no dealer evidence; fair mirrors market; walk-away = market high
+  assert.equal(c.buy_decision.dealer_evidence, "none");
+  assert.deepEqual([c.price_guidance.fair_price_low, c.price_guidance.fair_price_high], [300, 700]);
+  assert.equal(c.negotiation_strategy.walk_away_price, 700);
+  assert.equal(c.buy_decision.label, "Walk Away");
   // auction mode: the auction range, its walk-away and bands as before
   const au: any = postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 950, category: "mirrors", isAuction: true, premiumPct: 25, sellerType: "Auction" }))[0];
   assert.equal(au.buy_decision.price_scale, "auction"); assert.equal(au.buy_decision.dealer_bands, null);
-  assert.equal(au.negotiation_strategy.walk_away_price, 700); assert.equal(au.buy_decision.label, "Overpriced");
+  assert.equal(au.negotiation_strategy.walk_away_price, 700); assert.equal(au.buy_decision.label, "Walk Away"); // above market high (= walk-away) with no dealer retail
   const bad2 = lpRaw(); Object.assign(bad2.items[0].price_guidance, { fair_price_low: 320, fair_price_high: 650 });
   const au2: any = postProcessAppraisal(bad2, dealerCtx(q, { askingPrice: 950, category: "mirrors", isAuction: true, premiumPct: 25, sellerType: "Auction" }))[0];
-  assert.deepEqual([au2.price_guidance.fair_price_low, au2.price_guidance.fair_price_high], [320, 700]); // not clamped in auction mode (unchanged)
+  assert.deepEqual([au2.price_guidance.fair_price_low, au2.price_guidance.fair_price_high], [300, 700]); // auction: no dealer retail projected
   // the model's notes never contradict the verdict (dealer mode); auction prose untouched
   const wordy = () => { const r = lpRaw(); const it = r.items[0];
     it.item_summary.snap_judgement = "A decorative piece. At 950 EUR this is a full retail price.";
@@ -1431,15 +1442,20 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   }
 });
 
-check("a confirmed Bellangé stamp changes the valuation: comps-anchored range, 'Fair' at a dealer's €12k (within the dealer range), not 'Overpriced'; a dealer's label stays plain Empire", () => {
+check("a confirmed Bellangé stamp changes the valuation: comps-anchored range; no invented ×1.3/×1.6 dealer margin; a dealer's label stays plain Empire", () => {
   const conf: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_CONF, { comps: COMPS_RESP }))[0];
   assert.equal(conf.maker_attribution.status, "stamped_confirmed");
   assert.equal(conf.comparables.status, "anchored");
   assert.deepEqual([conf.price_guidance.estimated_market_range_low, conf.price_guidance.estimated_market_range_high], [7650, 11500]);
-  // shop price judged against the dealer range (comps x1.3 .. x1.6 = €9,950–18,400): €12k is a fair shop price
-  assert.deepEqual([conf.price_guidance.fair_price_low, conf.price_guidance.fair_price_high], [9945, 18400]);
-  assert.equal(conf.buy_decision.label, "Fair Price"); assert.equal(conf.buy_decision.price_scale, "dealer");
-  assert.equal(conf.negotiation_strategy.walk_away_price, 18400);
+  // No invented ×1.3/×1.6: model fair (€6–9k) is below anchored market high, so no dealer evidence.
+  // Shop walk-away = market high (€11,500); €12k asking is Walk Away (above walk-away with no retail tier).
+  assert.equal(conf.buy_decision.dealer_evidence, "none");
+  assert.deepEqual([conf.price_guidance.fair_price_low, conf.price_guidance.fair_price_high], [7650, 11500]);
+  assert.equal(conf.buy_decision.label, "Walk Away"); assert.equal(conf.buy_decision.price_scale, "auction");
+  assert.equal(conf.negotiation_strategy.walk_away_price, 11500);
+  assert.equal(conf.price_guidance.overpaying_above, 11500);
+  assert.equal(conf.valuation.walkAway, conf.valuation.overpayingAbove);
+  assert.equal(conf.negotiation_plan.walk_away, conf.valuation.walkAway);
   assert.match(conf.item_summary.title, /stamped Bellangé/); assert.ok(!/Attributed/i.test(conf.item_summary.title));
   assert.match(conf.price_guidance.pricing_reasoning, /Anchored on 3 matched verified auction results/);
   const label: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_LABEL, { comps: COMPS_RESP }))[0];
@@ -1756,9 +1772,9 @@ check("valuation object: fees, walk-away agreement, max bid ≠ market high, no-
   assert.equal(auction.walkAway, 700);
   assert.equal(auction.overpayingAbove, auction.walkAway);
   assert.ok(auction.maxBidHammer != null && auction.maxBidHammer <= 700);
-  assert.ok((auction.maxBidAllIn || 0) <= 700); // restoration pulls all-in budget below walk-away
   assert.equal(auction.buyScoreAllowed, true);
   assert.deepEqual(validateValuation(auction), []);
+  assertValuationAgreement(auction);
 
   const noAsk = buildValuation({
     currency: "EUR", isAuction: true, premiumPct: 28, askingPrice: null, hasPhotos: false,
@@ -1769,16 +1785,57 @@ check("valuation object: fees, walk-away agreement, max bid ≠ market high, no-
   assert.ok(noAsk.provisional);
   assert.deepEqual(validateValuation(noAsk), []);
 
-  // Lot 245-like: style Charles X damaged — dealer path, walk-away = dealer high, not a blind market top bid
-  const style = buildValuation({
-    currency: "EUR", isAuction: false, premiumPct: 0, askingPrice: null, hasPhotos: false,
-    market: { low: 100, high: 350, currency: "EUR", basis: "all_in", provisional: true },
-    dealerRetail: { low: 250, high: 700, currency: "EUR", basis: "asking" },
+  // No invented ×1.3/×1.6: without a stated dealer tier → no dealer evidence
+  const none = buildValuation({
+    currency: "EUR", isAuction: false, premiumPct: 0, askingPrice: 12000, hasPhotos: true,
+    market: { low: 7650, high: 11500, currency: "EUR", basis: "all_in" },
+    dealerEvidence: "none",
   });
-  assert.equal(style.walkAway, 700);
-  assert.equal(style.buyScoreAllowed, false);
-  assert.ok(style.suggestedAcquisition != null && style.suggestedAcquisition <= 700);
+  assert.equal(none.dealerEvidence, "none");
+  assert.equal(none.dealerRetail, null);
+  assert.equal(none.walkAway, 11500);
+  assert.ok(none.notes.includes("no_dealer_evidence"));
+
+  // Labelled assumption when model stated retail above market
+  const assumed = buildValuation({
+    currency: "EUR", isAuction: false, premiumPct: 0, askingPrice: 950, hasPhotos: true,
+    market: { low: 300, high: 700, currency: "EUR", basis: "all_in" },
+    dealerRetail: { low: 700, high: 1100, currency: "EUR", basis: "asking" },
+    dealerEvidence: "assumption",
+  });
+  assert.equal(assumed.dealerEvidence, "assumption");
+  assert.ok(assumed.dealerRetail && assumed.dealerRetail.high === 1100);
+  assert.equal(assumed.walkAway, 1100);
+  assert.equal(assumed.overpayingAbove, assumed.walkAway);
+  assert.ok(assumed.openingOffer != null && assumed.suggestedAcquisition != null);
+  assert.ok(assumed.openingOffer! <= assumed.suggestedAcquisition!);
+  assert.ok(assumed.suggestedAcquisition! <= assumed.walkAway);
+  assertValuationAgreement(assumed);
 });
+
+check("valuation agreement: walk-away, warning, threshold and opening offer cannot diverge", () => {
+  const v = buildValuation({
+    currency: "EUR", isAuction: false, premiumPct: 0, askingPrice: 12000, hasPhotos: true,
+    market: { low: 7650, high: 11500, currency: "EUR", basis: "all_in" },
+    dealerRetail: { low: 9945, high: 18400, currency: "EUR", basis: "asking" },
+    dealerEvidence: "assumption",
+  });
+  assertValuationAgreement(v);
+  assert.equal(v.walkAway, v.overpayingAbove);
+  assert.equal(v.walkAway, 18500); // roundMoney to nearest €500
+  assert.ok(v.openingOffer! <= v.suggestedAcquisition!);
+  assert.ok(v.suggestedAcquisition! <= v.targetHigh!);
+  assert.ok(v.targetHigh! <= v.walkAway);
+  // Same figures feed negotiate
+  const plan = buildNegotiationPlan({
+    sellerType: "Antique Shop", isAuction: false, askingPrice: 12000, currency: "EUR",
+    walkAway: v.walkAway, openingOffer: v.openingOffer!, targetHigh: v.targetHigh!, dealerLow: v.dealerRetail!.low,
+  });
+  assert.equal(plan.walk_away, v.walkAway);
+  assert.ok(plan.opening_offer! <= plan.happy_at!);
+  assert.ok(plan.happy_at! <= plan.walk_away);
+});
+
 
 console.log(`
 ${passed} checks passed`);
