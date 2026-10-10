@@ -50,7 +50,7 @@ export const FieldNotesForPiece: React.FC<{
               data-testid={`field-notes-for-piece-${note.id}`}
             >
               <div className="w-16 shrink-0">
-                <FieldNoteIllustration id={note.illustration} />
+                <FieldNoteIllustration id={note.illustration} lazy />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink leading-snug">{noteTitle(note, lang)}</p>

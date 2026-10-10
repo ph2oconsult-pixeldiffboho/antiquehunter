@@ -157,7 +157,7 @@ export const FieldNotesGuide: React.FC<{
               data-testid={`field-note-card-${n.id}`}
             >
               <div className="w-24 shrink-0">
-                <FieldNoteIllustration id={n.illustration} />
+                <FieldNoteIllustration id={n.illustration} lazy />
               </div>
               <div className="min-w-0 space-y-1.5 py-0.5">
                 <p className="text-[9px] uppercase tracking-widest font-bold text-gold">

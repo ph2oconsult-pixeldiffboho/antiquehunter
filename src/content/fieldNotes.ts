@@ -1,4 +1,4 @@
-/** Structured Dealer Field Notes (EN/FR). illustration id === note id; no shared fallbacks. */
+/** Structured Dealer Field Notes (EN/FR). illustration id === note id; optional WebP; no shared fallbacks. */
 
 export type FieldNoteCategory = 'piece' | 'period' | 'stamps' | 'buying';
 
@@ -96,7 +96,7 @@ export interface FieldNote {
   category: FieldNoteCategory;
   title: LocalizedText;
   body: LocalizedText;
-  /** Must equal id. Each id has a dedicated SVG — never a generic fallback. */
+  /** Must equal id (1:1). Optional WebP in public/field-notes/; never a generic fallback. */
   illustration: IllustrationId;
   pieceTags: PieceTag[];
   periodTags: PeriodTag[];
@@ -567,7 +567,7 @@ export const FIELD_NOTES: FieldNote[] = [
     id: "per-louis-xv",
     category: "period",
     title: { en: "Louis XV: asymmetry, cabriole legs, and rocaille mounts", fr: "Louis XV : asymétrie, pieds cabriole et bronzes rocaille" },
-    body: { en: "Period Louis XV work (roughly 1730s–1770s) favours bombed façades, cabriole legs with scroll or pied-de-biche feet, and asymmetrical rocaille mounts. Woods include walnut, rosewood (palissandre), and bois de violette. A perfectly symmetrical “Louis XV” with razor-sharp identical mounts and plywood backs is often later style work—not a period cabriole piece with fluted neoclassical legs.", fr: "Le Louis XV d’époque (années 1730–1770 environ) aime les façades galbées, les pieds cabriole à enroulement ou pied-de-biche, et les bronzes rocaille asymétriques. Bois : noyer, palissandre, bois de violette. Un « Louis XV » parfaitement symétrique, aux bronzes identiques ultra-nets et fonds en contreplaqué, est souvent un travail de style plus tardif—pas une pièce d’époque à cabriole avec des pieds néoclassiques cannelés." },
+    body: { en: "Period Louis XV work (roughly 1730s–1770s) favours bombé façades, cabriole legs with scroll or pied-de-biche feet, and asymmetrical rocaille mounts. Woods include walnut, rosewood (palissandre), and bois de violette. A perfectly symmetrical “Louis XV” with razor-sharp identical mounts and plywood backs is often later style work. Fluted, straight tapered legs belong to Louis XVI; on a so-called Louis XV piece they point to a later or mixed design.", fr: "Le Louis XV d’époque (années 1730–1770 environ) aime les façades galbées, les pieds cabriole à enroulement ou pied-de-biche, et les bronzes rocaille asymétriques. Bois : noyer, palissandre, bois de violette. Un « Louis XV » parfaitement symétrique, aux bronzes identiques ultra-nets et fonds en contreplaqué, est souvent un travail de style plus tardif. Les pieds fuseaux cannelés appartiennent au Louis XVI ; sur une pièce dite Louis XV, ils indiquent un dessin plus tardif ou mixte." },
     illustration: "per-louis-xv",
     pieceTags: ["commodes", "chairs", "tables"],
     periodTags: ["louis_xv"],

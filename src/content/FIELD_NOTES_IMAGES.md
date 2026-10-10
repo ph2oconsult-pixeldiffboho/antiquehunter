@@ -1,12 +1,25 @@
 # Field Notes illustrations — sources and licences
 
-All diagrams are **original inline SVGs** drawn for this app
-(`src/components/fieldNotes/FieldNoteIllustration.tsx`).
+Raster illustrations live in `public/field-notes/*.webp` (sepia / ink line on warm paper,
+about 800 px wide, typically under 80 KB each; total under ~3 MB).
+
+**Generation:** These are **programmatically drawn technical line illustrations** in an
+antique-engraving style (SVG geometry → PNG → WebP). The `GenerateImage` tool in the
+`cursor` namespace was **not available** in the agent environment that produced them, so
+they are not diffusion / multimodal AI generations. They are original drawings made for
+this app; no third-party photos, no museum objects, no real brands or people, and no
+readable maker names inside the images (labels stay in the UI captions). The JME guild
+mark letters are the subject of that note and are intentional.
 
 Rules:
-- **One dedicated drawing per note id** (`illustration === note.id`).
-- **No shared fallbacks.** The €1 “faire offre” diagram is only for `buy-scam-listings`.
-- If a drawing cannot be made accurate, the component returns `null` rather than a wrong image.
-- No third-party photos, no hotlinks, no Wikimedia downloads.
+- **One asset per note id** (`illustration === note.id`). Filename stem equals the note id.
+- **Images are optional.** Notes without an accepted, feature-accurate image show no
+  illustration (`FieldNoteIllustration` returns `null`) — never a wrong or generic fallback.
+- The €1 “faire offre” scam diagram is not reused as decoration for other notes.
+- List cards lazy-load WebP; detail views load the full image eagerly.
+
+Accepted image count and ids are listed in
+`src/components/fieldNotes/FieldNoteIllustration.tsx` (`IMAGE_IDS` /
+`REGISTERED_ILLUSTRATION_IDS`).
 
 Licence: same as the application source.

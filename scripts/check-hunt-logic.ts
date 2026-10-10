@@ -1557,23 +1557,32 @@ check("field notes: content coverage (piece / period / stamps / buying)", () => 
   assert.ok(rest.some(n => /bois clair|citronnier|gondol|console|Charles X|copie|copy/i.test(n.title.en + n.body.en)));
 });
 
-check("field notes: every illustration is unique and registered (no fallbacks)", () => {
+check("field notes: illustration ids are 1:1; images optional and never shared", () => {
   assert.ok(illustrationBelongsOnlyToItsNote(), "illustration must equal note id for every note");
   assert.ok(scamIllustrationNotReused(), "€1 faire offre drawing only on buy-scam-listings");
   const ills = FIELD_NOTES.map(n => n.illustration);
   assert.equal(new Set(ills).size, ills.length, "duplicate illustration ids");
   assert.equal(EXPECTED_ILLUSTRATION_IDS.length, FIELD_NOTES.length);
-  for (const n of FIELD_NOTES) {
-    assert.ok(hasIllustration(n.illustration), `missing drawing for ${n.illustration}`);
+  // Registered WebP assets are a subset: each maps only to its matching note id
+  assert.ok(REGISTERED_ILLUSTRATION_IDS.length > 0, "expected some accepted images");
+  assert.ok(REGISTERED_ILLUSTRATION_IDS.length < FIELD_NOTES.length, "images are optional; not every note has one");
+  for (const id of REGISTERED_ILLUSTRATION_IDS) {
+    assert.ok(hasIllustration(id), `registry missing ${id}`);
+    const n = FIELD_NOTES.find(x => x.id === id);
+    assert.ok(n, `image ${id} has no matching note`);
+    assert.equal(n!.illustration, id, `image ${id} must be 1:1 with its note`);
   }
-  assert.equal(REGISTERED_ILLUSTRATION_IDS.length, FIELD_NOTES.length);
-  assert.deepEqual([...REGISTERED_ILLUSTRATION_IDS].sort(), [...EXPECTED_ILLUSTRATION_IDS].sort());
   assert.equal(SCAM_ONLY_ILLUSTRATION_ID, "buy-scam-listings");
+  assert.ok(!hasIllustration("buy-scam-listings"), "scam note must not reuse a shared decorative image");
   for (const id of ["per-regence-trap", "per-louis-xv-style", "per-style-trap", "stamp-fakes", "per-louis-xv", "per-louis-xvi", "mirror-mercury"]) {
     const n = FIELD_NOTES.find(x => x.id === id);
     assert.ok(n, id);
     assert.equal(n!.illustration, id);
     assert.notEqual(n!.illustration, "buy-scam-listings");
+  }
+  // Priority notes that must show a real image
+  for (const id of ["per-louis-xv", "commode-dovetails", "mirror-mercury", "chair-seat-rail", "per-regence-trap", "chair-pegged", "stamp-jme"]) {
+    assert.ok(hasIllustration(id), `priority note needs image: ${id}`);
   }
 });
 

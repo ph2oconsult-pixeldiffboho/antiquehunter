@@ -1,7 +1,7 @@
 /** Illustration registry checks (no JSX) — used by unit tests. */
 import { FIELD_NOTES, type IllustrationId } from '../content/fieldNotes';
 
-/** Every note must have illustration === id, and that id must appear here exactly once. */
+/** Every note must have illustration === id (1:1 identity). Visual assets are optional. */
 export const EXPECTED_ILLUSTRATION_IDS: IllustrationId[] = FIELD_NOTES.map(n => n.illustration);
 
 export const SCAM_ONLY_ILLUSTRATION_ID: IllustrationId = 'buy-scam-listings';
