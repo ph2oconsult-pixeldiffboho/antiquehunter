@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Camera, Search, History, Settings, Sparkles, ArrowRight, Upload, Mic, X, BookOpen, Compass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { VersionFooter } from './VersionFooter';
 
 interface HomeProps {
   onScan: () => void;
@@ -270,6 +271,9 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
           </div>
         )}
       </AnimatePresence>
+
+      {/* App version — tap to copy */}
+      <VersionFooter className="pt-4 pb-2" />
 
       {/* Bottom Nav Placeholder */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-border-custom flex items-center justify-around">

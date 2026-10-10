@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Globe, User, LogOut, Info, ChevronRight, MessageSquare } from 'lucide-react';
 import { auth } from '../firebase';
 import { FeedbackHistory } from './FeedbackHistory';
+import { VersionFooter } from './VersionFooter';
 
 interface SettingsProps {
   onBack: () => void;
@@ -193,10 +194,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
         <section className="space-y-4">
           <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">{t('settings.about')}</h2>
           <div className="bg-white border border-border-custom rounded-[32px] p-6 space-y-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted">{t('settings.version')}</span>
-              <span className="font-medium text-ink">1.0.0</span>
-            </div>
+            <VersionFooter compact />
             <button 
               onClick={onNavigateToLegal}
               className="w-full flex items-center justify-between text-sm hover:opacity-70 transition-opacity"
@@ -210,3 +208,4 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
     </div>
   );
 };
+
