@@ -345,12 +345,12 @@ export default function Main() {
   }
 
   const handleCheckout = (packId: string) => {
-    // In a real app, this would trigger a payment gateway (Stripe, etc.)
-    console.log(`Initiating checkout for: ${packId}`);
-    
-    // For demo purposes, we'll simulate a successful purchase
-    // and upgrade the user to 'pro' status
+    // Production entitlement must go through a real payment + webhook before setPlan('pro').
+    // Demo / preview only: reveal numbers locally and label the badge so it is not mistaken for a paid entitlement.
+    console.warn(`[demo-checkout] pack=${packId} — no payment processed; granting local demo_pro preview only`);
     setPlan('pro');
+    try { sessionStorage.setItem('ah_demo_pro', '1'); } catch { /* ignore */ }
+    showToast('info', t('toast.demo_unlock', 'Demo unlock — no payment was taken. Production requires a completed purchase.'));
   };
 
   const renderScreen = () => {

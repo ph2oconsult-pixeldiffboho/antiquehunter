@@ -1286,6 +1286,43 @@ check("comparables anchor the range, scaled to the number of pieces (stamped on 
   assert.equal(anchorOnComparables([], { status: "stamped_confirmed", pieces: 4, isAuction: false, eurTo: (e) => e }).reason, "none");
 });
 
+check("comps anchor: drop trophy/outlier lots; plain Hache and modest Boudin stay in the low thousands", () => {
+  const eur = (e: number) => e;
+  // Plain provincial Hache: mix of modest stamped lots + trophy ormolu/museum lots
+  const hache: Comparable[] = [
+    comp({ url: "https://h/1", title: "Commode Transition noyer estampille Hache Grenoble", snippet: "noyer, placage simple, estampille Hache a Grenoble", material: "walnut", stamp: "stamped", date: "2021-04-27", perPieceAllInEur: 2800, perPieceHammerEur: 2200, price: 2800 }),
+    comp({ url: "https://h/2", title: "Commode Louis XV Hache Grenoble", snippet: "bois de noyer, estampille", material: "walnut", stamp: "stamped", date: "2019-06-01", perPieceAllInEur: 4200, perPieceHammerEur: 3300, price: 4200 }),
+    comp({ url: "https://h/3", title: "Commode exceptionnelle Hache", snippet: "exceptionnelle, laque de Chine, montures en bronze dore, provenance royale", material: "lacquer", stamp: "stamped", date: "2020-11-01", perPieceAllInEur: 149750, perPieceHammerEur: 118000, price: 149750 }),
+    comp({ url: "https://h/4", title: "Important commode Hache ormolu-mounted", snippet: "richly mounted ormolu, Grand Salon", material: "mahogany", stamp: "stamped", date: "2022-03-01", perPieceAllInEur: 82500, perPieceHammerEur: 65000, price: 82500 }),
+  ];
+  const hp = "Commode tombeau Transition, bois de noyer et placage, estampillee Hache a Grenoble, stamp confirmed. Provincial dealer.";
+  const ha = anchorOnComparables(hache, { status: "stamped_confirmed", pieces: 1, material: "walnut", isAuction: false, eurTo: eur, pieceText: hp, priorLow: 1500, priorHigh: 3500, textOnly: true });
+  assert.ok(ha.applied);
+  assert.ok(ha.high <= 3500 * 2.5 + 1, `Hache high ${ha.high}`);
+  assert.ok(ha.perPieceMedianEur <= 6000, `Hache median ${ha.perPieceMedianEur}`);
+  assert.ok(ha.used.every(c => c.perPieceAllInEur < 20000), JSON.stringify(ha.used.map(c => c.perPieceAllInEur)));
+  assert.ok(ha.nearest.some(n => !n.kept && /trophy|outlier|ormolu|material_mismatch/i.test(n.reason)), JSON.stringify(ha.nearest));
+
+  // Modest Boudin: should not anchor on €75k+ Christie's trophies
+  const boudin: Comparable[] = [
+    comp({ url: "https://b/1", title: "Commode Louis XV estampillee L. Boudin", snippet: "bois de rose, estampille L.Boudin, JME", material: "rosewood", stamp: "stamped", date: "2007-12-19", perPieceAllInEur: 9600, perPieceHammerEur: 7500, price: 9600 }),
+    comp({ url: "https://b/2", title: "Commode Transition Boudin", snippet: "placage, estampille Boudin", material: "mahogany", stamp: "stamped", date: "2019-05-01", perPieceAllInEur: 7800, perPieceHammerEur: 6100, price: 7800 }),
+    comp({ url: "https://b/3", title: "Commode exceptionnelle Leonard Boudin", snippet: "exceptionnelle, bronzes dores ciselés, provenance collection", material: "rosewood", stamp: "stamped", date: "2020-10-14", perPieceAllInEur: 92000, perPieceHammerEur: 72000, price: 92000 }),
+    comp({ url: "https://b/4", title: "Important bureau Boudin", snippet: "important bureau, ormolu-mounted", material: "rosewood", stamp: "stamped", date: "2018-05-23", perPieceAllInEur: 73125, perPieceHammerEur: 57500, price: 73125 }),
+  ];
+  const bp = "Commode Louis XV en bois de rose et amarante, marbre d'origine, estampillee L. Boudin, marque JME. Demande 3 500 € chez un antiquaire.";
+  const ba = anchorOnComparables(boudin, { status: "stamped_stated", pieces: 1, isAuction: false, eurTo: eur, pieceText: bp, priorLow: 1200, priorHigh: 3000, textOnly: true });
+  assert.ok(ba.applied);
+  assert.ok(ba.high <= 12000, `Boudin high ${ba.high} (expect high single-digit thousands)`);
+  assert.ok(ba.used.every(c => c.perPieceAllInEur < 30000));
+  assert.ok(ba.nearest.some(n => !n.kept));
+
+  // Bellangé confirmed set still ~€7.6–11.5k
+  const bell = anchorOnComparables(BELL_COMPS, { status: "stamped_confirmed", pieces: 4, material: "mahogany", isAuction: false, eurTo: eur, pieceText: "Set of four mahogany armchairs stamped Bellangé, stamp confirmed" });
+  assert.deepEqual([bell.low, bell.high], [7650, 11500]);
+});
+
+
 const bellRaw = () => ({ items: [{
   item_summary: { title: "Set of Four Empire Mahogany Fauteuils (Attributed to P. Bellangé)", category: "Chairs", likely_origin: "France", likely_style: "Empire", likely_period: "Early 19th Century", value_tier: "B", snap_judgement: "Standard Empire form.", confidence: "low", confidence_score: 40, confidence_breakdown: { evidence_quality: 20, identification_certainty: 15, risk_factors: 15 }, confidence_reason: "Photos of the chairs.", confidence_improvement_suggestions: [], evidence_gaps: [], period_certainty: "probable_period", reproduction_risk: false, construction_evidence: "none shown", maker: { name: "Pierre-Antoine Bellangé", status: "stamped_stated", evidence: "buyer's text" } },
   buy_decision: { score: 20, label: "Walk Away", confidence: "low", decision_summary: [], investment_insight: "", must_have_insight: "", resale_insight: "" },
@@ -1403,7 +1440,7 @@ check("a confirmed Bellangé stamp changes the valuation: comps-anchored range, 
   assert.equal(conf.buy_decision.label, "Fair Price"); assert.equal(conf.buy_decision.price_scale, "dealer");
   assert.equal(conf.negotiation_strategy.walk_away_price, 18400);
   assert.match(conf.item_summary.title, /stamped Bellangé/); assert.ok(!/Attributed/i.test(conf.item_summary.title));
-  assert.match(conf.price_guidance.pricing_reasoning, /Anchored on 3 verified auction results/);
+  assert.match(conf.price_guidance.pricing_reasoning, /Anchored on 3 matched verified auction results/);
   const label: any = postProcessAppraisal(bellRaw(), dealerCtx(BELL_LABEL, { comps: COMPS_RESP }))[0];
   assert.equal(label.maker_attribution.status, "dealer_label");
   assert.equal(label.comparables.status, "shown");
@@ -1706,3 +1743,4 @@ check("field notes: cash-cap note matches negotiation constants", () => {
 
 console.log(`
 ${passed} checks passed`);
+process.exit(0);

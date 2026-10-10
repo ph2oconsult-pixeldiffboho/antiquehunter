@@ -74,8 +74,8 @@
     "market_cold": "Cold",
     "confidence_high_desc": "Strong match across form, materials, and market behaviour.",
     "confidence_medium_desc": "Good match — key details missing",
-    "confidence_low_desc": "Based on visible features only. Inspect carefully before buying.",
-    "confidence_very_low_desc": "Based on visible features only. Inspect carefully before buying.",
+    "confidence_low_desc": "Based on your description only. Photos of construction, condition and any stamps would change this estimate.",
+    "confidence_very_low_desc": "Based on your description only. Photos of construction, condition and any stamps would change this estimate.",
     "data_quality_assessment": "How confident this is",
     "how_to_improve_accuracy": "To tighten this assessment:",
     "provide_more_details": "Improve Accuracy",
@@ -439,7 +439,8 @@
     "saved_local": "Saved on this device – sign in to sync.",
     "save_failed": "Could not save: {{reason}}",
     "signin_needed": "Sign in with Google to save to your account…",
-    "save_failed_local": "Couldn't save to your account ({{reason}}). Saved on this device instead."
+    "save_failed_local": "Couldn't save to your account ({{reason}}). Saved on this device instead.",
+    "demo_unlock": "Demo unlock — no payment was taken. Production requires a completed purchase."
   },
   "evidence": {
     "title": "Need more evidence",
@@ -558,7 +559,10 @@
     "per_piece_all_in": "per piece incl. fees",
     "not_used": "not used (other kind)",
     "unreachable": "Not searchable: {{list}}.",
-    "verified_note": "Each result was opened and checked on the auction house's own page (maker, piece and sold price). Nothing unverified is shown."
+    "verified_note": "Each result was opened and checked on the auction house's own page (maker, piece and sold price). Nothing unverified is shown.",
+    "nearest_title": "Nearest lots — why kept or dropped",
+    "kept": "Kept",
+    "dropped": "Dropped"
   },
   "negotiate": {
     "title": "Negotiate",

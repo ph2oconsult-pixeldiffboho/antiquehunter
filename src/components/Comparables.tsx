@@ -43,6 +43,21 @@ export const MakerAndComparables: React.FC<{ item: any }> = ({ item }) => {
           ))}
         </ul>
       )}
+      {(comps?.nearest || []).length > 0 && (
+        <div data-testid="comps-nearest" className="space-y-1 pt-1">
+          <p className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('comps.nearest_title', 'Nearest lots — why kept or dropped')}</p>
+          <ul className="space-y-1">
+            {(comps.nearest as Array<{ url: string; title: string; kept: boolean; reason: string; perPieceEur: number }>).slice(0, 8).map((n) => (
+              <li key={n.url + n.reason} className="text-[10px] text-muted leading-snug">
+                <span className={n.kept ? 'text-emerald-700 font-bold' : 'text-amber-800 font-bold'}>{n.kept ? t('comps.kept', 'Kept') : t('comps.dropped', 'Dropped')}</span>
+                {' · '}{n.reason.replace(/_/g, ' ')}
+                {' · '}{(n.title || '').slice(0, 80)}
+                {n.perPieceEur ? ` · ~€${Math.round(n.perPieceEur).toLocaleString()}/pc` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {(comps?.unreachable || []).length > 0 && <p className="text-[10px] text-muted">{t('comps.unreachable', { list: comps.unreachable.join(', ') })}</p>}
       <p className="text-[10px] text-muted">{t('comps.verified_note')}</p>
     </section>

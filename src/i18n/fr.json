@@ -81,8 +81,8 @@
     "market_insight_desc": "Demande et facteurs de valeur",
     "confidence_high_desc": "Forte correspondance entre la forme, le matériau et le marché",
     "confidence_medium_desc": "Bonne correspondance — détails clés manquants",
-    "confidence_low_desc": "Basé uniquement sur les caractéristiques visibles. Inspectez soigneusement avant d'acheter.",
-    "confidence_very_low_desc": "Basé uniquement sur les caractéristiques visibles. Inspectez soigneusement avant d'acheter.",
+    "confidence_low_desc": "D'après votre description uniquement. Des photos de la construction, de l'état et des estampilles modifieraient cette estimation.",
+    "confidence_very_low_desc": "D'après votre description uniquement. Des photos de la construction, de l'état et des estampilles modifieraient cette estimation.",
     "data_quality_assessment": "Niveau de confiance",
     "how_to_improve_accuracy": "Pour affiner cette évaluation :",
     "provide_more_details": "Améliorer la précision",
@@ -439,7 +439,8 @@
     "saved_local": "Enregistré sur cet appareil – connectez-vous pour synchroniser.",
     "save_failed": "Échec de l'enregistrement : {{reason}}",
     "signin_needed": "Connectez-vous avec Google pour enregistrer dans votre compte…",
-    "save_failed_local": "Impossible d'enregistrer dans votre compte ({{reason}}). Enregistré sur cet appareil à la place."
+    "save_failed_local": "Impossible d'enregistrer dans votre compte ({{reason}}). Enregistré sur cet appareil à la place.",
+    "demo_unlock": "Déblocage démo — aucun paiement n'a été pris. La production exige un achat abouti."
   },
   "evidence": {
     "title": "Il faut plus d'éléments",
@@ -558,7 +559,10 @@
     "per_piece_all_in": "par pièce frais compris",
     "not_used": "non retenu (autre type)",
     "unreachable": "Non consultable : {{list}}.",
-    "verified_note": "Chaque résultat a été ouvert et vérifié sur la page de la maison de ventes (ébéniste, pièce, prix d'adjudication). Rien de non vérifié n'est affiché."
+    "verified_note": "Chaque résultat a été ouvert et vérifié sur la page de la maison de ventes (ébéniste, pièce, prix d'adjudication). Rien de non vérifié n'est affiché.",
+    "nearest_title": "Lots proches — pourquoi retenus ou écartés",
+    "kept": "Retenu",
+    "dropped": "Écarté"
   },
   "negotiate": {
     "title": "Négocier",

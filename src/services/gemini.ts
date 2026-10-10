@@ -500,7 +500,12 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       : comps;
     const compList = compsForStatus?.comparables || [];
     const toTarget = (eur: number) => convertApprox(eur, 'EUR', targetCurrency) ?? eur;
-    const anchor = anchorOnComparables(compList, { status: maker?.status || null, pieces, material: materialOf(pieceText), isAuction, eurTo: toTarget });
+    const priorLow = Number(item.price_guidance?.estimated_market_range_low) || 0;
+    const priorHigh = Number(item.price_guidance?.estimated_market_range_high) || 0;
+    const anchor = anchorOnComparables(compList, {
+      status: maker?.status || null, pieces, material: materialOf(pieceText), isAuction, eurTo: toTarget,
+      pieceText, priorLow, priorHigh, textOnly: !hasPhotos,
+    });
     const perPiece = anchor.used.map(x => isAuction ? x.perPieceHammerEur : x.perPieceAllInEur);
     const spread = perPiece.length >= 2 ? Math.max(...perPiece) / Math.max(1, Math.min(...perPiece)) : undefined;
 
@@ -516,10 +521,10 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     if (!hasPhotos) {
       c.evidence_quality = Math.min(c.evidence_quality || 12, 14);
       if (!item.item_summary.confidence_reason.includes('photographic') && !item.item_summary.confidence_reason.includes('photos')) {
-        item.item_summary.confidence_reason = `Unverified: Evaluated without physical photographs. Stamped marks, joinery, and authenticity cannot be confirmed without visual inspection. ${item.item_summary.confidence_reason}`;
+        item.item_summary.confidence_reason = `Based on your description (no photos). Stamped marks, joinery, and authenticity cannot be confirmed without visual inspection. ${item.item_summary.confidence_reason}`;
       }
       if (!item.price_guidance.pricing_reasoning.includes('photos') && !item.price_guidance.pricing_reasoning.includes('photographs')) {
-        item.price_guidance.pricing_reasoning = `Preliminary text-only appraisal without photos. Actual valuation depends on physical condition and construction. ${item.price_guidance.pricing_reasoning}`;
+        item.price_guidance.pricing_reasoning = `Based on your description only. Photos of construction and condition would change this estimate. ${item.price_guidance.pricing_reasoning}`;
       }
     }
 
@@ -750,11 +755,15 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     if (evidence.required) item.price_guidance = { ...item.price_guidance, provisional: true };
     if (anchor.applied) {
       const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
-      item.price_guidance = { ...item.price_guidance, pricing_reasoning: `Anchored on ${anchor.used.length} verified auction results for ${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}). ${item.price_guidance.pricing_reasoning || ''}`.trim() };
+      const how = anchor.blended ? 'Blended prior range with' : 'Anchored on';
+      const capNote = anchor.capped ? ' Text-only lift capped against the prior range.' : '';
+      item.price_guidance = { ...item.price_guidance, pricing_reasoning: `${how} ${anchor.used.length} matched verified auction results for ${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}).${capNote} ${item.price_guidance.pricing_reasoning || ''}`.trim() };
     }
+    // Physical checklist features (marble, veneer, etc.) come from the USER text only — never from
+    // model-invented title / walk_away_if lines (Lot 49 had no marble but got a marble check).
     const checklistItems = buildChecklist({
       pieceKind, pieces, period: item.item_summary.likely_period, maker: makerAsClaimed ? { name: makerAsClaimed.name, status: makerAsClaimed.status } : null,
-      basis, text: `${query} ${titleText} ${item.item_summary.likely_style || ''} ${(item.walk_away_if || []).join(' ')}`, category,
+      basis, text: query, category,
     });
 
     const nsF = item.negotiation_strategy || {};
@@ -773,9 +782,10 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, jme: !!maker.jme, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
       comparables: {
-        status: compsForStatus === undefined ? (maker ? 'not_searched' : 'no_maker') : compsForStatus === null || compsForStatus.ok === false ? 'error' : maker?.status === 'doubtful_stamp' ? 'not_stamped' : compList.length === 0 ? 'none_verified' : anchor.applied ? 'anchored' : 'shown',
+        status: compsForStatus === undefined ? (maker ? 'not_searched' : 'no_maker') : compsForStatus === null || compsForStatus.ok === false ? 'error' : maker?.status === 'doubtful_stamp' ? 'not_stamped' : compList.length === 0 ? 'none_verified' : anchor.applied ? (anchor.blended ? 'anchored' : 'anchored') : 'shown',
         reason: anchor.reason, group: anchor.group, pieces: anchor.pieces, per_piece_median_eur: anchor.perPieceMedianEur || null, basis: anchor.basis,
-        list: compList, used_urls: anchor.used.map(x => x.url), unreachable: compsForStatus?.unreachable || [],
+        blended: !!anchor.blended, capped: !!anchor.capped,
+        list: compList, used_urls: anchor.used.map(x => x.url), nearest: anchor.nearest || [], unreachable: compsForStatus?.unreachable || [],
       },
       checklist: { items: checklistItems, answers: checkAnswers || {}, base: checklistBase, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },
       appraisal_inputs: {
