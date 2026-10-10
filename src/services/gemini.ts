@@ -14,6 +14,7 @@ import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from ".
 import { pieceKindOf } from "./appraisalMath";
 import { buildValuation, validateValuation, assertValuationAgreement, type Valuation } from "./valuation";
 import { normaliseEvidenceLedger, ledgerHasContent, type EvidenceLedger } from "./evidenceLedger";
+import { applyBaseBandPriors } from "./baseBandPriors";
 
 /** Fixed seed + temperature 0: the same input gives the same appraisal (fix 9). */
 export const APPRAISAL_SEED = 20261009;
@@ -641,8 +642,35 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const pg = item.price_guidance;
     pg.estimated_market_range_low = Math.max(0, Number(pg.estimated_market_range_low) || 0);
     pg.estimated_market_range_high = Math.max(pg.estimated_market_range_low, Number(pg.estimated_market_range_high) || pg.estimated_market_range_low * 1.5);
-    const rawMidEur = convertApprox((pg.estimated_market_range_low + pg.estimated_market_range_high) / 2, targetCurrency, 'EUR') ?? 0;
     pg.currency = targetCurrency;
+
+    // Base-band priors when comps did not anchor: style-vs-period, condition, lighting/category caps.
+    const draftLedger = normaliseEvidenceLedger(item.evidence_ledger, {
+      hasPhotos,
+      styleText: `${item.item_summary.likely_style || ''} ${item.item_summary.likely_period || ''} ${query || ''}`,
+    });
+    const catForPrior = category && category !== 'unknown' ? category : (item.item_summary.category || '');
+    const prior = applyBaseBandPriors({
+      marketLow: pg.estimated_market_range_low,
+      marketHigh: pg.estimated_market_range_high,
+      category: catForPrior,
+      periodCertainty: item.item_summary.period_certainty,
+      styleNote: draftLedger.style_note,
+      title: item.item_summary.title,
+      query,
+      defects: draftLedger.defects,
+      compsAnchored: !!anchor.applied,
+    });
+    if (prior.factors.length) {
+      pg.estimated_market_range_low = prior.low;
+      pg.estimated_market_range_high = prior.high;
+      (item as any)._band_priors = prior;
+      const note = prior.factors.filter(f => !f.endsWith('_note')).join(', ');
+      if (note) {
+        pg.pricing_reasoning = `${pg.pricing_reasoning || ''} [Band prior: ${note}].`.trim();
+      }
+    }
+    const rawMidEur = convertApprox((pg.estimated_market_range_low + pg.estimated_market_range_high) / 2, targetCurrency, 'EUR') ?? 0;
 
     // Dealer retail: only when the model stated a retail tier above the market — labelled assumption.
     // Never invent ×1.3/×1.6 from the auction/comps range.
@@ -842,6 +870,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       valuation,
       valuation_errors: validateValuation(valuation),
       evidence_ledger: evidenceLedger,
+      band_priors: (item as any)._band_priors || null,
       negotiation_plan: negotiationPlan,
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, jme: !!maker.jme, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,

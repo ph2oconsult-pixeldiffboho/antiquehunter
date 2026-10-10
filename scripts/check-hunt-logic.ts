@@ -36,6 +36,7 @@ import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, com
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
 import { buildValuation, validateValuation, assertValuationAgreement, allInFromHammer, hammerFromAllIn } from "../src/services/valuation.ts";
 import { normaliseEvidenceLedger, ledgerHasContent } from "../src/services/evidenceLedger.ts";
+import { applyBaseBandPriors, isStyleNotPeriod, conditionDiscountOf, categoryPriorHigh } from "../src/services/baseBandPriors.ts";
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS , knownLotSeeds} from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
@@ -1912,6 +1913,71 @@ check("narrative consistency: valuation figures kept; mismatched euro amounts st
   const a: any = postProcessAppraisal(raw(), dealerCtx("Louis-Philippe mirror", { askingPrice: 950, category: "mirrors" }))[0];
   assert.ok(!/2,?500/.test(a.price_guidance.pricing_reasoning), a.price_guidance.pricing_reasoning);
   assert.ok(!/€99|99 bargain/.test(a.item_summary.snap_judgement), a.item_summary.snap_judgement);
+});
+
+
+check("base-band priors: style-vs-period + condition + lighting category cap when comps do not anchor", () => {
+  assert.equal(isStyleNotPeriod("later_style_or_revival"), true);
+  assert.equal(isStyleNotPeriod("confirmed_period", null, "époque Charles X"), false);
+  assert.equal(isStyleNotPeriod(undefined, null, "Commode de style Charles X, placage"), true);
+  assert.equal(isStyleNotPeriod(undefined, "Charles X style carving", "commode"), true);
+  assert.equal(conditionDiscountOf([], "belle commode").factor, 1);
+  assert.ok(conditionDiscountOf([{ severity: "structural" }], "").factor < 0.5);
+  assert.ok(conditionDiscountOf([], "marbre fendu restauré, fentes").factor <= 0.45);
+  assert.equal(categoryPriorHigh("chandelier_lighting"), 450);
+
+  // Style + damage, no comps: high must fall well below the raw model high
+  const styleDamaged = applyBaseBandPriors({
+    marketLow: 300, marketHigh: 900, category: "furniture",
+    periodCertainty: "later_style_or_revival",
+    query: "Commode de style Charles X (marbre fendu restauré, fentes)",
+    defects: [{ severity: "major" }],
+    compsAnchored: false,
+  });
+  assert.ok(styleDamaged.high < 900 * 0.55, JSON.stringify(styleDamaged));
+  assert.ok(styleDamaged.factors.includes("style_vs_period_discount"));
+  assert.ok(styleDamaged.factors.some(f => f.startsWith("condition_")));
+
+  // Lighting unsigned: category prior caps an inflated model high
+  const light = applyBaseBandPriors({
+    marketLow: 200, marketHigh: 900, category: "chandelier_lighting",
+    query: "Lustre en bronze ou laiton à pampilles",
+    compsAnchored: false,
+  });
+  assert.ok(light.high <= 520, JSON.stringify(light));
+  assert.ok(light.categoryCapApplied);
+
+  // Comps anchored: priors do not move the numbers
+  const anchored = applyBaseBandPriors({
+    marketLow: 7650, marketHigh: 11500, category: "furniture",
+    periodCertainty: "later_style_or_revival",
+    defects: [{ severity: "structural" }],
+    compsAnchored: true,
+  });
+  assert.deepEqual([anchored.low, anchored.high], [7650, 11500]);
+
+  // Wired: style Charles X + damage, no comps → postProcess high below raw 900
+  const raw = () => { const r: any = bellRaw(); const it = r.items[0];
+    it.item_summary.title = "Commode de style Charles X";
+    it.item_summary.period_certainty = "later_style_or_revival";
+    it.item_summary.category = "Furniture";
+    Object.assign(it.price_guidance, { estimated_market_range_low: 300, estimated_market_range_high: 900, fair_price_low: 400, fair_price_high: 1000 });
+    it.evidence_ledger = { facts: [], claims: ["de style Charles X"], photo_features: [], hypotheses: [], unknowns: [],
+      defects: [{ text: "Marble cracked", severity: "major", location: "top" }], style_note: "Charles X style" };
+    return r; };
+  const a: any = postProcessAppraisal(raw(), dealerCtx("Commode de style Charles X (marbre fendu, fentes)", { askingPrice: null, category: "furniture", comps: { ok: true, comparables: [] } }))[0];
+  assert.ok(a.band_priors, "band_priors attached");
+  assert.ok(a.price_guidance.estimated_market_range_high < 900, JSON.stringify(a.price_guidance));
+  assert.ok(a.band_priors.factors.includes("style_vs_period_discount"));
+
+  // Lighting: lustre text → category prior even if category string is lighting
+  const lr = () => { const r: any = bellRaw(); const it = r.items[0];
+    it.item_summary.title = "Lustre bronze pampilles"; it.item_summary.category = "Lighting";
+    it.item_summary.period_certainty = "ambiguous";
+    Object.assign(it.price_guidance, { estimated_market_range_low: 200, estimated_market_range_high: 900, fair_price_low: 300, fair_price_high: 1200 });
+    return r; };
+  const L: any = postProcessAppraisal(lr(), dealerCtx("Lustre en bronze ou laiton à pampilles de cristal", { askingPrice: null, category: "chandelier_lighting", comps: { ok: true, comparables: [] } }))[0];
+  assert.ok(L.price_guidance.estimated_market_range_high <= 520, JSON.stringify(L.price_guidance));
 });
 
 console.log(`
