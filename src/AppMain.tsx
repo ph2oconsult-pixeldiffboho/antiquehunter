@@ -25,11 +25,11 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'f
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Toast, type ToastKind, type ToastMessage } from './components/Toast';
-import { analysisItems, saveLocalFind } from './services/localFinds';
+import { analysisItems, saveLocalFind, preserveAppraisalDraft, clearAppraisalDraft, commitDraftToLocalFinds } from './services/localFinds';
 
-const SIGNIN_TIMEOUT_MS = 60_000;      // give up on the Google popup after 1 minute
+const SIGNIN_TIMEOUT_MS = 20_000;      // give up on the Google popup after 20s (Save-to-Log must not hang)
 const SIGNIN_RETURN_GRACE_MS = 4_000;  // after the user comes back to the app, wait this long for the sign-in to land
-const SAVE_TIMEOUT_MS = 15_000;        // Firestore write (offline writes never resolve)
+const SAVE_TIMEOUT_MS = 8_000;         // Firestore write (offline writes never resolve)
 
 const withTimeout = <T,>(p: Promise<T>, ms: number, message: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
@@ -274,12 +274,19 @@ export default function Main() {
       sellerType: lastDetails?.sellerType ? String(lastDetails.sellerType).slice(0, 63) : null,
     };
 
+    // Preserve first: empty log / slow auth / cancelled popup / offline must not lose the appraisal.
+    preserveAppraisalDraft(record);
+
     const saveOnDevice = (reasonKey: 'saved_local' | 'save_failed_local', reason?: string) => {
       try {
         saveLocalFind(record);
+        clearAppraisalDraft();
         setSavedResult(analysisResult);
         showToast(reasonKey === 'saved_local' ? 'success' : 'error', t(`toast.${reasonKey}`, { reason }));
       } catch (e: any) {
+        // Draft remains; Collection can still pick it up via commitDraftToLocalFinds
+        commitDraftToLocalFinds();
+        setSavedResult(analysisResult);
         showToast('error', t('toast.save_failed', { reason: reason || friendlySaveError(e) }));
       }
     };
@@ -303,6 +310,7 @@ export default function Main() {
         notes: '',
         createdAt: serverTimestamp()
       }), SAVE_TIMEOUT_MS, 'no connection (timed out)');
+      clearAppraisalDraft();
       setSavedResult(analysisResult);
       showToast('success', t('toast.saved'));
     } catch (error) {

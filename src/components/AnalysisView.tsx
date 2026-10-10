@@ -1554,7 +1554,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 onClick={async () => {
                   if (saveState === 'saving') return;
                   setSaveState('saving');
-                  try { await onSave('watching'); } finally { setSaveState('idle'); }
+                  // Hard ceiling: even if onSave never settles (auth popup / offline), release the button.
+                  const ceiling = new Promise<void>(r => setTimeout(r, 25_000));
+                  try { await Promise.race([Promise.resolve(onSave('watching')).then(() => undefined), ceiling]); }
+                  finally { setSaveState('idle'); }
                 }}
                 disabled={saveState === 'saving'}
                 className="flex-1 py-3 px-4 bg-ink text-paper rounded-2xl font-semibold text-xs hover:opacity-90 transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-ink/20 disabled:opacity-60"

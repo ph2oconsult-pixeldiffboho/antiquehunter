@@ -46,3 +46,46 @@ export const analysisItems = (analysis: any): any[] => {
   if (Array.isArray(analysis.items)) return analysis.items;
   return [analysis];
 };
+
+const DRAFT_KEY = 'ah_appraisal_draft_v1';
+
+/** Snapshot the in-progress appraisal so a failed/cancelled sign-in or offline write cannot lose it. */
+export const preserveAppraisalDraft = (payload: { analysis: any; title?: string; status?: string; askingPrice?: number | null; currency?: string | null; sellerType?: string | null; location?: string | null }): void => {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...payload, savedAt: new Date().toISOString() }));
+  } catch { /* quota / private mode — caller still tries saveLocalFind */ }
+};
+
+export const loadAppraisalDraft = (): (Omit<LocalFind, 'id' | 'local' | 'createdAt'> & { savedAt?: string }) | null => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    return d && d.analysis ? d : null;
+  } catch { return null; }
+};
+
+export const clearAppraisalDraft = (): void => {
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+};
+
+/** Promote a draft into the local finds list (idempotent if already saved). Returns the local find or null. */
+export const commitDraftToLocalFinds = (): LocalFind | null => {
+  const draft = loadAppraisalDraft();
+  if (!draft) return null;
+  try {
+    const entry = saveLocalFind({
+      title: draft.title || 'Antique Find',
+      analysis: draft.analysis,
+      status: draft.status || 'watching',
+      location: draft.location ?? null,
+      askingPrice: draft.askingPrice ?? null,
+      currency: draft.currency ?? null,
+      sellerType: draft.sellerType ?? null,
+    });
+    clearAppraisalDraft();
+    return entry;
+  } catch {
+    return null;
+  }
+};

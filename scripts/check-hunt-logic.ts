@@ -36,6 +36,7 @@ import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, com
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
 import { buildValuation, validateValuation, assertValuationAgreement, allInFromHammer, hammerFromAllIn } from "../src/services/valuation.ts";
 import { normaliseEvidenceLedger, ledgerHasContent } from "../src/services/evidenceLedger.ts";
+import { preserveAppraisalDraft, loadAppraisalDraft, clearAppraisalDraft, commitDraftToLocalFinds, loadLocalFinds, saveLocalFind } from "../src/services/localFinds.ts";
 import { applyBaseBandPriors, isStyleNotPeriod, conditionDiscountOf, categoryPriorHigh } from "../src/services/baseBandPriors.ts";
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS , knownLotSeeds} from "../src/services/compsSearch.ts";
@@ -1978,6 +1979,48 @@ check("base-band priors: style-vs-period + condition + lighting category cap whe
     return r; };
   const L: any = postProcessAppraisal(lr(), dealerCtx("Lustre en bronze ou laiton à pampilles de cristal", { askingPrice: null, category: "chandelier_lighting", comps: { ok: true, comparables: [] } }))[0];
   assert.ok(L.price_guidance.estimated_market_range_high <= 520, JSON.stringify(L.price_guidance));
+});
+
+
+check("Save-to-Log recovery: draft preserved before auth; cancelled/offline still keeps the appraisal", () => {
+  // Memory localStorage for Node
+  const mem = new Map<string, string>();
+  const ls = {
+    getItem: (k: string) => mem.has(k) ? mem.get(k)! : null,
+    setItem: (k: string, v: string) => { mem.set(k, v); },
+    removeItem: (k: string) => { mem.delete(k); },
+  };
+  (globalThis as any).localStorage = ls;
+
+  clearAppraisalDraft();
+  const analysis = { items: [{ item_summary: { title: "Draft Commode" }, price_guidance: { estimated_market_range_low: 100, estimated_market_range_high: 300 } }] };
+  preserveAppraisalDraft({ title: "Draft Commode", analysis, status: "watching", currency: "EUR" });
+  const draft = loadAppraisalDraft();
+  assert.ok(draft);
+  assert.equal(draft!.title, "Draft Commode");
+  assert.equal(draft!.analysis.items[0].item_summary.title, "Draft Commode");
+
+  // Simulate cancelled popup / offline: commit draft into local finds
+  const entry = commitDraftToLocalFinds();
+  assert.ok(entry);
+  assert.ok(entry!.id.startsWith("local-"));
+  assert.equal(loadAppraisalDraft(), null); // cleared after commit
+  const list = loadLocalFinds();
+  assert.ok(list.some(f => f.title === "Draft Commode"));
+
+  // Second commit is a no-op (no draft)
+  assert.equal(commitDraftToLocalFinds(), null);
+
+  // AppMain source: preserve happens before sign-in; timeouts are bounded
+  const app = readFileSync(new URL("../src/AppMain.tsx", import.meta.url), "utf8");
+  assert.match(app, /preserveAppraisalDraft\(record\)/);
+  assert.match(app, /SIGNIN_TIMEOUT_MS = 20_000/);
+  assert.match(app, /SAVE_TIMEOUT_MS = 8_000/);
+  const view = readFileSync(new URL("../src/components/AnalysisView.tsx", import.meta.url), "utf8");
+  assert.match(view, /25_000/);
+  const col = readFileSync(new URL("../src/components/Collection.tsx", import.meta.url), "utf8");
+  assert.match(col, /commitDraftToLocalFinds/);
+  assert.match(col, /8_000/);
 });
 
 console.log(`
