@@ -128,7 +128,6 @@ const DRAWINGS: Record<IllustrationId, DrawFn> = {
   ),
   'mirror-mercury': () => (
     <Frame label="Mercury glass vs modern silvering">
-
       <rect x="14" y="14" width="80" height="80" rx="3" fill="#9aa4aa" stroke={ink} strokeWidth="1.2" />
       <ellipse cx="36" cy="38" rx="15" ry="11" fill="#7a8489" opacity="0.55" />
       <ellipse cx="64" cy="70" rx="12" ry="9" fill="#8a9398" opacity="0.5" />
@@ -136,11 +135,12 @@ const DRAWINGS: Record<IllustrationId, DrawFn> = {
       <circle cx="30" cy="74" r="2.4" fill="#c0c8cc" opacity="0.65" />
       <path d="M20 86 q22 -8 44 2 q14 6 26 -4" fill="none" stroke="#657074" strokeWidth="1.15" opacity="0.55" />
       <text x="24" y="110" fontSize="7" fill={mute} fontFamily="Georgia, serif">Mercury · blooms</text>
-      <rect x="106" y="14" width="80" height="80" rx="3" fill="#e8eef2" stroke={ink} strokeWidth="1.2" />
-      <path d="M118 34 h56 M118 50 h56 M118 66 h56" stroke="#c8d0d6" strokeWidth="0.85" />
-      <path d="M128 26 l36 36" stroke="#d5dde3" strokeWidth="1.1" />
+      <rect x="106" y="14" width="80" height="80" rx="3" fill="#eef3f6" stroke={ink} strokeWidth="1.2" />
+      <path d="M114 32 h64" stroke="#d5dde4" strokeWidth="3" opacity="0.7" />
+      <path d="M114 48 h64" stroke="#dfe6eb" strokeWidth="2.2" opacity="0.55" />
+      <path d="M114 64 h64" stroke="#d5dde4" strokeWidth="3" opacity="0.65" />
+      <path d="M114 78 h40" stroke="#e4eaee" strokeWidth="1.5" opacity="0.5" />
       <text x="118" y="110" fontSize="7" fill={mute} fontFamily="Georgia, serif">Modern · uniform</text>
-
     </Frame>
   ),
   'mirror-backboards': () => (
@@ -511,16 +511,18 @@ const DRAWINGS: Record<IllustrationId, DrawFn> = {
 
     </Frame>
   ),
-  'per-regence-trap': () => (
+    'per-regence-trap': () => (
     <Frame label="Trap: 19th-century 'Boulle' and Régence revival">
-
-      <rect x="30" y="18" width="140" height="72" fill="#2a1f18" stroke={ink} strokeWidth="1.2" />
-      <path d="M40 30 h50 v20 H40 z M110 30 h50 v20 H110 z M40 58 h50 v20 H40 z M110 58 h50 v20 H110 z" fill={brass} opacity="0.55" stroke={brass} strokeWidth="0.8" />
-      <path d="M45 35 q15 6 30 0 q-15 6 -30 0" fill={shell} />
-      <path d="M115 63 q15 6 30 0" fill={shell} opacity="0.8" />
-      <text x="100" y="55" fontSize="18" fill={gold} fontFamily="Georgia, serif" opacity="0.9">?</text>
-      <text x="32" y="110" fontSize="7" fill={mute} fontFamily="Georgia, serif">Boulle surface ≠ early date</text>
-
+      <rect x="28" y="16" width="144" height="76" fill="#1f1814" stroke={ink} strokeWidth="1.2" />
+      <path d="M36 24 h56 v28 H36 z" fill={brass} opacity="0.5" stroke={brass} strokeWidth="0.8" />
+      <path d="M108 24 h56 v28 H108 z" fill={shell} stroke={ink} strokeWidth="0.7" />
+      <path d="M36 60 h56 v24 H36 z" fill={shell} stroke={ink} strokeWidth="0.7" />
+      <path d="M108 60 h56 v24 H108 z" fill={brass} opacity="0.5" stroke={brass} strokeWidth="0.8" />
+      <path d="M44 30 q16 8 32 0 q-16 8 -32 0" fill={shell} opacity="0.85" />
+      <path d="M116 66 q16 8 32 0" fill={brass} opacity="0.35" />
+      <path d="M48 68 q12 -10 24 0 q12 10 24 0" fill="none" stroke={brass} strokeWidth="0.9" />
+      <text x="90" y="56" fontSize="16" fill={gold} fontFamily="Georgia, serif">≠</text>
+      <text x="32" y="110" fontSize="7" fill={mute} fontFamily="Georgia, serif">Brass &amp; tortoiseshell ≠ early date</text>
     </Frame>
   ),
   'per-louis-xv': () => (
@@ -772,15 +774,14 @@ const DRAWINGS: Record<IllustrationId, DrawFn> = {
 
     </Frame>
   ),
-  'stamp-fakes': () => (
+    'stamp-fakes': () => (
     <Frame label="Fake and transplanted stamps">
-
-      <rect x="30" y="20" width="140" height="70" fill="#c4a882" stroke={ink} strokeWidth="1.15" />
-      <rect x="70" y="36" width="60" height="36" fill="#8b6914" stroke={gold} strokeWidth="1.6" strokeDasharray="4 2" />
-      <text x="80" y="58" fontSize="8" fill={ink} fontFamily="Georgia, serif">STAMP</text>
-      <path d="M70 36 l60 36 M130 36 l-60 36" stroke={gold} strokeWidth="0.7" opacity="0.4" />
+      <rect x="28" y="18" width="144" height="72" fill="#c4a882" stroke={ink} strokeWidth="1.15" />
+      <path d="M40 28 h40 M40 40 h55 M120 70 h40" stroke={ink} strokeWidth="0.4" opacity="0.25" />
+      <rect x="72" y="36" width="56" height="34" fill="#7a5530" stroke={gold} strokeWidth="1.7" strokeDasharray="5 2.5" />
+      <text x="80" y="57" fontSize="8" fill={paper} fontFamily="Georgia, serif">STAMP</text>
+      <path d="M72 36 l-6 -6 M128 36 l6 -6 M72 70 l-6 6 M128 70 l6 6" stroke={gold} strokeWidth="1" />
       <text x="36" y="110" fontSize="7" fill={mute} fontFamily="Georgia, serif">Transplanted wood patch</text>
-
     </Frame>
   ),
   'stamp-dealer-label': () => (
