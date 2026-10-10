@@ -74,7 +74,12 @@ export interface MakerMatch { key: string; name: string; search: string; status:
 
 /** The first known maker named in the text (null when none). */
 export const findMaker = (text: string): Maker | null => {
-  const t = fold(text);
+  const t = fold(text).trim();
+  // Exact key / display name / search string (comps API often passes the maker alone)
+  for (const m of MAKERS) {
+    const names = [m.key, m.name, m.search, m.name.split('(')[0]].map(s => fold(s).trim()).filter(Boolean);
+    if (names.includes(t)) return m;
+  }
   let best: { m: Maker; at: number } | null = null;
   for (const m of MAKERS) {
     const r = t.match(m.re);
