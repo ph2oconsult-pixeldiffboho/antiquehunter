@@ -14,6 +14,8 @@ Rules:
 - **One asset per note id** (`illustration === note.id`). Filename stem equals the note id.
 - **Images are optional.** Notes without an accepted, feature-accurate image show no
   illustration (`FieldNoteIllustration` returns `null`) — never a wrong or generic fallback.
+- Two notes may share the same visual only when they cover the same feature (separate
+  files, same pixels); otherwise each accepted subject maps to one note.
 - The €1 “faire offre” scam diagram is not reused as decoration for other notes.
 - List cards lazy-load WebP; detail views load the full image eagerly.
 

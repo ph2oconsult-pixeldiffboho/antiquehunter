@@ -1590,8 +1590,11 @@ check("field notes: illustration ids are 1:1; images optional and never shared",
     assert.ok(hasIllustration(id), `priority note needs image: ${id}`);
   }
   // Still no accepted image for these subjects
-  for (const id of ["stamp-jme", "sec-fall-front", "buy-scam-listings"]) {
+  for (const id of ["stamp-jme", "buy-scam-listings"]) {
     assert.ok(!hasIllustration(id), `no inaccurate image for ${id}`);
+  }
+  for (const id of ["per-n3", "per-lp", "per-transition", "sec-fall-front", "mirror-joints", "chair-webbing"]) {
+    assert.ok(hasIllustration(id), `batch3 note needs image: ${id}`);
   }
 });
 

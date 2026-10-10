@@ -8,13 +8,16 @@ import type { IllustrationId } from '../../content/fieldNotes';
  */
 const IMAGE_IDS = [
   'cabinet-cornice',
+  'cabinet-hardware',
   'chair-legs',
   'chair-nails-screws',
   'chair-pegged',
   'chair-seat-rail',
+  'chair-webbing',
   'commode-dovetails',
   'commode-saw-marks',
   'mirror-backboards',
+  'mirror-joints',
   'mirror-mercury',
   'mirror-regilding',
   'per-empire',
@@ -23,13 +26,19 @@ const IMAGE_IDS = [
   'per-louis-xv',
   'per-louis-xv-style',
   'per-louis-xvi',
+  'per-lp',
   'per-lp-mirror',
+  'per-n3',
   'per-regence',
   'per-regence-trap',
+  'per-restauration-console',
   'per-restauration-gondole',
+  'per-transition',
+  'sec-fall-front',
   'sec-stamp-location',
   'stamp-where-case',
   'stamp-where-chairs',
+  'table-gueridon',
 ] as const satisfies readonly IllustrationId[];
 
 const IMAGE_SET = new Set<string>(IMAGE_IDS);
