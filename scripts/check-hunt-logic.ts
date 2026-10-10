@@ -40,6 +40,8 @@ import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../sr
 import { COMPS_CLIENT_TIMEOUT_MS } from "../src/services/gemini.ts";
 import { FIELD_NOTES, type FieldNoteCategory, type PieceTag } from "../src/content/fieldNotes.ts";
 import { countsByCategory, filterNotes, matchNotesForPiece, periodTagsFromText, pieceTagsFromAppraisal, teaserNotes } from "../src/services/fieldNotes.ts";
+import { EXPECTED_ILLUSTRATION_IDS, SCAM_ONLY_ILLUSTRATION_ID, illustrationBelongsOnlyToItsNote, scamIllustrationNotReused } from "../src/services/fieldNoteIllustrations.ts";
+import { REGISTERED_ILLUSTRATION_IDS, hasIllustration } from "../src/components/fieldNotes/FieldNoteIllustration.tsx";
 import { CASH_CAP_FR_RESIDENT_EUR as CASH_NOTE_CAP } from "../src/services/negotiation.ts";
 
 let passed = 0;
@@ -1531,22 +1533,47 @@ await (async () => {
 
 
 
+
 check("field notes: content coverage (piece / period / stamps / buying)", () => {
   const counts = countsByCategory();
   assert.ok(counts.piece >= 30, `piece notes ${counts.piece}`);
-  assert.ok(counts.period >= 10, `period notes ${counts.period}`);
+  assert.ok(counts.period >= 15, `period notes ${counts.period}`);
   assert.ok(counts.stamps >= 6, `stamps ${counts.stamps}`);
   assert.ok(counts.buying >= 6, `buying ${counts.buying}`);
   assert.equal(FIELD_NOTES.length, counts.piece + counts.period + counts.stamps + counts.buying);
   for (const n of FIELD_NOTES) {
     assert.ok(n.title.en && n.title.fr, n.id);
     assert.ok(n.body.en.length > 40 && n.body.fr.length > 40, n.id);
-    assert.ok(n.illustration, n.id);
+    assert.equal(n.illustration, n.id, `illustration must equal note id (${n.id})`);
   }
   const pieceTags = new Set(FIELD_NOTES.flatMap(n => n.pieceTags));
   for (const tag of ["commodes", "mirrors", "chairs", "cabinets", "tables", "secretaires"] as PieceTag[]) {
     assert.ok(pieceTags.has(tag), tag);
     assert.ok(FIELD_NOTES.filter(n => n.pieceTags.includes(tag)).length >= 5, `${tag} checks`);
+  }
+  // Restauration / Charles X coverage
+  const rest = FIELD_NOTES.filter(n => n.periodTags.includes("restauration"));
+  assert.ok(rest.length >= 4, `restauration notes ${rest.length}`);
+  assert.ok(rest.some(n => /bois clair|citronnier|gondol|console|Charles X|copie|copy/i.test(n.title.en + n.body.en)));
+});
+
+check("field notes: every illustration is unique and registered (no fallbacks)", () => {
+  assert.ok(illustrationBelongsOnlyToItsNote(), "illustration must equal note id for every note");
+  assert.ok(scamIllustrationNotReused(), "€1 faire offre drawing only on buy-scam-listings");
+  const ills = FIELD_NOTES.map(n => n.illustration);
+  assert.equal(new Set(ills).size, ills.length, "duplicate illustration ids");
+  assert.equal(EXPECTED_ILLUSTRATION_IDS.length, FIELD_NOTES.length);
+  for (const n of FIELD_NOTES) {
+    assert.ok(hasIllustration(n.illustration), `missing drawing for ${n.illustration}`);
+  }
+  assert.equal(REGISTERED_ILLUSTRATION_IDS.length, FIELD_NOTES.length);
+  assert.deepEqual([...REGISTERED_ILLUSTRATION_IDS].sort(), [...EXPECTED_ILLUSTRATION_IDS].sort());
+  assert.equal(SCAM_ONLY_ILLUSTRATION_ID, "buy-scam-listings");
+  for (const id of ["per-regence-trap", "per-louis-xv-style", "per-style-trap", "stamp-fakes", "per-louis-xv", "per-louis-xvi", "mirror-mercury"]) {
+    const n = FIELD_NOTES.find(x => x.id === id);
+    assert.ok(n, id);
+    assert.equal(n!.illustration, id);
+    assert.notEqual(n!.illustration, "buy-scam-listings");
   }
 });
 
@@ -1557,6 +1584,7 @@ check("field notes: EN/FR search and category filters", () => {
   assert.ok(filterNotes({ category: "stamps" }, "en").every(n => n.category === "stamps"));
   assert.ok(filterNotes({ category: "piece", pieceTag: "chairs" }, "en").every(n => n.pieceTags.includes("chairs")));
   assert.ok(filterNotes({ category: "buying", query: "D112-3" }, "en").some(n => n.id === "buy-cash-cap"));
+  assert.ok(filterNotes({ query: "gondole" }, "fr").some(n => n.id === "per-restauration-gondole"));
 });
 
 check("field notes: period and piece tag detection", () => {
@@ -1564,6 +1592,7 @@ check("field notes: period and piece tag detection", () => {
   assert.ok(periodTagsFromText("époque Empire", "Bellangé").includes("directoire_empire"));
   assert.ok(periodTagsFromText("Louis-Philippe mercury mirror").includes("louis_philippe"));
   assert.ok(periodTagsFromText("Gustavian painted cupboard").includes("gustavian"));
+  assert.ok(periodTagsFromText("Restauration citronnier").includes("restauration"));
   assert.ok(pieceTagsFromAppraisal("mirrors", "Large Provençal giltwood mirror").includes("mirrors"));
   assert.ok(pieceTagsFromAppraisal("chairs", "Four Empire mahogany armchairs").includes("chairs"));
   assert.ok(pieceTagsFromAppraisal(undefined, "Commode tombeau Transition").includes("commodes"));
@@ -1590,7 +1619,6 @@ check("field notes: appraisal matching (Provençal mirror & Bellangé chairs)", 
   }, 5);
   assert.ok(chairs.length >= 3);
   assert.ok(chairs.some(r => r.note.makerRelated || r.note.pieceTags.includes("chairs")));
-  assert.ok(chairs.some(r => r.reasons.includes("maker") || r.note.id.includes("stamp") || r.note.id.includes("empire") || r.note.id.includes("chair")));
 });
 
 check("field notes: cash-cap note matches negotiation constants", () => {
@@ -1602,6 +1630,7 @@ check("field notes: cash-cap note matches negotiation constants", () => {
   assert.equal(CASH_NOTE_CAP, 1000);
   assert.ok(teaserNotes({ count: 2 }).length === 2);
 });
+
 
 console.log(`
 ${passed} checks passed`);

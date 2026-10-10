@@ -1,12 +1,12 @@
 # Field Notes illustrations — sources and licences
 
-All diagrams used by Dealer Field Notes are **original inline SVGs** drawn for this app
-(`src/components/fieldNotes/FieldNoteIllustration.tsx`). They are simple instructional
-line drawings (dovetails, seat-rail stamps, mirror backs, mercury-glass edges, legs,
-mount backs, cash-cap cues, etc.).
+All diagrams are **original inline SVGs** drawn for this app
+(`src/components/fieldNotes/FieldNoteIllustration.tsx`).
 
-- **No third-party photos** are bundled or hotlinked.
-- **No Wikimedia / stock assets** were downloaded for this feature.
-- Licence of the SVGs: same as the application source (project repository).
+Rules:
+- **One dedicated drawing per note id** (`illustration === note.id`).
+- **No shared fallbacks.** The €1 “faire offre” diagram is only for `buy-scam-listings`.
+- If a drawing cannot be made accurate, the component returns `null` rather than a wrong image.
+- No third-party photos, no hotlinks, no Wikimedia downloads.
 
-Total added illustration code is well under 1.5 MB (single TSX module, ~22 KB).
+Licence: same as the application source.
