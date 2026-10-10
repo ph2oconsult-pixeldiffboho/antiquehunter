@@ -8,7 +8,7 @@ import {
   modernYearInTitle, parseInterencheresItem, parsePage,
 } from "../src/services/huntValidation.ts";
 import {
-  alignProseRanges, allInCost, basisFromScore, clampToBand, decideBuy, maxHammerForMarketHigh, parseBudget, parsePriceInput, priceBandScore,
+  alignProseRanges, stripMismatchedMoney, enforceNarrativeConsistency, allInCost, basisFromScore, clampToBand, decideBuy, maxHammerForMarketHigh, parseBudget, parsePriceInput, priceBandScore,
   reconcileNegotiation, sanitizeDeep, sanitizePriceTyping, sanitizeProse,
 } from "../src/services/appraisalMath.ts";
 import { checkGeography, itemTypesInQuery, matchesItemType, regionsFor, regionsInLocation } from "../src/services/huntGeo.ts";
@@ -1881,6 +1881,37 @@ check("evidence ledger: facts/claims/photo/hypotheses/unknowns split; style stay
   assert.ok(a.evidence_ledger.unknowns.includes("Not sure about the glass"));
   assert.equal(a.evidence_ledger.style_note, "Louis-Philippe style frame");
   assert.equal(a.evidence_ledger.defects[0].location, "crest");
+});
+
+
+check("narrative consistency: valuation figures kept; mismatched euro amounts stripped; catalogue estimates kept", () => {
+  const allowed = { marketLow: 300, marketHigh: 700, retailLow: 700, retailHigh: 1100, smartBuy: 840, walkAway: 1100, asking: 950 };
+  const fmt = (n: number) => `€${n}`;
+  const keep = stripMismatchedMoney("Walk away at €1,100; smart buy €840.", allowed);
+  assert.equal(keep.stripped, 0);
+  const bad = stripMismatchedMoney("Dealers pay €2,500 and retail hits €4,000.", allowed);
+  assert.ok(bad.stripped >= 2, String(bad));
+  assert.ok(!/2500|4000|2,500|4,000/.test(bad.text), bad.text);
+  const cat = stripMismatchedMoney("Catalogue estimate €1,200–1,800 for lot 12. Market range €300–€700.", allowed);
+  assert.ok(/1,200|1200/.test(cat.text), cat.text); // catalogue protected
+  assert.ok(/300/.test(cat.text) && /700/.test(cat.text));
+  const narr = enforceNarrativeConsistency({
+    pricing_reasoning: "A decorative piece around €2,500.",
+    snap_judgement: "Worth about €99.",
+    teaser_insight: "Buy below €840.",
+    decision_summary: ["Ask €950 is fair.", "Some say €5,000."],
+  }, allowed, fmt);
+  assert.ok(narr.stripped >= 2);
+  assert.ok(!/2500|2,500|€99|5000|5,000/.test(JSON.stringify(narr.fields)), JSON.stringify(narr.fields));
+  assert.ok(/840/.test(narr.fields.teaser_insight || ""));
+  assert.ok(/950/.test(narr.fields.decision_summary![0]));
+  // Wired through postProcess: mismatched figure in pricing_reasoning is stripped
+  const raw = () => { const r: any = bellRaw(); const it = r.items[0];
+    Object.assign(it.price_guidance, { estimated_market_range_low: 300, estimated_market_range_high: 700, fair_price_low: 700, fair_price_high: 1100, pricing_reasoning: "Worth €2,500 at a top dealer; auction around €300–€700." });
+    it.item_summary.snap_judgement = "A €99 bargain."; return r; };
+  const a: any = postProcessAppraisal(raw(), dealerCtx("Louis-Philippe mirror", { askingPrice: 950, category: "mirrors" }))[0];
+  assert.ok(!/2,?500/.test(a.price_guidance.pricing_reasoning), a.price_guidance.pricing_reasoning);
+  assert.ok(!/€99|99 bargain/.test(a.item_summary.snap_judgement), a.item_summary.snap_judgement);
 });
 
 console.log(`

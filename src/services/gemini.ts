@@ -2,7 +2,7 @@ import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
 import {
-  alignProseRanges, calibratedConfidence, confidenceLabel, evidenceCheck, normaliseConfidence, dropContradictions, sanitizeDeep,
+  alignProseRanges, enforceNarrativeConsistency, calibratedConfidence, confidenceLabel, evidenceCheck, normaliseConfidence, dropContradictions, sanitizeDeep,
   type PriceBasis, type ScoreBand,
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFetch";
@@ -775,6 +775,35 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, align(x)]))
       : v;
     const cleaned: any = align(sanitizeDeep(item));
+    // Narrative consistency: only valuation figures may appear as money in key prose.
+    const narr = enforceNarrativeConsistency({
+      pricing_reasoning: cleaned.price_guidance?.pricing_reasoning,
+      snap_judgement: cleaned.item_summary?.snap_judgement,
+      teaser_insight: cleaned.teaser_insight,
+      resale_insight: cleaned.buy_decision?.resale_insight,
+      decision_summary: cleaned.buy_decision?.decision_summary,
+    }, {
+      marketLow: valuation.expectedHammer.low,
+      marketHigh: valuation.expectedHammer.high,
+      retailLow: valuation.dealerRetail?.low ?? valuation.expectedHammer.low,
+      retailHigh: valuation.dealerRetail?.high ?? valuation.expectedHammer.high,
+      smartBuy: valuation.suggestedAcquisition ?? undefined,
+      walkAway: valuation.walkAway,
+      opening: valuation.openingOffer ?? undefined,
+      asking: valuation.askingPrice,
+      buyerCostLow: valuation.buyerCost.low,
+      buyerCostHigh: valuation.buyerCost.high,
+      maxBidHammer: valuation.maxBidHammer,
+      maxBidAllIn: valuation.maxBidAllIn,
+    }, fmtMoney);
+    if (cleaned.price_guidance) cleaned.price_guidance.pricing_reasoning = narr.fields.pricing_reasoning;
+    if (cleaned.item_summary) cleaned.item_summary.snap_judgement = narr.fields.snap_judgement;
+    cleaned.teaser_insight = narr.fields.teaser_insight;
+    if (cleaned.buy_decision) {
+      cleaned.buy_decision.resale_insight = narr.fields.resale_insight;
+      if (narr.fields.decision_summary) cleaned.buy_decision.decision_summary = narr.fields.decision_summary;
+      cleaned.buy_decision.narrative_money_stripped = narr.stripped || undefined;
+    }
     item = cleaned;
     if (evidence.required) item.price_guidance = { ...item.price_guidance, provisional: true };
     if (anchor.applied) {
