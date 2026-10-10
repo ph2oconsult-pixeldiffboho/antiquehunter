@@ -514,6 +514,7 @@
       "stamp_in_photo": "Estampille visible sur photo",
       "attributed": "Attribué",
       "dealer_label": "Étiquette du marchand seulement",
+      "doubtful_stamp": "Estampille douteuse",
       "mentioned": "Nom cité, sans estampille"
     },
     "status_note": {
@@ -522,8 +523,10 @@
       "stamp_in_photo": "Une estampille est visible sur vos photos — vérifiez qu'elle est lisible sur chaque pièce.",
       "attributed": "Une attribution, pas une estampille : estimé entre une pièce anonyme et une pièce estampillée.",
       "dealer_label": "Une étiquette de marchand n'est pas une estampille : estimé comme une pièce d'époque anonyme.",
+      "doubtful_stamp": "Estampille probablement rapportée, fausse ou incohérente avec la construction : pas de prime de maker.",
       "mentioned": "Aucune estampille confirmée : estimé comme une pièce d'époque anonyme."
     },
+    "jme_note": "Marque JME / jurande mentionnée — indice de jurande s'il est authentique, jamais un maker à elle seule.",
     "stamp_warning": "Vérifiez vous-même l'estampille {{maker}} sur CHAQUE pièce, et faites-la écrire sur la facture (« estampillé {{maker}} »). Sans elle, la plus-value de l'ébéniste ne s'applique pas.",
     "anchored_all_in": "Fourchette fondée sur {{n}} résultats de ventes vérifiés : médiane {{median}} par pièce frais compris, × {{pieces}}.",
     "anchored_hammer": "Fourchette fondée sur {{n}} résultats de ventes vérifiés : médiane {{median}} par pièce (marteau), × {{pieces}}.",
