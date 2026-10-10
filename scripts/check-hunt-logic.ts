@@ -1573,7 +1573,7 @@ check("field notes: illustration ids are 1:1; images optional and never shared",
     assert.equal(n!.illustration, id, `image ${id} must be 1:1 with its note`);
   }
   assert.equal(SCAM_ONLY_ILLUSTRATION_ID, "buy-scam-listings");
-  assert.ok(!hasIllustration("buy-scam-listings"), "scam note must not reuse a shared decorative image");
+  assert.ok(hasIllustration("buy-scam-listings"), "scam note has dedicated engraving");
   for (const id of ["per-regence-trap", "per-louis-xv-style", "per-style-trap", "stamp-fakes", "per-louis-xv", "per-louis-xvi", "mirror-mercury"]) {
     const n = FIELD_NOTES.find(x => x.id === id);
     assert.ok(n, id);
@@ -1590,9 +1590,11 @@ check("field notes: illustration ids are 1:1; images optional and never shared",
     assert.ok(hasIllustration(id), `priority note needs image: ${id}`);
   }
   // Still no accepted image for these subjects
-  for (const id of ["stamp-jme", "buy-scam-listings"]) {
+  for (const id of ["stamp-jme"]) {
     assert.ok(!hasIllustration(id), `no inaccurate image for ${id}`);
   }
+  assert.ok(hasIllustration("buy-scam-listings"), "scam listings note has its own engraving");
+  assert.ok(hasIllustration("buy-cash-cap") && hasIllustration("buy-cash-vs-transfer"), "cash notes share cash feature image");
   for (const id of ["per-n3", "per-lp", "per-transition", "sec-fall-front", "mirror-joints", "chair-webbing", "commode-oxidation", "commode-mounts", "commode-married", "cabinet-doors", "table-top-joints", "table-aprons", "stamp-fakes", "buy-negotiate", "per-restauration"]) {
     assert.ok(hasIllustration(id), `batch3 note needs image: ${id}`);
   }
