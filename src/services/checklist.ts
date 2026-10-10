@@ -31,8 +31,13 @@ export const buildChecklist = (i: ChecklistInput): CheckItem[] => {
   const buying = ['strong_buy', 'good_buy', 'fair', 'need_evidence', 'no_price'].includes(String(i.basis || ''));
   if (maker && maker.status !== 'mentioned') {
     if (maker.status === 'dealer_label') add('label_is_not_stamp', true, { maker: maker.name });
-    if (i.pieces > 1) add('stamp_every_piece', true, { maker: maker.name, n: i.pieces, where: i.pieceKind === 'seating' ? 'seat_rail' : 'carcass' });
-    else add('stamp_present', true, { maker: maker.name, where: i.pieceKind === 'seating' ? 'seat_rail' : 'carcass' });
+    if (maker.status === 'doubtful_stamp') {
+      // Fraud / transplant: check the mark, but do not treat it as a maker premium
+      add('stamp_present', true, { maker: maker.name, where: i.pieceKind === 'seating' ? 'seat_rail' : 'carcass' });
+    } else if (maker.status !== 'attributed') {
+      if (i.pieces > 1) add('stamp_every_piece', true, { maker: maker.name, n: i.pieces, where: i.pieceKind === 'seating' ? 'seat_rail' : 'carcass' });
+      else add('stamp_present', true, { maker: maker.name, where: i.pieceKind === 'seating' ? 'seat_rail' : 'carcass' });
+    }
   }
   if (i.pieces > 1) add('matching_set', true, { n: i.pieces });
   if (i.pieceKind === 'mirror') {
@@ -49,7 +54,7 @@ export const buildChecklist = (i: ChecklistInput): CheckItem[] => {
     if (/\b(giltwood|gilt|dore|gilded)\b/.test(t)) add('gilding_original');
   }
   add('no_major_restoration');
-  add('invoice_wording', true, { maker: maker && maker.status !== 'mentioned' && maker.status !== 'dealer_label' ? maker.name : '', period: i.period || '' });
+  add('invoice_wording', true, { maker: maker && !['mentioned', 'dealer_label', 'doubtful_stamp', 'attributed'].includes(maker.status) ? maker.name : '', period: i.period || '' });
   add('provenance_condition_report');
   return out;
 };

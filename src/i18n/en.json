@@ -514,6 +514,7 @@
       "stamp_in_photo": "Stamp seen in photo",
       "attributed": "Attributed",
       "dealer_label": "Dealer's label only",
+      "doubtful_stamp": "Doubtful stamp",
       "mentioned": "Maker named, no stamp"
     },
     "status_note": {
@@ -522,8 +523,10 @@
       "stamp_in_photo": "A stamp is visible in your photos — confirm it is legible on every piece.",
       "attributed": "An attribution, not a stamp: valued between an unattributed piece and a stamped one.",
       "dealer_label": "A dealer's label is not a stamp: valued as an unattributed piece of the period.",
+      "doubtful_stamp": "Stamp looks transplanted, fake or inconsistent with the construction: no maker premium.",
       "mentioned": "No stamp confirmed: valued as an unattributed piece of the period."
     },
+    "jme_note": "JME / jurande mark mentioned — supporting guild evidence when genuine, never a maker by itself.",
     "stamp_warning": "Check the {{maker}} stamp on EVERY piece yourself, and have it written on the invoice (« estampillé {{maker}} »). Without it, the maker premium does not apply.",
     "anchored_all_in": "Range anchored on {{n}} verified auction results: median {{median}} per piece incl. fees, × {{pieces}}.",
     "anchored_hammer": "Range anchored on {{n}} verified auction results: median {{median}} per piece (hammer), × {{pieces}}.",

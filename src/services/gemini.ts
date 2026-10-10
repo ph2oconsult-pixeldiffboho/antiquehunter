@@ -488,11 +488,17 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const pieceKind = pieceKindOf(category, `${titleText} ${query}`);
     const fx = checksEffect(checkAnswers);
     let maker = combineMakerStatus(detectMaker(query), item.item_summary.maker);
+    // Checklist / chip claim status is captured before stamp-answer overrides so the stamp
+    // check stays on the list after the buyer confirms or denies.
     const makerAsClaimed = maker;
     let stampAnswer: 'confirmed' | 'denied' | undefined = fx.stampOverride;
-    if (maker && stampAnswer === 'confirmed') maker = { ...maker, status: 'stamped_confirmed' };
+    if (maker && stampAnswer === 'confirmed' && maker.status !== 'doubtful_stamp') maker = { ...maker, status: 'stamped_confirmed' };
     if (maker && stampAnswer === 'denied') maker = { ...maker, status: 'mentioned' };
-    const compList = comps?.comparables || [];
+    // Doubtful: never show stamped comps as anchors (chip matches valuation status)
+    const compsForStatus = (maker && maker.status === 'doubtful_stamp')
+      ? { ok: true as const, comparables: [] as any[], unreachable: (comps as any)?.unreachable || [], searched: (comps as any)?.searched || [], stats: (comps as any)?.stats }
+      : comps;
+    const compList = compsForStatus?.comparables || [];
     const toTarget = (eur: number) => convertApprox(eur, 'EUR', targetCurrency) ?? eur;
     const anchor = anchorOnComparables(compList, { status: maker?.status || null, pieces, material: materialOf(pieceText), isAuction, eurTo: toTarget });
     const perPiece = anchor.used.map(x => isAuction ? x.perPieceHammerEur : x.perPieceAllInEur);
@@ -757,7 +763,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       walkAway: Number(nsF.walk_away_price) || Number(item.price_guidance?.estimated_market_range_high) || 0,
       openingOffer: Number(nsF.opening_offer) || undefined, targetHigh: Number(nsF.target_price_high) || undefined, premiumPct,
       dealerLow: bands ? Number(item.price_guidance?.fair_price_low) || undefined : undefined,
-      checklist: checklistItems, answers: checkAnswers, maker: makerAsClaimed && !['mentioned', 'dealer_label'].includes(makerAsClaimed.status) ? makerAsClaimed.name : null,
+      checklist: checklistItems, answers: checkAnswers, maker: makerAsClaimed && !['mentioned', 'dealer_label', 'doubtful_stamp'].includes(makerAsClaimed.status) ? makerAsClaimed.name : null,
       period: item.item_summary.likely_period, text: `${query} ${titleText}`, pieces, pieceKind,
     });
 
@@ -765,11 +771,11 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       ...item,
       negotiation_plan: negotiationPlan,
       evidence_check: evidence,
-      maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
+      maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, jme: !!maker.jme, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
       comparables: {
-        status: comps === undefined ? (maker ? 'not_searched' : 'no_maker') : comps === null || comps.ok === false ? 'error' : compList.length === 0 ? 'none_verified' : anchor.applied ? 'anchored' : 'shown',
+        status: compsForStatus === undefined ? (maker ? 'not_searched' : 'no_maker') : compsForStatus === null || compsForStatus.ok === false ? 'error' : maker?.status === 'doubtful_stamp' ? 'not_stamped' : compList.length === 0 ? 'none_verified' : anchor.applied ? 'anchored' : 'shown',
         reason: anchor.reason, group: anchor.group, pieces: anchor.pieces, per_piece_median_eur: anchor.perPieceMedianEur || null, basis: anchor.basis,
-        list: compList, used_urls: anchor.used.map(x => x.url), unreachable: comps?.unreachable || [],
+        list: compList, used_urls: anchor.used.map(x => x.url), unreachable: compsForStatus?.unreachable || [],
       },
       checklist: { items: checklistItems, answers: checkAnswers || {}, base: checklistBase, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },
       appraisal_inputs: {

@@ -32,10 +32,10 @@ import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt
 import { bandScore, dealerBands, saneDealerRange, reconcileDealerNegotiation, priceBandScore as pbs, decideBuy as decideBuyX, DEALER_WALK_AWAY_FACTOR } from "../src/services/appraisalMath.ts";
 import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceCheck, evidenceAsks, pieceKindOf, isBriefInput, periodStatedIn, centuryStatedIn, laterSignIn } from "../src/services/appraisalMath.ts";
 
-import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker } from "../src/services/makers.ts";
+import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker, hasJmeMention, anchorGroupFor, MAKERS } from "../src/services/makers.ts";
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
-import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS } from "../src/services/compsSearch.ts";
+import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS , knownLotSeeds} from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
 import { COMPS_CLIENT_TIMEOUT_MS } from "../src/services/gemini.ts";
 import { FIELD_NOTES, type FieldNoteCategory, type PieceTag } from "../src/content/fieldNotes.ts";
@@ -1191,6 +1191,56 @@ check("makers: stamped (confirmed / stated), attributed and dealer's label are t
   assert.equal(pieceOf(BELL_CONF)?.key, "armchair");
 });
 
+check("stamp status: EN/FR phrases never mis-label STAMPED/CONFIRMED; doubtful demotes", () => {
+  const expect = (text: string, status: string, key?: string) => {
+    const m = detectMaker(text);
+    assert.equal(m?.status || makerStatusFromText(text), status, text);
+    if (key) assert.equal(m?.key, key, text);
+  };
+  // Confirmed
+  expect("Set of four mahogany armchairs, stamped P. Bellangé, stamp confirmed.", "stamped_confirmed", "bellange");
+  expect("Fauteuils estampillés Bellangé, estampille confirmée sur chaque traverse.", "stamped_confirmed", "bellange");
+  // Never confirmed / stamped
+  expect("estampillés P. Bellangé. Stamp not yet checked by me.", "mentioned", "bellange");
+  expect("Bellangé stamp unchecked — I have not verified it.", "mentioned", "bellange");
+  expect("Commode attribuée à Jean-Henri Riesener (pas d'estampille visible).", "attributed", "riesener");
+  expect("Commode non estampillée, attribuée à Riesener.", "attributed", "riesener");
+  expect("Commode sans estampille, dans le goût de Riesener.", "attributed", "riesener");
+  expect("Commode dans le goût de Jean-Henri Riesener.", "attributed", "riesener");
+  expect("Commode style Louis XVI, manner of Riesener.", "attributed", "riesener");
+  expect("Dealer label says Pierre-Antoine Bellangé.", "dealer_label", "bellange");
+  // Doubtful — no maker premium
+  expect("Fauteuil stamped Bellangé on a replaced rail; stamp through new varnish only — transplanted.", "doubtful_stamp", "bellange");
+  expect("Commode style Louis XVI with a Riesener stamp — likely fake / fausse estampille.", "doubtful_stamp", "riesener");
+  expect("Estampille rapportée regravée au nom de Riesener.", "doubtful_stamp", "riesener");
+  expect("Suspicious stamp Bellangé, machine screws in the rail.", "doubtful_stamp", "bellange");
+  // Boudin + JME
+  expect("Commode Louis XV estampillée L. Boudin, marque JME.", "stamped_stated", "boudin");
+  assert.equal(hasJmeMention("marque JME à côté de L. Boudin"), true);
+  assert.equal(detectMaker("estampillée L. Boudin, JME")?.jme, true);
+  // Registry coverage
+  assert.ok(findMaker("Léonard Boudin"));
+  assert.ok(findMaker("Nogaret"));
+  assert.ok(findMaker("Beneman"));
+  assert.ok(findMaker("Schwerdfeger"));
+  assert.ok(findMaker("Lardin"));
+  assert.ok(findMaker("Pafrat"));
+  assert.ok(findMaker("Delorme"));
+  assert.ok(MAKERS.length >= 55);
+  // Doubtful never anchors
+  assert.equal(anchorGroupFor("doubtful_stamp"), null);
+  assert.equal(anchorGroupFor("stamped_confirmed"), "stamped");
+});
+
+check("comps: known lot seeds verify on page for Bellangé, Boudin, Riesener, Hache", () => {
+  assert.ok(knownLotSeeds("bellange", "armchair").length >= 3);
+  assert.ok(knownLotSeeds("boudin", "commode").length >= 2);
+  assert.ok(knownLotSeeds("riesener", "commode").length >= 2);
+  assert.ok(knownLotSeeds("hache", "commode").length >= 2);
+});
+
+
+
 const christiesHtml = (id: string, other: string) => `<html><script>{"lots":[{"object_id":"${other}","title_primary_txt":"A COMMODE","title_secondary_txt":"BY RIESENER","price_realised":8750.0,"price_realised_txt":"EUR 8,750","end_date":"2021-04-27T00:00Z"},{"object_id":"${id}","title_primary_txt":"FAUTEUIL D'EPOQUE EMPIRE","title_secondary_txt":"ESTAMPILLE DE PIERRE-ANTOINE BELLANGE, DEBUT DU XIXe SIECLE","estimate_low":2000.0,"price_realised":2250.0,"price_realised_txt":"EUR 2,250","end_date":"2021-04-27T00:00Z"}]}</script><span class="chr-lot-section__accordion--text">FAUTEUIL<br>En acajou mouluré et sculpté, estampillé sur la traverse avant BELLANGE</span></html>`;
 const bonhamsHtml = `<html><head><meta property="og:title" content="Bonhams : Empire Fauteuil a Chassis Attributed to Pierre-Antoine Bellangé,"></head><body><h1>Empire Fauteuil a Chassis Attributed to Pierre-Antoine Bellangé,</h1><p>Sold for US$4,096 inc. premium</p><p>in carved and gilded beech, trace of a stamp</p><div>Other lot: Commode stamped Dussautoy Sold for US$9,000 inc. premium</div></body></html>`;
 
@@ -1465,7 +1515,7 @@ check("checklist and comparables texts exist in EN and FR (every item, status an
     const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8"));
     for (const id of ids) assert.ok(j.checklist.items[id], `${lang} ${id}`);
     for (const k of ["yes", "no", "unsure", "rerun", "title", "title_embedded"]) assert.ok(j.checklist[k], `${lang} ${k}`);
-    for (const st of ["stamped_confirmed", "stamped_stated", "stamp_in_photo", "attributed", "dealer_label", "mentioned"]) { assert.ok(j.comps.status[st]); assert.ok(j.comps.status_note[st]); }
+    for (const st of ["stamped_confirmed", "stamped_stated", "stamp_in_photo", "attributed", "dealer_label", "doubtful_stamp", "mentioned"]) { assert.ok(j.comps.status[st]); assert.ok(j.comps.status_note[st]); }
     for (const f of ["too_few", "not_stamped", "none_verified", "error", "not_searched"]) assert.ok(j.comps.fallback[f], `${lang} ${f}`);
     assert.match(j.comps.stamp_warning, /(EVERY|CHAQUE)/);
     assert.match(j.comps.stamp_warning, /(invoice|facture)/);
@@ -1512,7 +1562,7 @@ await (async () => {
   const part = await findComparables({ maker: "Bellangé", piece: "armchair", material: "mahogany", pieces: 4 }, undefined, Date.now(), {
     search: async (prompt) => {
       const scope = (prompt.match(/Where to look: ([^\n]*)/) || [])[1] || "";
-      if (scope.startsWith("Bonhams")) throw new Error("boom");
+      if (scope.startsWith("Christie's lot pages (christies.com")) throw new Error("boom");
       if (scope.startsWith("French")) return { text: "not json", grounded: ["https://www.christies.com/en/lot/lot-6314500"] };
       return { text: JSON.stringify({ results: [{ url: "https://www.bonhams.com/auction/31313/lot/152/x/", house: "Bonhams", title: "x", price: 4096, currency: "USD" }] }), grounded: [] };
     },
