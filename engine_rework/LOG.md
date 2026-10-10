@@ -93,3 +93,9 @@
 - Dev corpus n=39 (34 calibration + 5 Giraudeau); eval n=34 sealed (sha256=89fb1b7e69da5489a253d5e91aab709262870708c72c207f647015b46e2c7f16).
 - Dev BEFORE hit 44% / style-overval 25% → AFTER hit 31% / style-overval **6%**; repeatability pass; ask-sensitivity pass.
 - PROPOSED_TARGETS.md updated with concrete numbers. **Sealed eval not run.**
+
+### 2026-10-11 00:15 PT — Item 8 done (Lot-245 phone shots @ def2862)
+- Preview phone (390×844) run of Giraudeau g245 text-only on appraisal-engine preview.
+- Captured: `engine_rework/shots/g245_phone_full.png`, `g245_max_bid.png`, `g245_bidding_vp.png`, body extract.
+- Visible: text-only confidence blurb, Charles X title, Before-you-buy checklist, Bidding tips (25% premium / max bid unlock), teaser “buy below €510 / above €900”.
+- Free plan still paywalls Price Guidance / Evidence ledger / Comparables testids; demo Unlock opens pack picker (did not persist Pro in headless). Full wired panels need Pro session — code path covered by unit tests + AnalysisView wiring.
