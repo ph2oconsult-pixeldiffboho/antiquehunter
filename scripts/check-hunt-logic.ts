@@ -1565,7 +1565,8 @@ check("field notes: illustration ids are 1:1; images optional and never shared",
   assert.equal(EXPECTED_ILLUSTRATION_IDS.length, FIELD_NOTES.length);
   // Registered WebP assets are a subset: each maps only to its matching note id
   assert.ok(REGISTERED_ILLUSTRATION_IDS.length > 0, "expected some accepted images");
-  assert.ok(REGISTERED_ILLUSTRATION_IDS.length < FIELD_NOTES.length, "images are optional; not every note has one");
+  assert.ok(REGISTERED_ILLUSTRATION_IDS.length <= FIELD_NOTES.length, "registry cannot exceed notes");
+  assert.equal(REGISTERED_ILLUSTRATION_IDS.length, FIELD_NOTES.length, "all notes currently have accepted images");
   for (const id of REGISTERED_ILLUSTRATION_IDS) {
     assert.ok(hasIllustration(id), `registry missing ${id}`);
     const n = FIELD_NOTES.find(x => x.id === id);
@@ -1589,10 +1590,8 @@ check("field notes: illustration ids are 1:1; images optional and never shared",
   ]) {
     assert.ok(hasIllustration(id), `priority note needs image: ${id}`);
   }
-  // Still no accepted image for these subjects
-  for (const id of ["stamp-jme"]) {
-    assert.ok(!hasIllustration(id), `no inaccurate image for ${id}`);
-  }
+  // JME guild mark now has accepted interlaced monogram engraving
+  assert.ok(hasIllustration("stamp-jme"), "JME note needs image");
   assert.ok(hasIllustration("buy-scam-listings"), "scam listings note has its own engraving");
   assert.ok(hasIllustration("buy-cash-cap") && hasIllustration("buy-cash-vs-transfer"), "cash notes share cash feature image");
   for (const id of ["per-n3", "per-lp", "per-transition", "sec-fall-front", "mirror-joints", "chair-webbing", "commode-oxidation", "commode-mounts", "commode-married", "cabinet-doors", "table-top-joints", "table-aprons", "stamp-fakes", "buy-negotiate", "per-restauration"]) {
