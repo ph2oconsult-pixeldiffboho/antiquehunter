@@ -1580,9 +1580,13 @@ check("field notes: illustration ids are 1:1; images optional and never shared",
     assert.equal(n!.illustration, id);
     assert.notEqual(n!.illustration, "buy-scam-listings");
   }
-  // Priority notes that must show a real image
-  for (const id of ["per-louis-xv", "commode-dovetails", "mirror-mercury", "chair-seat-rail", "per-regence-trap", "chair-pegged", "stamp-jme"]) {
+  // Priority notes that currently have accepted AI engravings
+  for (const id of ["per-louis-xv", "commode-dovetails", "mirror-mercury", "chair-seat-rail", "mirror-backboards", "per-louis-xvi", "per-restauration-gondole"]) {
     assert.ok(hasIllustration(id), `priority note needs image: ${id}`);
+  }
+  // Rejected / unavailable subjects must not get a wrong placeholder
+  for (const id of ["per-regence-trap", "per-empire", "per-lp-mirror", "chair-pegged", "stamp-jme"]) {
+    assert.ok(!hasIllustration(id), `no inaccurate image for ${id}`);
   }
 });
 

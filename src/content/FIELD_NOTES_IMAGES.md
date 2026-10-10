@@ -1,15 +1,14 @@
 # Field Notes illustrations — sources and licences
 
-Raster illustrations live in `public/field-notes/*.webp` (sepia / ink line on warm paper,
-about 800 px wide, typically under 80 KB each; total under ~3 MB).
+Raster illustrations live in `public/field-notes/*.webp` (sepia / ink line with
+cross-hatching on warm cream paper, about 800 px on the long edge, typically
+40–90 KB each).
 
-**Generation:** These are **programmatically drawn technical line illustrations** in an
-antique-engraving style (SVG geometry → PNG → WebP). The `GenerateImage` tool in the
-`cursor` namespace was **not available** in the agent environment that produced them, so
-they are not diffusion / multimodal AI generations. They are original drawings made for
-this app; no third-party photos, no museum objects, no real brands or people, and no
-readable maker names inside the images (labels stay in the UI captions). The JME guild
-mark letters are the subject of that note and are intentional.
+**Generation:** These are **AI-generated illustrations** (GenerateImage), reviewed
+for period accuracy before acceptance. No third-party photos, no museum objects,
+no real brands or people. No text or labels inside the images (captions stay in
+the app UI). Maker-stamp marks may appear as stylised impressed strokes when that
+is the subject of the note.
 
 Rules:
 - **One asset per note id** (`illustration === note.id`). Filename stem equals the note id.
@@ -18,7 +17,7 @@ Rules:
 - The €1 “faire offre” scam diagram is not reused as decoration for other notes.
 - List cards lazy-load WebP; detail views load the full image eagerly.
 
-Accepted image count and ids are listed in
+Accepted image ids are listed in
 `src/components/fieldNotes/FieldNoteIllustration.tsx` (`IMAGE_IDS` /
 `REGISTERED_ILLUSTRATION_IDS`).
 
