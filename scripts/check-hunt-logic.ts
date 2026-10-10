@@ -34,6 +34,7 @@ import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceChe
 
 import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker, hasJmeMention, anchorGroupFor, MAKERS } from "../src/services/makers.ts";
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
+import { buildValuation, validateValuation, allInFromHammer, hammerFromAllIn } from "../src/services/valuation.ts";
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS , knownLotSeeds} from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
@@ -1741,6 +1742,45 @@ check("field notes: cash-cap note matches negotiation constants", () => {
 });
 
 
+
+check("valuation object: fees, walk-away agreement, max bid ≠ market high, no-ask disables buy score", () => {
+  assert.equal(allInFromHammer(1000, 25), 1250);
+  assert.equal(hammerFromAllIn(1250, 25), 1000);
+  const auction = buildValuation({
+    currency: "EUR", isAuction: true, premiumPct: 25, askingPrice: 800, hasPhotos: true,
+    market: { low: 300, high: 700, currency: "EUR", basis: "hammer" },
+    restorationAllowance: 50, marginFraction: 0,
+  });
+  assert.deepEqual([auction.expectedHammer.low, auction.expectedHammer.high], [300, 700]);
+  assert.deepEqual([auction.buyerCost.low, auction.buyerCost.high], [375, 875]);
+  assert.equal(auction.walkAway, 700);
+  assert.equal(auction.overpayingAbove, auction.walkAway);
+  assert.ok(auction.maxBidHammer != null && auction.maxBidHammer <= 700);
+  assert.ok((auction.maxBidAllIn || 0) <= 700); // restoration pulls all-in budget below walk-away
+  assert.equal(auction.buyScoreAllowed, true);
+  assert.deepEqual(validateValuation(auction), []);
+
+  const noAsk = buildValuation({
+    currency: "EUR", isAuction: true, premiumPct: 28, askingPrice: null, hasPhotos: false,
+    market: { low: 100, high: 400, currency: "EUR", basis: "hammer", provisional: true },
+  });
+  assert.equal(noAsk.buyScoreAllowed, false);
+  assert.equal(noAsk.textOnly, true);
+  assert.ok(noAsk.provisional);
+  assert.deepEqual(validateValuation(noAsk), []);
+
+  // Lot 245-like: style Charles X damaged — dealer path, walk-away = dealer high, not a blind market top bid
+  const style = buildValuation({
+    currency: "EUR", isAuction: false, premiumPct: 0, askingPrice: null, hasPhotos: false,
+    market: { low: 100, high: 350, currency: "EUR", basis: "all_in", provisional: true },
+    dealerRetail: { low: 250, high: 700, currency: "EUR", basis: "asking" },
+  });
+  assert.equal(style.walkAway, 700);
+  assert.equal(style.buyScoreAllowed, false);
+  assert.ok(style.suggestedAcquisition != null && style.suggestedAcquisition <= 700);
+});
+
 console.log(`
 ${passed} checks passed`);
+
 process.exit(0);
