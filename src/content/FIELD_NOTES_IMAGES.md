@@ -23,4 +23,7 @@ Accepted image ids are listed in
 `src/components/fieldNotes/FieldNoteIllustration.tsx` (`IMAGE_IDS` /
 `REGISTERED_ILLUSTRATION_IDS`).
 
+All 71 field notes currently have an accepted WebP, including `stamp-jme`
+(interlaced JME guild monogram struck into wood).
+
 Licence: same as the application source.

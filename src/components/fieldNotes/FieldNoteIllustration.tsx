@@ -69,6 +69,7 @@ const IMAGE_IDS = [
   'stamp-fakes',
   'stamp-genuine-look',
   'stamp-invoice',
+  'stamp-jme',
   'stamp-where-case',
   'stamp-where-chairs',
   'table-aprons',
