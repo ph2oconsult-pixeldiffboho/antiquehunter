@@ -24,7 +24,8 @@
     "hunt": "Chiner",
     "collection": "Collection",
     "profile": "Profil",
-    "saving": "Enregistrement…"
+    "saving": "Enregistrement…",
+    "field_notes": "Notes de terrain"
   },
   "home": {
     "hero_badge": "Outil de terrain professionnel",
@@ -608,5 +609,22 @@
     "bid_costs": "Ajoutez les frais : TVA sur les frais, frais d'enchères en ligne et transport.",
     "bid_max_note": "avec {{pct}} % de frais acheteur",
     "bid_max_locked": "Fixez votre maximum avant la vente, frais acheteur de {{pct}} % compris. Votre enchère maximale suggérée :"
+  },
+  "field_notes": {
+    "title": "Notes de terrain",
+    "subtitle": "{{count}} contrôles",
+    "search_placeholder": "Rechercher estampille, glace, queues d’aronde…",
+    "categories": "Catégories",
+    "all": "Tout",
+    "piece_types": "Types de pièce",
+    "periods": "Époques",
+    "results_count": "{{count}} notes",
+    "empty": "Aucune note ne correspond.",
+    "view_guide": "Ouvrir le guide",
+    "open_guide": "Guide complet",
+    "open_in_guide": "Voir dans le guide",
+    "for_piece_title": "Notes pour cette pièce",
+    "for_piece_intro": "Contrôles adaptés au type, à l’époque et à la mention de maker de cette évaluation. Des tendances, pas des règles absolues.",
+    "conservative_note": "Ce sont des tendances de marchand, pas des règles absolues. Confirmez sur la pièce devant vous."
   }
 }

@@ -24,7 +24,8 @@
     "home": "Home",
     "collection": "Collection",
     "profile": "Profile",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "field_notes": "Field Notes"
   },
   "home": {
     "hero_badge": "Professional Field Tool",
@@ -608,5 +609,22 @@
     "bid_costs": "Add the costs: VAT on the premium, online-bidding fees and transport.",
     "bid_max_note": "with the {{pct}}% buyer's premium",
     "bid_max_locked": "Set your maximum before the sale, including the {{pct}}% buyer's premium. Your suggested maximum bid:"
+  },
+  "field_notes": {
+    "title": "Dealer Field Notes",
+    "subtitle": "{{count}} field checks",
+    "search_placeholder": "Search stamps, glass, dovetails…",
+    "categories": "Categories",
+    "all": "All",
+    "piece_types": "Piece types",
+    "periods": "Periods",
+    "results_count": "{{count}} notes",
+    "empty": "No notes match that search.",
+    "view_guide": "Open guide",
+    "open_guide": "Full guide",
+    "open_in_guide": "Open in guide",
+    "for_piece_title": "Field notes for this piece",
+    "for_piece_intro": "Checks matched to the type, period and maker claim on this appraisal. Tendencies, not absolute rules.",
+    "conservative_note": "These are dealer tendencies, not absolute rules. Confirm on the piece in front of you."
   }
 }

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import MainLayout from './components/MainLayout';
 import { Home } from './components/Home';
+import { FieldNotesGuide } from './components/fieldNotes/FieldNotesGuide';
 import { Collection } from './components/Collection';
 import { CameraCapture } from './components/CameraCapture';
 import { DescriptionInput } from './components/DescriptionInput';
@@ -36,7 +37,7 @@ const withTimeout = <T,>(p: Promise<T>, ms: number, message: string): Promise<T>
     p.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
   });
 
-type Screen = 'intro-choice' | 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'legal' | 'upload-choice' | 'profile' | 'hunt';
+type Screen = 'intro-choice' | 'home' | 'scan' | 'describe' | 'analysis' | 'collection' | 'settings' | 'legal' | 'upload-choice' | 'profile' | 'hunt' | 'field-notes';
 
 export default function Main() {
   const { t, i18n } = useTranslation();
@@ -71,6 +72,7 @@ export default function Main() {
   const [showResetPrompt, setShowResetPrompt] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [fieldNotesInitial, setFieldNotesInitial] = useState<{ noteId?: string; category?: any; pieceTag?: any; periodTag?: any; query?: string } | undefined>(undefined);
   const [savedResult, setSavedResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -379,6 +381,7 @@ export default function Main() {
             onViewCollection={() => setCurrentScreen('collection')}
             onViewSettings={() => setCurrentScreen('settings')}
             onViewHunt={() => setCurrentScreen('hunt')}
+            onViewFieldNotes={(opts) => { setFieldNotesInitial(opts); setCurrentScreen('field-notes'); }}
           />
         );
       case 'scan':
@@ -508,6 +511,7 @@ export default function Main() {
                 plan={plan}
                 currency={currency}
                 onAddMoreDetails={() => setCurrentScreen('upload-choice')}
+                onOpenFieldNotes={(opts) => { setFieldNotesInitial(opts as any); setCurrentScreen('field-notes'); }}
                 onRerunWithChecks={(answers) => handleAnalyze(lastTyped || t('upload_choice.default_prompt', "Analyze this antique from the images provided."), lastDetails || {}, false, [], answers,
                   analysisItems(analysisResult)[0]?.checklist?.base || null)}
                 onAddEvidence={() => {
@@ -533,6 +537,15 @@ export default function Main() {
             onBack={() => setCurrentScreen('home')}
           />
         );
+
+      case 'field-notes':
+        return (
+          <FieldNotesGuide
+            onBack={() => { setFieldNotesInitial(undefined); setCurrentScreen('home'); }}
+            initial={fieldNotesInitial}
+          />
+        );
+
       case 'settings':
         return (
           <Settings 
@@ -575,6 +588,7 @@ export default function Main() {
             onViewCollection={() => setCurrentScreen('collection')}
             onViewSettings={() => setCurrentScreen('settings')}
             onViewHunt={() => setCurrentScreen('hunt')}
+            onViewFieldNotes={(opts) => { setFieldNotesInitial(opts); setCurrentScreen('field-notes'); }}
           />
         );
     }
@@ -600,7 +614,10 @@ export default function Main() {
         />
       )}
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <MainLayout onViewChange={setCurrentScreen}>
+      <MainLayout onViewChange={(view) => {
+        if (view === 'field-notes') setFieldNotesInitial(undefined);
+        setCurrentScreen(view);
+      }}>
         <input 
           type="file" 
           ref={fileInputRef} 
