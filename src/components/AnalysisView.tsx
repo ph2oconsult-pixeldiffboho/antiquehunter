@@ -10,6 +10,7 @@ import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis }
 import { EvidenceStep } from './EvidenceStep';
 import { BeforeYouBuy } from './BeforeYouBuy';
 import { Negotiate } from './Negotiate';
+import { FieldNotesForPiece } from './fieldNotes/FieldNotesForPiece';
 import { MakerAndComparables } from './Comparables';
 import type { CheckAnswers } from '../services/checklist';
 
@@ -26,6 +27,7 @@ interface AnalysisViewProps {
   onAddMoreDetails: () => void;
   /** "Need more evidence": back to the details form with the earlier photos and inputs kept */
   onAddEvidence?: () => void;
+  onOpenFieldNotes?: (opts: { noteId?: string; category?: string }) => void;
   onRerunWithChecks?: (answers: CheckAnswers) => void;
   iterationCount: number;
 }
@@ -252,7 +254,7 @@ const FeedbackSection = ({ currentItem, onBack }: { currentItem: any; onBack: ()
   );
 };
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onNewAppraisal, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, onAddEvidence, onRerunWithChecks, iterationCount }) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [], onSave, onBack, onNewAppraisal, onUpgrade, isSaved, plan = 'free', currency, onAddMoreDetails, onAddEvidence, onRerunWithChecks, onOpenFieldNotes, iterationCount }) => {
   const { t, i18n } = useTranslation();
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [localResult, setLocalResult] = useState(result);
@@ -924,6 +926,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       {/* 3e. Negotiate (dealer / private) or bidding tips (auction), part of "Before you buy" */}
       {!currentItem.evidence_check?.required && (
         <Negotiate plan={currentItem.negotiation_plan} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
+      )}
+
+      {/* Field notes matched to this piece */}
+      {onOpenFieldNotes && (
+        <FieldNotesForPiece item={currentItem} onOpenGuide={onOpenFieldNotes} />
       )}
 
       {/* Buying Goal Selector - Moved here to clarify it's a setting that affects the analysis */}

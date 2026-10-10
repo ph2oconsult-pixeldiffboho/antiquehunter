@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, User, Settings, Home, BookOpen, Compass } from 'lucide-react';
+import { Menu, User, Settings, Home, BookOpen, Compass, NotebookPen } from 'lucide-react';
 import Logo from './Logo';
 
 interface LayoutProps {
@@ -16,6 +16,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onViewChange }) => {
     { label: t('common.home', 'Home'), view: 'home', icon: Home },
     { label: t('common.hunt', 'Find Me an Antique'), view: 'hunt', icon: Compass },
     { label: t('common.collection', 'Collection'), view: 'collection', icon: BookOpen },
+    { label: t('common.field_notes', 'Field Notes'), view: 'field-notes', icon: NotebookPen },
     { label: t('common.settings', 'Settings'), view: 'settings', icon: Settings },
     { label: t('common.profile', 'Profile'), view: 'profile', icon: User },
   ];

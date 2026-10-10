@@ -38,6 +38,9 @@ import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDEN
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS } from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
 import { COMPS_CLIENT_TIMEOUT_MS } from "../src/services/gemini.ts";
+import { FIELD_NOTES, type FieldNoteCategory, type PieceTag } from "../src/content/fieldNotes.ts";
+import { countsByCategory, filterNotes, matchNotesForPiece, periodTagsFromText, pieceTagsFromAppraisal, teaserNotes } from "../src/services/fieldNotes.ts";
+import { CASH_CAP_FR_RESIDENT_EUR as CASH_NOTE_CAP } from "../src/services/negotiation.ts";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => { fn(); passed++; console.log("ok -", name); };
@@ -1526,4 +1529,79 @@ await (async () => {
   passed++; console.log("ok - comps server function: scoped searches run in parallel; a failed scope keeps the others' verified results");
 })();
 
-console.log(`\n${passed} checks passed`);
+
+
+check("field notes: content coverage (piece / period / stamps / buying)", () => {
+  const counts = countsByCategory();
+  assert.ok(counts.piece >= 30, `piece notes ${counts.piece}`);
+  assert.ok(counts.period >= 10, `period notes ${counts.period}`);
+  assert.ok(counts.stamps >= 6, `stamps ${counts.stamps}`);
+  assert.ok(counts.buying >= 6, `buying ${counts.buying}`);
+  assert.equal(FIELD_NOTES.length, counts.piece + counts.period + counts.stamps + counts.buying);
+  for (const n of FIELD_NOTES) {
+    assert.ok(n.title.en && n.title.fr, n.id);
+    assert.ok(n.body.en.length > 40 && n.body.fr.length > 40, n.id);
+    assert.ok(n.illustration, n.id);
+  }
+  const pieceTags = new Set(FIELD_NOTES.flatMap(n => n.pieceTags));
+  for (const tag of ["commodes", "mirrors", "chairs", "cabinets", "tables", "secretaires"] as PieceTag[]) {
+    assert.ok(pieceTags.has(tag), tag);
+    assert.ok(FIELD_NOTES.filter(n => n.pieceTags.includes(tag)).length >= 5, `${tag} checks`);
+  }
+});
+
+check("field notes: EN/FR search and category filters", () => {
+  assert.ok(filterNotes({ query: "dovetail" }, "en").some(n => n.id === "commode-dovetails"));
+  assert.ok(filterNotes({ query: "queue d'aronde" }, "fr").some(n => n.id === "commode-dovetails"));
+  assert.ok(filterNotes({ query: "mercure" }, "fr").some(n => n.id === "mirror-mercury"));
+  assert.ok(filterNotes({ category: "stamps" }, "en").every(n => n.category === "stamps"));
+  assert.ok(filterNotes({ category: "piece", pieceTag: "chairs" }, "en").every(n => n.pieceTags.includes("chairs")));
+  assert.ok(filterNotes({ category: "buying", query: "D112-3" }, "en").some(n => n.id === "buy-cash-cap"));
+});
+
+check("field notes: period and piece tag detection", () => {
+  assert.deepEqual(periodTagsFromText("Louis XVI fauteuil"), ["louis_xvi"]);
+  assert.ok(periodTagsFromText("époque Empire", "Bellangé").includes("directoire_empire"));
+  assert.ok(periodTagsFromText("Louis-Philippe mercury mirror").includes("louis_philippe"));
+  assert.ok(periodTagsFromText("Gustavian painted cupboard").includes("gustavian"));
+  assert.ok(pieceTagsFromAppraisal("mirrors", "Large Provençal giltwood mirror").includes("mirrors"));
+  assert.ok(pieceTagsFromAppraisal("chairs", "Four Empire mahogany armchairs").includes("chairs"));
+  assert.ok(pieceTagsFromAppraisal(undefined, "Commode tombeau Transition").includes("commodes"));
+});
+
+check("field notes: appraisal matching (Provençal mirror & Bellangé chairs)", () => {
+  const mirror = matchNotesForPiece({
+    category: "mirrors",
+    title: "Louis XVI Provençal giltwood mirror",
+    style: "Louis XVI",
+    period: "circa 1780",
+    origin: "Provence",
+  }, 5);
+  assert.ok(mirror.length >= 3 && mirror.length <= 5);
+  assert.ok(mirror.some(r => r.note.pieceTags.includes("mirrors") || r.note.id.includes("mirror")));
+
+  const chairs = matchNotesForPiece({
+    category: "chairs",
+    title: "Set of four Empire mahogany fauteuils",
+    style: "Empire",
+    period: "Empire",
+    makerText: "Bellangé stamped_confirmed",
+    hasMakerClaim: true,
+  }, 5);
+  assert.ok(chairs.length >= 3);
+  assert.ok(chairs.some(r => r.note.makerRelated || r.note.pieceTags.includes("chairs")));
+  assert.ok(chairs.some(r => r.reasons.includes("maker") || r.note.id.includes("stamp") || r.note.id.includes("empire") || r.note.id.includes("chair")));
+});
+
+check("field notes: cash-cap note matches negotiation constants", () => {
+  const note = FIELD_NOTES.find(n => n.id === "buy-cash-cap");
+  assert.ok(note);
+  assert.ok(note!.body.en.includes("1,000") || note!.body.en.includes("1000"));
+  assert.ok(note!.body.en.includes("15,000") || note!.body.en.includes("15000"));
+  assert.ok(note!.body.en.includes("D112-3"));
+  assert.equal(CASH_NOTE_CAP, 1000);
+  assert.ok(teaserNotes({ count: 2 }).length === 2);
+});
+
+console.log(`
+${passed} checks passed`);
