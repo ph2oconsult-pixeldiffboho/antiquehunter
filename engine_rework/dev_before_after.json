@@ -1,0 +1,85 @@
+{
+  "generated_at": "2026-10-10T22:10:22.377Z",
+  "note": "Dev-only synthetic-model before/after. BEFORE = model range untouched (abf833d-like). AFTER = current postProcess with base-band priors + valuation. Sealed eval NOT run.",
+  "sample_sizes": {
+    "dev": 39,
+    "eval_sealed": 34
+  },
+  "before": {
+    "n": 39,
+    "range_hit": 17,
+    "range_hit_pct": 44,
+    "median_abs_err_pct": 33.3,
+    "median_range_width_ratio": 1.7,
+    "overvaluation_rate_style_damaged_pct": 25,
+    "undervaluation_rate_pct": 28,
+    "style_damaged_n": 16,
+    "bands": {
+      "<300": {
+        "n": 17,
+        "hit": 7,
+        "med_abs": 38.00675675675676
+      },
+      "300-1k": {
+        "n": 11,
+        "hit": 5,
+        "med_abs": 29.967426710097723
+      },
+      "1-5k": {
+        "n": 10,
+        "hit": 5,
+        "med_abs": 30.371352785145888
+      },
+      ">5k": {
+        "n": 1,
+        "hit": 0,
+        "med_abs": 40.61085972850679
+      }
+    }
+  },
+  "after": {
+    "n": 39,
+    "range_hit": 12,
+    "range_hit_pct": 31,
+    "median_abs_err_pct": 36.8,
+    "median_range_width_ratio": 1.7,
+    "overvaluation_rate_style_damaged_pct": 6,
+    "undervaluation_rate_pct": 38,
+    "style_damaged_n": 16,
+    "bands": {
+      "<300": {
+        "n": 17,
+        "hit": 5,
+        "med_abs": 38.00675675675676
+      },
+      "300-1k": {
+        "n": 11,
+        "hit": 3,
+        "med_abs": 36.75373134328358
+      },
+      "1-5k": {
+        "n": 10,
+        "hit": 4,
+        "med_abs": 30.371352785145888
+      },
+      ">5k": {
+        "n": 1,
+        "hit": 0,
+        "med_abs": 94.51357466063348
+      }
+    }
+  },
+  "repeatability": {
+    "ok": true,
+    "mids": [
+      120,
+      120,
+      120
+    ],
+    "lot": "drouot-35127785"
+  },
+  "asking_price_sensitivity": {
+    "market_range_stable": true,
+    "lot": "drouot-35127785"
+  }
+}

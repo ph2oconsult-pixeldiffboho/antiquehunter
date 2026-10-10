@@ -1,0 +1,4 @@
+sha256=89fb1b7e69da5489a253d5e91aab709262870708c72c207f647015b46e2c7f16
+n=34
+source=testset60/lots_split66.json holdout
+status=NOT_RUN
