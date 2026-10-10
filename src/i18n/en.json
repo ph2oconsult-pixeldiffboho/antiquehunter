@@ -436,7 +436,11 @@
     "found_direct_desc": "Read directly from the auction site's own search page: estimate, sale date and fees are the auction house's.",
     "all_in": "All-in ≈ {{range}}",
     "fees_assumed": "(~{{pct}}% fees assumed)",
-    "lot_number": "Lot {{num}}"
+    "lot_number": "Lot {{num}}",
+    "approximate": "Approximate",
+    "approx_near_budget": "Slightly above your budget (all-in).",
+    "approx_material_unconfirmed": "Requested material not confirmed in the catalogue.",
+    "approx_generic": "Close alternative — check period, material and budget."
   },
   "toast": {
     "saved": "Saved to your log.",

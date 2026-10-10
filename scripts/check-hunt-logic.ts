@@ -23,7 +23,7 @@ import { parseDrouotLotPage, parseDrouotSearch, stripLotNumber } from "../src/se
 import { parseInterencheresSearch, parisDate } from "../src/services/sources/interencheres.ts";
 import { clearSourceCache, fetchSource, requestUrlFor } from "../src/services/sources/fetchSource.ts";
 import { napoleonIIIProblem, siteQueries } from "../src/services/directSearch.ts";
-import { candidateToMatch, crossListingKey, evaluateLot, periodProblemFor, finishDirect, searchDirectSites } from "../src/services/directSearch.ts";
+import { candidateToMatch, crossListingKey, evaluateLot, periodProblemFor, finishDirect, searchDirectSites, materialVerdict } from "../src/services/directSearch.ts";
 import { allIn, budgetMin } from "../src/services/budget.ts";
 import { localQueries } from "../src/services/huntGeo.ts";
 import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
@@ -416,7 +416,8 @@ check("Auctionet API results: only live period lots of the right type, in budget
   }
   // Sweden-only search drops the Spanish house (EUR) and a tight budget drops the expensive lot
   assert.equal(auctionetToMatch(json.items.find((i: any) => i.id === 5329913), { ...params, periodOnly: false, query: "antique" }, planHunt({ ...params, geographies: ["Sweden"], query: "antique" }), now).dropReason, "geo_location_mismatch");
-  assert.equal(auctionetToMatch(json.items.find((i: any) => i.id === 5384954), { ...params, priceRange: "300 EUR" }, plan, now).dropReason, "over_budget");
+  { const r = auctionetToMatch(json.items.find((i: any) => i.id === 5384954), { ...params, priceRange: "300 EUR" }, plan, now);
+    assert.ok(r.dropReason === "over_budget" || (r.match?.approximate && r.match.labels?.includes("near_budget")), JSON.stringify(r)); }
   assert.equal(budgetMax("500 – 2 000 EUR"), 2000);
   assert.equal(withinBudget(6000, "SEK", 2000, "EUR"), true);
   assert.equal(withinBudget(60000, "SEK", 2000, "EUR"), false);
@@ -726,7 +727,7 @@ check("direct lots: all-in budget (estimate × (1 + premium)), period, type, sol
   assert.equal(ok.candidate!.allInHigh, 384);
   assert.equal(ok.candidate!.premiumAssumed, true);
   // €400–600 + 28% = €512 at the low estimate: over a €500 budget
-  assert.equal(ev("89071358").dropReason, "over_budget");
+  assert.ok(ev("89071358").candidate?.approximate && ev("89071358").candidate?.labels?.includes("near_budget"), JSON.stringify(ev("89071358")));
   // a coin is not a mirror
   assert.equal(ev("88592460").dropReason, "not_requested_type");
   // the sale today at 14:00 is gone the next day
@@ -2021,6 +2022,47 @@ check("Save-to-Log recovery: draft preserved before auth; cancelled/offline stil
   const col = readFileSync(new URL("../src/components/Collection.tsx", import.meta.url), "utf8");
   assert.match(col, /commitDraftToLocalFinds/);
   assert.match(col, /8_000/);
+});
+
+
+check("hunt: enforce material + budget; label approximate alternatives", () => {
+  assert.equal(materialVerdict("Louis XV walnut commode", "Commode Louis XV en noyer"), "match");
+  assert.equal(materialVerdict("Louis XV walnut commode", "Commode Louis XV en chêne"), "mismatch");
+  assert.equal(materialVerdict("Louis XV walnut commode", "Commode Louis XV époque"), "unconfirmed");
+  assert.equal(materialVerdict("Louis XV commode", "Commode en chêne"), "n/a");
+
+  const plan = { regions: null, itemTypes: ["commode"], allowedDomains: ["drouot.com"] } as any;
+  const baseLot = (over: Partial<any> = {}) => ({
+    site: "drouot", id: "1", url: "https://drouot.com/l/1", title: "Commode Louis XV en chêne",
+    description: "époque Louis XV", estimateLow: 200, estimateHigh: 400, currency: "EUR",
+    saleDate: new Date(Date.now() + 86400_000), soldOrEnded: false, ...over,
+  });
+  // Different wood → hard drop
+  const mm = evaluateLot(baseLot(), { query: "Louis XV walnut commode", priceRange: "100-2000 EUR", currency: "EUR", periodOnly: true }, plan);
+  assert.equal(mm.dropReason, "material_mismatch");
+
+  // Matching wood, in budget → primary
+  const ok = evaluateLot(baseLot({ title: "Commode Louis XV en noyer" }), { query: "Louis XV walnut commode", priceRange: "100-2000 EUR", currency: "EUR", periodOnly: true }, plan);
+  assert.ok(ok.candidate);
+  assert.equal(ok.candidate!.approximate, undefined);
+  assert.ok(ok.candidate!.labels?.includes("material_match"));
+
+  // Material unconfirmed → approximate
+  const unc = evaluateLot(baseLot({ title: "Commode Louis XV", description: "époque Louis XV, belle patine" }), { query: "Louis XV walnut commode", priceRange: "100-2000 EUR", currency: "EUR", periodOnly: true }, plan);
+  assert.ok(unc.candidate?.approximate);
+  assert.equal(unc.candidate!.approxReason, "material_unconfirmed");
+
+  // Slight budget overrun → approximate near_budget; far over → drop
+  const near = evaluateLot(baseLot({ title: "Commode Louis XV en noyer", estimateLow: 820, estimateHigh: 850 }), { query: "Louis XV walnut commode", priceRange: "1000 EUR", currency: "EUR", periodOnly: true }, plan);
+  // all-in at 25% on 900 = 1125; max 1000 → 1125/1000 = 1.125 ≤ 1.15 → near
+  assert.ok(near.candidate?.approximate, JSON.stringify(near));
+  assert.ok(near.candidate!.labels?.includes("near_budget"));
+  const far = evaluateLot(baseLot({ title: "Commode Louis XV en noyer", estimateLow: 2000, estimateHigh: 3000 }), { query: "Louis XV walnut commode", priceRange: "1000 EUR", currency: "EUR", periodOnly: true }, plan);
+  assert.equal(far.dropReason, "over_budget");
+
+  const match = candidateToMatch(unc.candidate!, { query: "Louis XV walnut commode", currency: "EUR" });
+  assert.equal(match.approximate, true);
+  assert.match(match.dealerAnalysis, /Approximate alternative/i);
 });
 
 console.log(`

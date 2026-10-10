@@ -436,7 +436,11 @@
     "found_direct_desc": "Lu directement sur la page de recherche du site d'enchères : estimation, date et frais sont ceux de la maison de ventes.",
     "all_in": "Frais compris ≈ {{range}}",
     "fees_assumed": "(~{{pct}} % de frais supposés)",
-    "lot_number": "Lot {{num}}"
+    "lot_number": "Lot {{num}}",
+    "approximate": "Approximatif",
+    "approx_near_budget": "Légèrement au-dessus de votre budget (frais inclus).",
+    "approx_material_unconfirmed": "Le matériau demandé n’est pas confirmé dans le catalogue.",
+    "approx_generic": "Alternative proche — vérifiez période, matériau et budget."
   },
   "toast": {
     "saved": "Enregistré dans votre journal.",
