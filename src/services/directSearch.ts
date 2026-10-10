@@ -41,6 +41,10 @@ export interface DirectCandidate {
   allInHigh?: number;
   styleMatch: boolean | null;
   region?: Region | null; // null = not known yet (needs the lot page)
+  /** Labels for approximate alternatives (material unconfirmed, near budget, etc.). */
+  labels?: string[];
+  approximate?: boolean;
+  approxReason?: string;
 }
 
 /** Not a period piece for this request: "style", XXe, copies, partly period / old parts, or "de style <requested 18th-c. style>" made later. */
@@ -84,6 +88,20 @@ const firstSentence = (s?: string) => String(s || '').split(/(?<=[.;!?])\s|\n/)[
 const TOY_WORDS = /(^|[^a-zà-ÿ])(jouets?|poup[ée]es?|dinette|maquettes?|miniatures?|doll'?s?|dolls'? house|toys?)([^a-zà-ÿ]|$)/i;
 const PERIOD_HINT = /([ée]poque|XVIII|XIX|18th|19th|1[78]\d\d|vers 1[78]|circa 1[78])/i;
 
+/** Material enforcement: when the query names a wood/material, lots that name a different one are mismatches. */
+export const materialVerdict = (query: string, text: string): 'match' | 'mismatch' | 'unconfirmed' | 'n/a' => {
+  const wanted = materialsInQuery(query);
+  if (!wanted.length) return 'n/a';
+  const norm = normalise(text);
+  const hitWanted = wanted.some(m => m.match.some(w => norm.includes(normalise(w)) || norm.includes(normalise(m.fr))));
+  if (hitWanted) return 'match';
+  // Another known material named in the lot?
+  const other = materialsInQuery(text).filter(m => !wanted.some(w => w.fr === m.fr));
+  if (other.length) return 'mismatch';
+  return 'unconfirmed';
+};
+
+
 /** Decide whether a lot can be shown, and score it. `requireRegion` = the lot page has been read (or never will be). */
 export const evaluateLot = (lot: DirectLot, params: DirectParams, plan: DirectPlan, now = Date.now(), requireRegion = false):
   { candidate?: DirectCandidate; dropReason?: string } => {
@@ -116,24 +134,43 @@ export const evaluateLot = (lot: DirectLot, params: DirectParams, plan: DirectPl
   const allInHigh = conv(high);
   const max = budgetMax(params.priceRange);
   const min = budgetMin(params.priceRange);
-  if (max && allInLow && allInLow > max) return { dropReason: 'over_budget' };
+  const text = `${lot.title} ${lot.description || ''}`;
+  const mat = materialVerdict(params.query, text);
+  if (mat === 'mismatch') return { dropReason: 'material_mismatch' };
+
   const hasEstimate = !!(lot.estimateLow || lot.estimateHigh);
+  let approximate = false;
+  let approxReason: string | undefined;
+  const labels: string[] = [];
+
+  if (max && allInLow && allInLow > max) {
+    // Slight overrun → approximate alternative; far over → drop
+    if (allInLow <= max * 1.15) {
+      approximate = true; approxReason = 'near_budget'; labels.push('near_budget');
+    } else {
+      return { dropReason: 'over_budget' };
+    }
+  }
   if (min && hasEstimate && allInHigh && allInHigh < min * 0.8) return { dropReason: 'under_budget' };
 
-  const text = `${lot.title} ${lot.description || ''}`;
+  if (mat === 'unconfirmed') { labels.push('material_unconfirmed'); approximate = true; approxReason = approxReason || 'material_unconfirmed'; }
+  if (mat === 'match') labels.push('material_match');
+
   const styleMatch = matchesStyle(params.query, text);
   const normText = normalise(text);
   let score = 0;
   if (styleMatch === true) score += 3;
   if (styleMatch === false) score += impliedStyleMatch(params.query, text) ? 1.5 : -1;
-  if (materialsInQuery(params.query).some(m => m.match.some(w => normText.includes(w)))) score += 1;
+  if (mat === 'match') score += 1;
+  if (mat === 'unconfirmed') score -= 0.5;
   if (PERIOD_HINT.test(text)) score += 1;
   if (hasEstimate) score += 1; else if (lot.startingPrice) score += 0.3; else score -= 1;
   if (max && allInHigh && allInHigh <= max) score += 1;
   if (lot.image) score += 0.3;
   if (!premiumAssumed) score += 0.2;
   if (lot.saleDate && lot.saleDate.getTime() - now < 14 * 86400_000) score += 0.5;
-  return { candidate: { lot, score: Math.round(score * 10) / 10, premiumPct, premiumAssumed, allInLow, allInHigh, styleMatch, region } };
+  if (approximate) score -= 1;
+  return { candidate: { lot, score: Math.round(score * 10) / 10, premiumPct, premiumAssumed, allInLow, allInHigh, styleMatch, region, labels: labels.length ? labels : undefined, approximate: approximate || undefined, approxReason } };
 };
 
 // ---------------------------------------------------------------------------
@@ -234,6 +271,8 @@ export const crossListingKey = (lot: DirectLot): string =>
 
 export interface DirectSearchResult {
   candidates: DirectCandidate[];
+  /** Near-misses: material unconfirmed, slight budget overrun — labelled, not mixed into primary hits. */
+  approximate: DirectCandidate[];
   stats: DirectSourceStat[];
   dropped: Record<string, number>;
   /** Domains whose search page was actually read (Gemini web search does not need to cover them) */
@@ -310,8 +349,11 @@ export const finishDirect = async (
     kept: finalList.filter(c => c.lot.site === o.stat.site).length,
     enriched: enrichedCount[o.stat.site],
   }));
+  const primary = finalList.filter(c => !c.approximate);
+  const approximate = finalList.filter(c => c.approximate);
   return {
-    candidates: finalList,
+    candidates: primary,
+    approximate,
     stats,
     dropped,
     coveredDomains: stats.filter(s => s.status >= 200 && s.status < 300).map(s => SITE_DOMAIN[s.site]),
@@ -346,7 +388,15 @@ export const templateAnalysis = (c: DirectCandidate, query: string): string => {
   const l = c.lot;
   const where = [l.house, l.city].filter(Boolean).join(', ');
   const style = c.styleMatch === false ? ' The catalogue text does not name the style you asked for – check the photos.' : '';
-  return `Found directly on ${SITE_LABEL[l.site]}${where ? ` (${where})` : ''}. Estimate, sale date${c.premiumAssumed ? '' : ' and fees'} are from the auction house.${style} Ask for a condition report and photos of the back, drawers and any stamp before bidding.`;
+  const approx = c.approximate
+    ? (c.approxReason === 'near_budget'
+      ? ' Approximate alternative: all-in is slightly above your budget.'
+      : c.approxReason === 'material_unconfirmed'
+      ? ' Approximate alternative: the wood/material you asked for is not confirmed in the catalogue text.'
+      : ' Approximate alternative.')
+    : '';
+  const mat = c.labels?.includes('material_match') ? ' Material matches your request.' : '';
+  return `Found directly on ${SITE_LABEL[l.site]}${where ? ` (${where})` : ''}. Estimate, sale date${c.premiumAssumed ? '' : ' and fees'} are from the auction house.${style}${mat}${approx} Ask for a condition report and photos of the back, drawers and any stamp before bidding.`;
 };
 
 export interface DirectMatchFields {
@@ -354,6 +404,7 @@ export interface DirectMatchFields {
   dealerAnalysis: string; imageUrl?: string; verification: 'verified'; buyerPremiumPct?: number;
   source: 'drouot_search' | 'interencheres_search'; house?: string; allInEstimate?: string; premiumAssumed?: boolean; lotNumber?: number;
   allInLow?: number; allInHigh?: number; premiumPct?: number;
+  approximate?: boolean; approxReason?: string; labels?: string[];
 }
 
 export const candidateToMatch = (c: DirectCandidate, params: DirectParams, analysis?: string): DirectMatchFields => {
@@ -384,6 +435,9 @@ export const candidateToMatch = (c: DirectCandidate, params: DirectParams, analy
     allInLow: c.allInLow,
     allInHigh: c.allInHigh,
     premiumPct: c.premiumPct,
+    approximate: c.approximate,
+    approxReason: c.approxReason,
+    labels: c.labels,
   };
 };
 

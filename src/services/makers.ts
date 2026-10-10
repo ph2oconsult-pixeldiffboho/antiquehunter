@@ -15,31 +15,31 @@ export const MAKERS: Maker[] = [
   M('jacob', 'Georges Jacob', 'Georges Jacob', /\b(g\.?|georges)\s*jacob\b|\bjacob\b(?=.{0,40}(estampill|stamp|menuisier|maitre|1765))|\b(attribue?e?s?\s+a|attributed\s+to|atelier\s+de|workshop\s+of|stamped|estampille\w*|by)\s+(g\.?\s*)?jacob\b/),
   M('riesener', 'Jean-Henri Riesener', 'Riesener', /\briesener\b/),
   M('migeon', 'Pierre Migeon', 'Migeon', /\bmigeon\b/),
-  M('hache', 'Hache (Grenoble)', 'Hache Grenoble', /\bhache\b(?=.{0,60}grenoble)|\bjean[\s-]francois\s+hache\b|\bpierre\s+hache\b|\bthomas\s+hache\b|\bchristophe[\s-]andre\s+hache\b/),
+  M('hache', 'Hache (Grenoble)', 'Hache Grenoble', /\bhache\b(?=.{0,60}grenoble)|\b(estampill\w*|stamped|stamp|signe\w*|by)\s+hache\b|\bjean[\s-]francois\s+hache\b|\bpierre\s+hache\b|\bthomas\s+hache\b|\bchristophe[\s-]andre\s+hache\b/),
   M('lebesgue', 'Lebesgue', 'Lebesgue', /\blebesgue\b/),
   M('mondon', 'François Mondon', 'Mondon', /\bmondon\b/),
   M('oeben', 'Jean-François Oeben', 'Oeben', /\b(o|oe)eben\b|\boeben\b/),
   M('weisweiler', 'Adam Weisweiler', 'Weisweiler', /\bweisweiler\b/),
-  M('carlin', 'Martin Carlin', 'Martin Carlin', /\bmartin\s+carlin\b|\bcarlin\b(?=.{0,40}(estampill|stamp))/),
+  M('carlin', 'Martin Carlin', 'Martin Carlin', /\bmartin\s+carlin\b|\bcarlin\b(?=.{0,40}(estampill|stamp))|\b(estampill\w*|stamped|stamp|signe\w*|by)\s+(martin\s+)?carlin\b/),
   M('bvrb', 'Bernard II van Risenburgh (BVRB)', 'BVRB Van Risenburgh', /\bbvrb\b|\bvan\s+risen\s?burgh\b/),
   M('cressent', 'Charles Cressent', 'Cressent', /\bcressent\b/),
   M('boulle', 'André-Charles Boulle', 'Boulle', /\bandre[\s-]charles\s+boulle\b/),
-  M('dubois', 'Jacques Dubois', 'Jacques Dubois', /\b(jacques|i\.?)\s*dubois\b|\brene\s+dubois\b/),
-  M('sene', 'Sené', 'Sené', /\bsene\b(?=.{0,60}(estampill|stamp|menuisier|maitre|claude|jean[\s-]baptiste))|\b(claude|jean[\s-]baptiste[\s-]claude)\s+sene\b/),
+  M('dubois', 'Jacques Dubois', 'Jacques Dubois', /\b(jacques|i\.?)\s*dubois\b|\brene\s+dubois\b|\b(estampill\w*|stamped|stamp|signe\w*|by)\s+(jacques\s+|rene\s+|i\.?\s*)?dubois\b|\bdubois\b(?=.{0,40}(estampill|stamp))/),
+  M('sene', 'Sené', 'Sené', /\bsene\b(?=.{0,60}(estampill|stamp|menuisier|maitre|claude|jean[\s-]baptiste))|\b(claude|jean[\s-]baptiste[\s-]claude)\s+sene\b|\b(estampill\w*|stamped|stamp|signe\w*|by)\s+(claude\s+|jean[\s-]baptiste[\s-]claude\s+)?sene\b/),
   M('delanois', 'Louis Delanois', 'Delanois', /\bdelanois\b/),
   M('gourdin', 'Gourdin', 'Gourdin', /\bgourdin\b/),
   M('tilliard', 'Tilliard', 'Tilliard', /\btilliard\b/),
   M('foliot', 'Foliot', 'Foliot', /\bfoliot\b/),
   M('heurtaut', 'Nicolas Heurtaut', 'Heurtaut', /\bheurtaut\b/),
-  M('nadal', 'Nadal', 'Nadal', /\bnadal\b(?=.{0,60}(estampill|stamp|menuisier|maitre))/),
+  M('nadal', 'Nadal', 'Nadal', /\bnadal\b(?=.{0,60}(estampill|stamp|menuisier|maitre))|\b(estampill\w*|stamped|stamp|signe\w*|by)\s+nadal\b/),
   M('avisse', 'Jean Avisse', 'Avisse', /\bavisse\b/),
   M('lelarge', 'Lelarge', 'Lelarge', /\blelarge\b/),
   M('boulard', 'Jean-Baptiste Boulard', 'Boulard', /\bboulard\b/),
   M('canabas', 'Canabas', 'Canabas', /\bcanabas\b/),
   M('topino', 'Charles Topino', 'Topino', /\btopino\b/),
-  M('leleu', 'Jean-François Leleu', 'Leleu', /\bleleu\b(?=.{0,60}(estampill|stamp|maitre|jean[\s-]francois))|\bjean[\s-]francois\s+leleu\b/),
+  M('leleu', 'Jean-François Leleu', 'Leleu', /\bleleu\b(?=.{0,60}(estampill|stamp|maitre|jean[\s-]francois))|\bjean[\s-]francois\s+leleu\b|\b(estampill\w*|stamped|stamp|signe\w*|by)\s+(jean[\s-]francois\s+)?leleu\b/),
   M('saunier', 'Claude-Charles Saunier', 'Saunier', /\bsaunier\b/),
-  M('montigny', 'Philippe-Claude Montigny', 'Montigny', /\bmontigny\b(?=.{0,60}(estampill|stamp|maitre))/),
+  M('montigny', 'Philippe-Claude Montigny', 'Montigny', /\bmontigny\b(?=.{0,60}(estampill|stamp|maitre))|\b(estampill\w*|stamped|stamp|signe\w*|by)\s+(philippe[\s-]claude\s+)?montigny\b/),
   M('levasseur', 'Levasseur', 'Levasseur', /\blevasseur\b/),
   M('molitor', 'Bernard Molitor', 'Molitor', /\bmolitor\b/),
   M('teune', 'François-Gaspard Teuné', 'Teuné', /\bteune\b/),
@@ -57,17 +57,29 @@ export const MAKERS: Maker[] = [
   M('galle', 'Émile Gallé', 'Gallé', /\bgalle\b(?=.{0,40}(marquet|signe|signed|nancy|emile))|\bemile\s+galle\b/),
   M('chippendale', 'Thomas Chippendale', 'Chippendale', /\bthomas\s+chippendale\b/),
   M('gillows', 'Gillows', 'Gillows', /\bgillows?\b(?=.{0,40}(of\s+lancaster|stamp|lancaster))|\bgillows\b/),
-  M('haupt', 'Georg Haupt', 'Georg Haupt', /\bgeorg\s+haupt\b/),
+  M('haupt', 'Georg Haupt', 'Georg Haupt', /\bgeorg\s+haupt\b|\bhaupt\b(?=.{0,60}(stockholm|sweden|suede|ebenist|estampill|stamp))|\b(estampill\w*|stamped|stamp|signe\w*|by)\s+(georg\s+)?haupt\b/),
   M('malmsten', 'Carl Malmsten', 'Malmsten', /\bmalmsten\b/),
+  M('boudin', 'Léonard Boudin', 'Boudin', /\b(l\.?\s*)?boudin\b|\bleonard\s+boudin\b/),
+  M('delorme', 'Adrien Delorme', 'Delorme', /\b(a\.?\s*)?delorme\b|\badrien\s+delorme\b/),
+  M('lardin', 'André-Antoine Lardin', 'Lardin', /\blardin\b/),
+  M('pafrat', 'Claude-Charles Pafrat', 'Pafrat', /\bpafrat\b/),
+  M('schwerdfeger', 'Ferdinand Schwerdfeger', 'Schwerdfeger', /\bschwerdfeger\b|\bschwerdtfeger\b/),
+  M('beneman', 'Guillaume Beneman', 'Beneman', /\bbeneman\b|\bbennemann\b/),
+  M('nogaret', 'Pierre Nogaret (Lyon)', 'Nogaret Lyon', /\bnogaret\b/),
 ];
 
-export type MakerStatus = 'stamped_confirmed' | 'stamped_stated' | 'stamp_in_photo' | 'attributed' | 'dealer_label' | 'mentioned';
+export type MakerStatus = 'stamped_confirmed' | 'stamped_stated' | 'stamp_in_photo' | 'attributed' | 'dealer_label' | 'doubtful_stamp' | 'mentioned';
 
-export interface MakerMatch { key: string; name: string; search: string; status: MakerStatus; source: 'text' | 'photo' }
+export interface MakerMatch { key: string; name: string; search: string; status: MakerStatus; source: 'text' | 'photo'; jme?: boolean }
 
 /** The first known maker named in the text (null when none). */
 export const findMaker = (text: string): Maker | null => {
-  const t = fold(text);
+  const t = fold(text).trim();
+  // Exact key / display name / search string (comps API often passes the maker alone)
+  for (const m of MAKERS) {
+    const names = [m.key, m.name, m.search, m.name.split('(')[0]].map(s => fold(s).trim()).filter(Boolean);
+    if (names.includes(t)) return m;
+  }
   let best: { m: Maker; at: number } | null = null;
   for (const m of MAKERS) {
     const r = t.match(m.re);
@@ -78,47 +90,89 @@ export const findMaker = (text: string): Maker | null => {
 
 const LABEL_RE = /\b(label|etiquette|ticket|tag|card)\b|dealer\s+(says|said|claims)|selon\s+le\s+(marchand|vendeur)|d'apres\s+le\s+(marchand|vendeur)/;
 const ATTR_RE = /\b(attribu\w*|attr\.|workshop|atelier|entourage|circle\s+of|manner\s+of|dans\s+le\s+gout|in\s+the\s+style|style\s+of|follower|suiveur|probably|probablement|possibly|peut[\s-]etre|modele\s+repertorie)\b/;
+/** Period/style wording that must never be read as a stamp claim on its own. */
+const STYLE_ONLY_RE = /\b(dans\s+le\s+gout|dans\s+le\s+style|in\s+the\s+style|style\s+of|style\s+(louis|empire|regence|restauration|napoleon)|style\s+louis)\b/;
 const STAMP_RE = /\b(estampill\w*|stamped|stamp|stamps|signed|signe|signee|branded|marque\s+au\s+fer|poincon\w*)\b/;
-const CONFIRM_RE = /\b(confirmed|confirme\w*|verified|verifie\w*|checked|i\s+(saw|have\s+seen|checked)|seen\s+(it|the\s+stamp)|visible|lisible|legible|present\s+on\s+(each|every|all)|sur\s+chaque|on\s+each)\b/;
+const CONFIRM_RE = /\b(confirmed|confirme\w*|verified|verifie\w*|i\s+(saw|have\s+seen)|seen\s+(it|the\s+stamp)|visible|lisible|legible|present\s+on\s+(each|every|all)|sur\s+chaque|on\s+each)\b/;
+/** Explicit denial / absence of a stamp — never STAMPED or CONFIRMED. */
+const NO_STAMP_RE = /\b(pas\s+d['']estampill\w*|non\s+estampill\w*|sans\s+estampill\w*|no\s+stamp|without\s+(a\s+)?stamp|unstamped|not\s+yet\s+(checked|confirmed|verified)|not\s+(checked|confirmed|verified)|unchecked|unconfirmed|non\s+confirme\w*|stamp\s+not\s+(yet\s+)?(checked|confirmed|verified))\b/;
+/** Transplanted / fake / suspicious stamp — Doubtful stamp, no maker premium. */
+const DOUBTFUL_RE = /\b(transplant\w*|rapport[eée]e?s?|fausse?\s+estampill|fake\s+stamp|forged|forgery|spurious|regrav[eée]\w*|suspicious|doubtful|through\s+new\s+varnish|replaced\s+rail|machine\s+screws|machine[\s-]cut\s+dovetail|circular[\s-]saw|likely\s+fake|probably\s+fake|fraudulent)\b/;
+const JME_RE = /\b(j\.?\s*m\.?\s*e\.?|jurande|marque\s+de\s+jurande)\b/;
+
+/** True when the text mentions a JME / jurande guild mark (supporting evidence, not a maker). */
+export const hasJmeMention = (text: string): boolean => JME_RE.test(fold(text));
 
 /**
- * How firmly the user's text ties the piece to the maker. "Stamped… stamp confirmed" = stamped_confirmed; a text or
- * catalogue entry saying "estampillé X" = stamped_stated; "attribué à" / "atelier de" = attributed; only a dealer's
- * label or the dealer's word = dealer_label. A stamp claim on a label ("label says … stamped") stays a label.
+ * How firmly the user's text ties the piece to the maker.
+ * - stamped_confirmed: buyer has confirmed a real stamp
+ * - stamped_stated: catalogue / text says estampillé (and does not deny it)
+ * - attributed: attribué à / dans le goût / style — never stamped
+ * - dealer_label: label or dealer's word only
+ * - doubtful_stamp: transplanted / fake / suspicious stamp language — no maker premium
+ * - mentioned: name only
+ * Phrases like "not yet checked", "pas d'estampille", "attribué à", "dans le goût de", "style" never yield STAMPED/CONFIRMED.
  */
 export const makerStatusFromText = (text: string): MakerStatus => {
   const t = fold(text);
-  const stamp = STAMP_RE.test(t), label = LABEL_RE.test(t), attr = ATTR_RE.test(t), confirm = CONFIRM_RE.test(t);
-  if (stamp && confirm && !/\b(not|no|pas|non|unconfirmed|non\s+confirme)\b[^.]{0,20}\b(confirm|verifi|stamp|estampill)/.test(t)) return 'stamped_confirmed';
+  const stamp = STAMP_RE.test(t);
+  const label = LABEL_RE.test(t);
+  const attr = ATTR_RE.test(t) || STYLE_ONLY_RE.test(t);
+  const confirm = CONFIRM_RE.test(t);
+  const noStamp = NO_STAMP_RE.test(t);
+  const doubtful = DOUBTFUL_RE.test(t);
+
+  if (doubtful && (stamp || /\b(bellange|riesener|boudin|jacob|oeben|hache)\b/.test(t) || stamp)) return 'doubtful_stamp';
+  if (doubtful && stamp) return 'doubtful_stamp';
+
+  // Explicit absence / not checked: never stamped or confirmed
+  if (noStamp) {
+    if (label) return 'dealer_label';
+    if (attr) return 'attributed';
+    return 'mentioned';
+  }
+
+  // Attribution / style wording without a positive stamp claim
+  if (attr && !stamp) return 'attributed';
+  if (attr && stamp && (STYLE_ONLY_RE.test(t) || /\battribu\w*/.test(t)) && !confirm) {
+    // "attribué… estampille" traces, or style piece "carrying a stamp" handled above as doubtful when fake words present
+    if (/\b(trace|traces|partial|illegible|illisible|effac)\w*/.test(t)) return 'attributed';
+    // "attribuée à X (pas d'estampille)" already caught by noStamp; plain attribuée stays attributed
+    if (/\battribu\w*/.test(t)) return 'attributed';
+  }
+
+  if (stamp && confirm) return 'stamped_confirmed';
   if (label && attr && !stamp) return 'attributed';
   if (label && !(stamp && /\b(and|et)\b[^.]{0,30}\b(stamp|estampill)/.test(t) && !/label\s+says|etiquette\s+(dit|indique)/.test(t))) return 'dealer_label';
-  if (attr && !stamp) return 'attributed';
   if (attr && stamp && /\b(trace|traces|partial|illegible|illisible|effac)\w*/.test(t)) return 'attributed';
   if (stamp) return 'stamped_stated';
   if (attr) return 'attributed';
   return 'mentioned';
 };
 
-/** Maker + status from the user's text (null when no known maker is named). */
 export const detectMaker = (text: string): MakerMatch | null => {
   const m = findMaker(text);
   if (!m) return null;
-  return { key: m.key, name: m.name, search: m.search, status: makerStatusFromText(text), source: 'text' };
+  return { key: m.key, name: m.name, search: m.search, status: makerStatusFromText(text), source: 'text', jme: hasJmeMention(text) };
 };
 
 /** A stamp (stated, confirmed or seen) anchors on stamped comparables; an attribution on attributed ones; a label on none. */
 export const anchorGroupFor = (s: MakerStatus): 'stamped' | 'attributed' | null =>
   s === 'stamped_confirmed' || s === 'stamped_stated' || s === 'stamp_in_photo' ? 'stamped' : s === 'attributed' ? 'attributed' : null;
+// doubtful_stamp / dealer_label / mentioned → no comps anchor
 
-const STATUS_RANK: Record<MakerStatus, number> = { stamped_confirmed: 6, stamped_stated: 5, stamp_in_photo: 4, attributed: 3, dealer_label: 2, mentioned: 1 };
+const STATUS_RANK: Record<MakerStatus, number> = { stamped_confirmed: 6, stamped_stated: 5, stamp_in_photo: 4, attributed: 3, dealer_label: 2, doubtful_stamp: 2, mentioned: 1 };
 
 /** The user's own words win; the model adds a stamp it read in a photo, or a maker the text did not name. */
 export const combineMakerStatus = (fromText: MakerMatch | null, model: { name?: string; status?: string } | null | undefined): MakerMatch | null => {
   const modelMaker = model?.name ? findMaker(model.name) : null;
   const ms = String(model?.status || '');
-  const modelStatus: MakerStatus | null = ms === 'stamp_visible_in_photo' ? 'stamp_in_photo' : ms === 'attributed' ? 'attributed' : ms === 'dealer_label' ? 'dealer_label' : ms === 'stamped_stated' ? 'stamped_stated' : null;
+  const modelStatus: MakerStatus | null = ms === 'stamp_visible_in_photo' ? 'stamp_in_photo' : ms === 'attributed' ? 'attributed' : ms === 'dealer_label' ? 'dealer_label' : ms === 'stamped_stated' ? 'stamped_stated' : ms === 'doubtful_stamp' ? 'doubtful_stamp' : null;
   if (fromText) {
-    if (modelStatus === 'stamp_in_photo' && (!modelMaker || modelMaker.key === fromText.key) && STATUS_RANK.stamp_in_photo > STATUS_RANK[fromText.status] && fromText.status !== 'dealer_label')
+    // Text wins on doubtful / no-stamp / label — never let a photo upgrade those to stamped
+    if (fromText.status === 'doubtful_stamp' || fromText.status === 'dealer_label' || fromText.status === 'mentioned')
+      return fromText;
+    if (modelStatus === 'stamp_in_photo' && (!modelMaker || modelMaker.key === fromText.key) && STATUS_RANK.stamp_in_photo > STATUS_RANK[fromText.status])
       return { ...fromText, status: 'stamp_in_photo', source: 'photo' };
     return fromText;
   }

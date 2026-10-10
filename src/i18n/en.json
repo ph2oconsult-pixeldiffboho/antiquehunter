@@ -74,8 +74,8 @@
     "market_cold": "Cold",
     "confidence_high_desc": "Strong match across form, materials, and market behaviour.",
     "confidence_medium_desc": "Good match — key details missing",
-    "confidence_low_desc": "Based on visible features only. Inspect carefully before buying.",
-    "confidence_very_low_desc": "Based on visible features only. Inspect carefully before buying.",
+    "confidence_low_desc": "Based on your description only. Photos of construction, condition and any stamps would change this estimate.",
+    "confidence_very_low_desc": "Based on your description only. Photos of construction, condition and any stamps would change this estimate.",
     "data_quality_assessment": "How confident this is",
     "how_to_improve_accuracy": "To tighten this assessment:",
     "provide_more_details": "Improve Accuracy",
@@ -189,7 +189,11 @@
     "reason_dealer_good_buy": "{{price}} is at or below {{goodTop}} (the lower of the auction high and the dealer low) – a good shop price.",
     "reason_dealer_fair": "{{price}} is within the dealer range ({{dealerLow}}–{{dealerHigh}}) – a fair shop price.",
     "reason_dealer_overpriced": "{{price}} is above the dealer high ({{dealerHigh}}) – overpriced, even for a shop. Don't go above {{dealerHigh}}.",
-    "reason_dealer_walk_away": "{{price}} is well above the dealer range (over {{overTop}}) – walk away."
+    "reason_dealer_walk_away": "{{price}} is well above the dealer range (over {{overTop}}) – walk away.",
+    "no_dealer_evidence": "No dealer-retail evidence — shown range is the auction/market band, not an invented shop margin.",
+    "dealer_assumption": "Dealer range is a labelled assumption from the appraiser (not comps).",
+    "buyer_cost_label": "Buyer cost (all-in)",
+    "max_bid_label": "Max bid (hammer)"
   },
   "results": {
     "title": "Dealer's Findings",
@@ -432,14 +436,19 @@
     "found_direct_desc": "Read directly from the auction site's own search page: estimate, sale date and fees are the auction house's.",
     "all_in": "All-in ≈ {{range}}",
     "fees_assumed": "(~{{pct}}% fees assumed)",
-    "lot_number": "Lot {{num}}"
+    "lot_number": "Lot {{num}}",
+    "approximate": "Approximate",
+    "approx_near_budget": "Slightly above your budget (all-in).",
+    "approx_material_unconfirmed": "Requested material not confirmed in the catalogue.",
+    "approx_generic": "Close alternative — check period, material and budget."
   },
   "toast": {
     "saved": "Saved to your log.",
     "saved_local": "Saved on this device – sign in to sync.",
     "save_failed": "Could not save: {{reason}}",
     "signin_needed": "Sign in with Google to save to your account…",
-    "save_failed_local": "Couldn't save to your account ({{reason}}). Saved on this device instead."
+    "save_failed_local": "Couldn't save to your account ({{reason}}). Saved on this device instead.",
+    "demo_unlock": "Demo unlock — no payment was taken. Production requires a completed purchase."
   },
   "evidence": {
     "title": "Need more evidence",
@@ -514,6 +523,7 @@
       "stamp_in_photo": "Stamp seen in photo",
       "attributed": "Attributed",
       "dealer_label": "Dealer's label only",
+      "doubtful_stamp": "Doubtful stamp",
       "mentioned": "Maker named, no stamp"
     },
     "status_note": {
@@ -522,8 +532,10 @@
       "stamp_in_photo": "A stamp is visible in your photos — confirm it is legible on every piece.",
       "attributed": "An attribution, not a stamp: valued between an unattributed piece and a stamped one.",
       "dealer_label": "A dealer's label is not a stamp: valued as an unattributed piece of the period.",
+      "doubtful_stamp": "Stamp looks transplanted, fake or inconsistent with the construction: no maker premium.",
       "mentioned": "No stamp confirmed: valued as an unattributed piece of the period."
     },
+    "jme_note": "JME / jurande mark mentioned — supporting guild evidence when genuine, never a maker by itself.",
     "stamp_warning": "Check the {{maker}} stamp on EVERY piece yourself, and have it written on the invoice (« estampillé {{maker}} »). Without it, the maker premium does not apply.",
     "anchored_all_in": "Range anchored on {{n}} verified auction results: median {{median}} per piece incl. fees, × {{pieces}}.",
     "anchored_hammer": "Range anchored on {{n}} verified auction results: median {{median}} per piece (hammer), × {{pieces}}.",
@@ -555,7 +567,10 @@
     "per_piece_all_in": "per piece incl. fees",
     "not_used": "not used (other kind)",
     "unreachable": "Not searchable: {{list}}.",
-    "verified_note": "Each result was opened and checked on the auction house's own page (maker, piece and sold price). Nothing unverified is shown."
+    "verified_note": "Each result was opened and checked on the auction house's own page (maker, piece and sold price). Nothing unverified is shown.",
+    "nearest_title": "Nearest lots — why kept or dropped",
+    "kept": "Kept",
+    "dropped": "Dropped"
   },
   "negotiate": {
     "title": "Negotiate",
@@ -626,5 +641,22 @@
     "for_piece_title": "Field notes for this piece",
     "for_piece_intro": "Checks matched to the type, period and maker claim on this appraisal. Tendencies, not absolute rules.",
     "conservative_note": "These are dealer tendencies, not absolute rules. Confirm on the piece in front of you."
+  },
+  "ledger": {
+    "title": "Evidence ledger",
+    "facts": "Facts",
+    "claims": "Catalogue / dealer claims",
+    "photo_features": "Photo-supported features",
+    "hypotheses": "Hypotheses",
+    "unknowns": "Unknowns",
+    "defects": "Defects (graded)",
+    "style_note": "Style (design description)",
+    "style_not_period": "Style describes the design language — it is not a period claim.",
+    "severity": {
+      "minor": "Minor",
+      "moderate": "Moderate",
+      "major": "Major",
+      "structural": "Structural"
+    }
   }
 }

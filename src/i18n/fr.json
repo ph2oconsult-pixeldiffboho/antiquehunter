@@ -81,8 +81,8 @@
     "market_insight_desc": "Demande et facteurs de valeur",
     "confidence_high_desc": "Forte correspondance entre la forme, le matériau et le marché",
     "confidence_medium_desc": "Bonne correspondance — détails clés manquants",
-    "confidence_low_desc": "Basé uniquement sur les caractéristiques visibles. Inspectez soigneusement avant d'acheter.",
-    "confidence_very_low_desc": "Basé uniquement sur les caractéristiques visibles. Inspectez soigneusement avant d'acheter.",
+    "confidence_low_desc": "D'après votre description uniquement. Des photos de la construction, de l'état et des estampilles modifieraient cette estimation.",
+    "confidence_very_low_desc": "D'après votre description uniquement. Des photos de la construction, de l'état et des estampilles modifieraient cette estimation.",
     "data_quality_assessment": "Niveau de confiance",
     "how_to_improve_accuracy": "Pour affiner cette évaluation :",
     "provide_more_details": "Améliorer la précision",
@@ -189,7 +189,11 @@
     "reason_dealer_good_buy": "{{price}} est au niveau ou en dessous de {{goodTop}} (le plus bas entre le haut de la fourchette aux enchères et le bas de la fourchette marchand) – un bon prix en boutique.",
     "reason_dealer_fair": "{{price}} est dans la fourchette marchand ({{dealerLow}}–{{dealerHigh}}) – un prix correct en boutique.",
     "reason_dealer_overpriced": "{{price}} dépasse le haut de la fourchette marchand ({{dealerHigh}}) – trop cher, même en boutique. Ne dépassez pas {{dealerHigh}}.",
-    "reason_dealer_walk_away": "{{price}} est bien au-dessus de la fourchette marchand (plus de {{overTop}}) – passez votre chemin."
+    "reason_dealer_walk_away": "{{price}} est bien au-dessus de la fourchette marchand (plus de {{overTop}}) – passez votre chemin.",
+    "no_dealer_evidence": "Pas de preuves de prix marchand — la fourchette affichée est celle du marché/enchères, pas une marge inventée.",
+    "dealer_assumption": "Fourchette marchand : hypothèse de l’estimateur (pas de comparables).",
+    "buyer_cost_label": "Coût acheteur (frais inclus)",
+    "max_bid_label": "Enchère max (marteau)"
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",
@@ -432,14 +436,19 @@
     "found_direct_desc": "Lu directement sur la page de recherche du site d'enchères : estimation, date et frais sont ceux de la maison de ventes.",
     "all_in": "Frais compris ≈ {{range}}",
     "fees_assumed": "(~{{pct}} % de frais supposés)",
-    "lot_number": "Lot {{num}}"
+    "lot_number": "Lot {{num}}",
+    "approximate": "Approximatif",
+    "approx_near_budget": "Légèrement au-dessus de votre budget (frais inclus).",
+    "approx_material_unconfirmed": "Le matériau demandé n’est pas confirmé dans le catalogue.",
+    "approx_generic": "Alternative proche — vérifiez période, matériau et budget."
   },
   "toast": {
     "saved": "Enregistré dans votre journal.",
     "saved_local": "Enregistré sur cet appareil – connectez-vous pour synchroniser.",
     "save_failed": "Échec de l'enregistrement : {{reason}}",
     "signin_needed": "Connectez-vous avec Google pour enregistrer dans votre compte…",
-    "save_failed_local": "Impossible d'enregistrer dans votre compte ({{reason}}). Enregistré sur cet appareil à la place."
+    "save_failed_local": "Impossible d'enregistrer dans votre compte ({{reason}}). Enregistré sur cet appareil à la place.",
+    "demo_unlock": "Déblocage démo — aucun paiement n'a été pris. La production exige un achat abouti."
   },
   "evidence": {
     "title": "Il faut plus d'éléments",
@@ -514,6 +523,7 @@
       "stamp_in_photo": "Estampille visible sur photo",
       "attributed": "Attribué",
       "dealer_label": "Étiquette du marchand seulement",
+      "doubtful_stamp": "Estampille douteuse",
       "mentioned": "Nom cité, sans estampille"
     },
     "status_note": {
@@ -522,8 +532,10 @@
       "stamp_in_photo": "Une estampille est visible sur vos photos — vérifiez qu'elle est lisible sur chaque pièce.",
       "attributed": "Une attribution, pas une estampille : estimé entre une pièce anonyme et une pièce estampillée.",
       "dealer_label": "Une étiquette de marchand n'est pas une estampille : estimé comme une pièce d'époque anonyme.",
+      "doubtful_stamp": "Estampille probablement rapportée, fausse ou incohérente avec la construction : pas de prime de maker.",
       "mentioned": "Aucune estampille confirmée : estimé comme une pièce d'époque anonyme."
     },
+    "jme_note": "Marque JME / jurande mentionnée — indice de jurande s'il est authentique, jamais un maker à elle seule.",
     "stamp_warning": "Vérifiez vous-même l'estampille {{maker}} sur CHAQUE pièce, et faites-la écrire sur la facture (« estampillé {{maker}} »). Sans elle, la plus-value de l'ébéniste ne s'applique pas.",
     "anchored_all_in": "Fourchette fondée sur {{n}} résultats de ventes vérifiés : médiane {{median}} par pièce frais compris, × {{pieces}}.",
     "anchored_hammer": "Fourchette fondée sur {{n}} résultats de ventes vérifiés : médiane {{median}} par pièce (marteau), × {{pieces}}.",
@@ -555,7 +567,10 @@
     "per_piece_all_in": "par pièce frais compris",
     "not_used": "non retenu (autre type)",
     "unreachable": "Non consultable : {{list}}.",
-    "verified_note": "Chaque résultat a été ouvert et vérifié sur la page de la maison de ventes (ébéniste, pièce, prix d'adjudication). Rien de non vérifié n'est affiché."
+    "verified_note": "Chaque résultat a été ouvert et vérifié sur la page de la maison de ventes (ébéniste, pièce, prix d'adjudication). Rien de non vérifié n'est affiché.",
+    "nearest_title": "Lots proches — pourquoi retenus ou écartés",
+    "kept": "Retenu",
+    "dropped": "Écarté"
   },
   "negotiate": {
     "title": "Négocier",
@@ -626,5 +641,22 @@
     "for_piece_title": "Notes pour cette pièce",
     "for_piece_intro": "Contrôles adaptés au type, à l’époque et à la mention de maker de cette évaluation. Des tendances, pas des règles absolues.",
     "conservative_note": "Ce sont des tendances de marchand, pas des règles absolues. Confirmez sur la pièce devant vous."
+  },
+  "ledger": {
+    "title": "Registre des preuves",
+    "facts": "Faits",
+    "claims": "Mentions catalogue / marchand",
+    "photo_features": "Éléments visibles sur photo",
+    "hypotheses": "Hypothèses",
+    "unknowns": "Inconnues",
+    "defects": "Défauts (classés)",
+    "style_note": "Style (description du décor)",
+    "style_not_period": "Le style décrit le langage formel — ce n'est pas une affirmation d'époque.",
+    "severity": {
+      "minor": "Mineur",
+      "moderate": "Modéré",
+      "major": "Majeur",
+      "structural": "Structurel"
+    }
   }
 }

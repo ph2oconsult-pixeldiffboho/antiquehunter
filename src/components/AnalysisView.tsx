@@ -8,6 +8,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis } from '../services/appraisalMath';
 import { EvidenceStep } from './EvidenceStep';
+import { EvidenceLedgerPanel } from './EvidenceLedgerPanel';
 import { BeforeYouBuy } from './BeforeYouBuy';
 import { Negotiate } from './Negotiate';
 import { FieldNotesForPiece } from './fieldNotes/FieldNotesForPiece';
@@ -311,20 +312,25 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     label = t(`analysis.verdict_${basis}`);
 
     const pg = rawItem.price_guidance || {};
-    const isAuction = !!rawItem.seller_context?.isAuction;
-    const pct = Number(rawItem.seller_context?.buyerPremiumRate) || 0;
+    const val = rawItem.valuation || null;
+    const isAuction = !!(val?.isAuction ?? rawItem.seller_context?.isAuction);
+    const pct = Number(val?.premiumPct ?? rawItem.seller_context?.buyerPremiumRate) || 0;
     const effective = Number(originalDecision.effective_price || rawItem.seller_context?.allInPrice) || 0;
     // Like with like (fix 3): the hammer / asking price is compared with the market range; all-in shown alongside.
     // Older saved appraisals have no compare_price: they keep the all-in wording.
     const compare = Number(originalDecision.compare_price) || 0;
     const hammerMode = isAuction && compare > 0;
-    const low = Number(pg.estimated_market_range_low) || 0;
-    const high = Number(pg.estimated_market_range_high) || 0;
+    const low = Number(val?.expectedHammer?.low ?? pg.estimated_market_range_low) || 0;
+    const high = Number(val?.expectedHammer?.high ?? pg.estimated_market_range_high) || 0;
     const ns = rawItem.negotiation_strategy || {};
-    const smartAllIn = Number(originalDecision.smart_buy_all_in) || allInCost(Number(pg.good_buy_below) || 0, pct, isAuction);
-    const walkAllIn = Number(originalDecision.walk_away_all_in) || allInCost(Number(ns.walk_away_price) || 0, pct, isAuction);
-    const smartHammer = Number(pg.good_buy_below) || 0;
-    const walkHammer = Number(ns.walk_away_price) || Number(pg.overpaying_above) || 0;
+    const smartAllIn = Number(originalDecision.smart_buy_all_in) || (val?.buyerCost && val.suggestedAcquisition != null
+      ? Math.round(val.suggestedAcquisition * (isAuction ? (1 + pct / 100) : 1))
+      : allInCost(Number(pg.good_buy_below) || 0, pct, isAuction));
+    const walkAllIn = Number(originalDecision.walk_away_all_in) || (val?.isAuction
+      ? (val.maxBidAllIn ?? allInCost(Number(val.walkAway) || 0, pct, true))
+      : (val?.walkAway ?? allInCost(Number(ns.walk_away_price) || 0, pct, isAuction)));
+    const smartHammer = Number(val?.suggestedAcquisition ?? pg.good_buy_below) || 0;
+    const walkHammer = Number(val?.walkAway ?? ns.walk_away_price ?? pg.overpaying_above) || 0;
     // Dealer / shop / private: the price was judged against the dealer range (gemini.ts); its own reason texts
     const db = originalDecision.price_scale === 'dealer' ? originalDecision.dealer_bands : null;
     const dealerReason = db && effective > 0 && ['strong_buy', 'good_buy', 'fair', 'overpriced', 'walk_away'].includes(basis);
@@ -512,16 +518,21 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     ? t(`categories.${categoryKey}`)
     : rawCategory.charAt(0).toLocaleUpperCase(i18n.language) + rawCategory.slice(1);
 
-  // Buyer's premium figures: computed once and reused everywhere so totals always match
-  const isAuctionItem = !!(currentItem.seller_context?.isAuction || currentItem.seller_context?.sellerType?.toLowerCase().includes('auction'));
-  const dealerScale = currentItem.buy_decision?.price_scale === 'dealer';
-  const premiumPct = Number(currentItem.seller_context?.buyerPremiumRate) > 0 ? Number(currentItem.seller_context.buyerPremiumRate) : 25;
-  const marketLow = Math.round(Number(currentItem.price_guidance?.estimated_market_range_low) || 0);
-  const marketHigh = Math.round(Number(currentItem.price_guidance?.estimated_market_range_high) || 0);
-  const walkAway = Math.round(Number(currentItem.negotiation_strategy?.walk_away_price) || 0);
-  const allInLow = allInCost(marketLow, premiumPct, true);
-  const allInHigh = allInCost(marketHigh, premiumPct, true);
-  const walkAwayAllIn = allInCost(walkAway, premiumPct, true);
+  // Prefer the single valuation object when present so every panel agrees.
+  const val = currentItem.valuation || null;
+  const isAuctionItem = !!(val?.isAuction ?? (currentItem.seller_context?.isAuction || currentItem.seller_context?.sellerType?.toLowerCase().includes('auction')));
+  const dealerEvidence = val?.dealerEvidence || currentItem.buy_decision?.dealer_evidence || 'none';
+  const dealerScale = currentItem.buy_decision?.price_scale === 'dealer' && dealerEvidence !== 'none';
+  const premiumPct = Number(val?.premiumPct ?? currentItem.seller_context?.buyerPremiumRate) > 0
+    ? Number(val?.premiumPct ?? currentItem.seller_context.buyerPremiumRate) : 25;
+  const marketLow = Math.round(Number(val?.expectedHammer?.low ?? currentItem.price_guidance?.estimated_market_range_low) || 0);
+  const marketHigh = Math.round(Number(val?.expectedHammer?.high ?? currentItem.price_guidance?.estimated_market_range_high) || 0);
+  const walkAway = Math.round(Number(val?.walkAway ?? currentItem.negotiation_strategy?.walk_away_price) || 0);
+  const allInLow = Math.round(Number(val?.buyerCost?.low) || allInCost(marketLow, premiumPct, true));
+  const allInHigh = Math.round(Number(val?.buyerCost?.high) || allInCost(marketHigh, premiumPct, true));
+  const walkAwayAllIn = Math.round(Number(val?.isAuction ? (val?.maxBidAllIn ?? allInCost(walkAway, premiumPct, true)) : walkAway) || allInCost(walkAway, premiumPct, true));
+  const smartBuy = Math.round(Number(val?.suggestedAcquisition ?? currentItem.price_guidance?.good_buy_below) || 0);
+  const maxBidHammer = val?.maxBidHammer != null ? Math.round(Number(val.maxBidHammer)) : null;
 
   const getContextualPaywallMessage = () => {
     const category = currentItem.item_summary?.category?.toLowerCase() || '';
@@ -907,6 +918,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 3b. Need more evidence (period not established): shown on every plan, before any verdict */}
       {currentItem.evidence_check?.required && (
+        <EvidenceLedgerPanel ledger={currentItem.evidence_ledger} />
         <EvidenceStep check={currentItem.evidence_check} constructionSeen={currentItem.item_summary?.construction_evidence} onAddEvidence={onAddEvidence || onAddMoreDetails}>
           {currentItem.checklist?.items?.length > 0 && (
             <BeforeYouBuy embedded items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />
@@ -1031,7 +1043,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 {currentItem.price_guidance.provisional ? t('evidence.provisional_range') : dealerScale ? t('analysis.auction_range') : t('analysis.value_insight', 'Market Range')}
               </p>
               <p className="text-xl font-medium text-ink" data-testid="range-auction">
-                {formatPrice(currentItem.price_guidance.estimated_market_range_low)} - {formatPrice(currentItem.price_guidance.estimated_market_range_high)}
+                {formatPrice(marketLow)} - {formatPrice(marketHigh)}
               </p>
               {currentItem.price_guidance.provisional && (
                 <p className="text-[10px] text-amber-700 italic">{t('evidence.provisional_note')}</p>
@@ -1040,19 +1052,26 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-decision-green/70">{t('analysis.smart_buy', 'Smart Buy')}</p>
               <p className="text-xl font-medium text-decision-green">
-                {formatPrice(currentItem.price_guidance.good_buy_below)}
+                {formatPrice(smartBuy || currentItem.price_guidance.good_buy_below)}
               </p>
               {isAuctionItem && (
                 <p className="text-[9px] text-decision-green/70 italic">
-                  {t('analysis.smart_buy_hammer', { allIn: formatPrice(allInCost(currentItem.price_guidance.good_buy_below, premiumPct, true)) })}
+                  {t('analysis.smart_buy_hammer', { allIn: formatPrice(val?.isAuction && val?.maxBidAllIn != null ? Math.round((smartBuy || 0) * (1 + premiumPct / 100)) : allInCost(smartBuy || currentItem.price_guidance.good_buy_below, premiumPct, true)) })}
                 </p>
               )}
             </div>
             <div className="space-y-1">
               <p className={`text-[9px] uppercase tracking-widest font-bold ${dealerScale ? 'text-ink' : 'text-muted'}`}>{dealerScale ? t('analysis.dealer_range') : t('analysis.retail_range', 'Retail Range')}</p>
-              <p className={dealerScale ? 'text-xl font-medium text-ink' : 'text-lg font-medium text-muted'} data-testid="range-dealer">
-                {formatPrice(currentItem.price_guidance.fair_price_low)} - {formatPrice(currentItem.price_guidance.fair_price_high)}
-              </p>
+              {dealerEvidence === 'none' && !isAuctionItem ? (
+                <p className="text-sm font-medium text-amber-800" data-testid="range-dealer-none">{t('analysis.no_dealer_evidence')}</p>
+              ) : (
+                <p className={dealerScale ? 'text-xl font-medium text-ink' : 'text-lg font-medium text-muted'} data-testid="range-dealer">
+                  {formatPrice(val?.dealerRetail?.low ?? currentItem.price_guidance.fair_price_low)} - {formatPrice(val?.dealerRetail?.high ?? currentItem.price_guidance.fair_price_high)}
+                </p>
+              )}
+              {dealerEvidence === 'assumption' && (
+                <p className="text-[10px] text-amber-700 italic" data-testid="dealer-assumption">{t('analysis.dealer_assumption')}</p>
+              )}
             </div>
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">{t('analysis.overpaying', 'Overpaying')}</p>
@@ -1535,7 +1554,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 onClick={async () => {
                   if (saveState === 'saving') return;
                   setSaveState('saving');
-                  try { await onSave('watching'); } finally { setSaveState('idle'); }
+                  // Hard ceiling: even if onSave never settles (auth popup / offline), release the button.
+                  const ceiling = new Promise<void>(r => setTimeout(r, 25_000));
+                  try { await Promise.race([Promise.resolve(onSave('watching')).then(() => undefined), ceiling]); }
+                  finally { setSaveState('idle'); }
                 }}
                 disabled={saveState === 'saving'}
                 className="flex-1 py-3 px-4 bg-ink text-paper rounded-2xl font-semibold text-xs hover:opacity-90 transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-ink/20 disabled:opacity-60"

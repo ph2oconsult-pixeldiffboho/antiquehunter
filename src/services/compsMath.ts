@@ -12,6 +12,8 @@ export interface Comparable {
   house: string;
   date?: string;            // YYYY-MM-DD (or YYYY)
   title: string;
+  /** Short lot description / catalogue text used for quality matching (optional). */
+  snippet?: string;
   pieces: number;
   stamp: CompStamp;
   material?: string;
@@ -23,6 +25,8 @@ export interface Comparable {
   perPieceAllInEur: number;
   perPieceHammerEur: number;
   verifiedBy: 'christies_lot_data' | 'bonhams_page' | 'price_on_page';
+  /** Why this lot was kept or dropped when anchoring (set by matchAndAnchor). */
+  matchNote?: string;
 }
 
 export interface CompsResponse {
@@ -205,7 +209,9 @@ export const verifyComparable = (
   if (date && !html.includes(date.slice(0, 4)) && verifiedBy === 'price_on_page') return { comp: undefined, reason: 'date_not_on_page' };
   return {
     comp: {
-      url, house: house || claim?.house || '', date, title: parsed.title.slice(0, 200), pieces,
+      url, house: house || claim?.house || '', date, title: parsed.title.slice(0, 200),
+      snippet: (parsed.description || lotText).slice(0, 800),
+      pieces,
       stamp: classifyStamp(lotText.slice(0, 1500)), material: materialOf(lotText.slice(0, 1500)),
       price: parsed.price, currency, feesIncluded: fees, allInEur, hammerEur,
       perPieceAllInEur: Math.round(allInEur / pieces), perPieceHammerEur: Math.round(hammerEur / pieces), verifiedBy,
@@ -217,16 +223,27 @@ export const verifyComparable = (
 // Anchoring the range on the comparables
 // ---------------------------------------------------------------------------
 
+export interface CompMatchNote {
+  url: string;
+  title: string;
+  kept: boolean;
+  reason: string;
+  perPieceEur: number;
+}
+
 export interface CompsAnchor {
   applied: boolean;
-  reason: 'anchored' | 'too_few' | 'not_stamped' | 'none';
+  reason: 'anchored' | 'blended' | 'too_few' | 'not_stamped' | 'none';
   group: 'stamped' | 'attributed' | null;
   used: Comparable[];
+  nearest: CompMatchNote[];
   perPieceMedianEur: number;
   pieces: number;
   low: number;   // in the target currency, for `pieces` pieces (hammer at auction, all-in elsewhere)
   high: number;
   basis: 'hammer' | 'all_in';
+  blended: boolean;
+  capped: boolean;
 }
 
 const quantile = (xs: number[], q: number): number => {
@@ -236,33 +253,159 @@ const quantile = (xs: number[], q: number): number => {
   return s[lo] + (s[hi] - s[lo]) * (pos - lo);
 };
 
+/** Museum / trophy wording — drop when the user's piece doesn't share those features. */
+export const TROPHY_RE = /\b(exceptionnell\w*|royal(e)?\s+provenanc|provenanc\w*\s+royal|provenanc\w*\s+collection|from\s+the\s+collection|collection\s+of\s+[a-z]|grand\s+salon|chateau\b|palais\b|important(e)?\s+(commode|bureau|secretaire)|tres\s+importante?|lacquer|laque\s+(de\s+)?chine|vernis\s+martin|porcelain\s+plaque|plaque\s+de\s+sevres|sevres\s+plaque|pietra\s+dura|japanese\s+lacquer)\b/;
+/** Heavy ormolu / rich mounts — trophy for a plain provincial piece. */
+export const HEAVY_ORMOLU_RE = /\b(richly\s+mounted|profusely\s+mounted|bronzes?\s+dores?(\s+cisele\w*)?|ormolu[- ]mounted|montures?\s+en\s+bronze\s+dore)\b/;
+/** Plain / provincial signals on the user's piece. */
+export const PLAIN_PIECE_RE = /\b(plain|provincial|walnut|noyer|bois\s+naturel|region\w*|grenoble|lyon|campagne|rustique|no\s+ormolu|sans\s+bronze|undecorated)\b/;
+
+const lotTextOf = (c: Comparable): string => fold(`${c.title} ${c.snippet || ''}`);
+
+export interface AnchorOptions {
+  status: MakerStatus | null;
+  pieces: number;
+  material?: string;
+  isAuction: boolean;
+  eurTo: (eur: number) => number;
+  /** User + model text for quality matching (plain vs trophy). */
+  pieceText?: string;
+  /** Model's pre-anchor market range (used to blend / cap). */
+  priorLow?: number;
+  priorHigh?: number;
+  /** Text-only appraisals: cap how far comps can lift the range above the prior. */
+  textOnly?: boolean;
+  /** Max multiple of prior high for text-only (default 2.5). */
+  textOnlyCap?: number;
+  /** Outlier threshold vs median (default 3). */
+  outlierFactor?: number;
+}
+
 /**
- * The market range from verified comparables: per-piece prices (hammer when buying at auction, all-in otherwise —
- * like with like), scaled to the number of pieces. A stamp anchors on stamped (or the house's "by") results, an
- * attribution on attributed ones; a dealer's label never anchors. Needs >= 2 matching results; same material
- * preferred when >= 2 share it; results since 2018 preferred when >= 2 exist.
+ * Match verified comps to the piece (stamp status, material, plain vs trophy quality), drop outliers
+ * (>~3× median) and museum features the piece lacks, then anchor on the median of kept lots.
+ * With 2 good matches, blend with the prior model range; with text-only, cap the lift above the prior.
  */
 export const anchorOnComparables = (
-  comps: Comparable[], o: { status: MakerStatus | null; pieces: number; material?: string; isAuction: boolean; eurTo: (eur: number) => number },
+  comps: Comparable[], o: AnchorOptions,
 ): CompsAnchor => {
   const group = o.status === 'stamped_confirmed' || o.status === 'stamped_stated' || o.status === 'stamp_in_photo' ? 'stamped'
     : o.status === 'attributed' ? 'attributed' : null;
-  const empty = (reason: CompsAnchor['reason']): CompsAnchor => ({ applied: false, reason, group, used: [], perPieceMedianEur: 0, pieces: o.pieces, low: 0, high: 0, basis: o.isAuction ? 'hammer' : 'all_in' });
+  const basis: 'hammer' | 'all_in' = o.isAuction ? 'hammer' : 'all_in';
+  const empty = (reason: CompsAnchor['reason']): CompsAnchor => ({
+    applied: false, reason, group, used: [], nearest: [], perPieceMedianEur: 0, pieces: o.pieces, low: 0, high: 0, basis, blended: false, capped: false,
+  });
   if (!comps.length) return empty('none');
   if (!group) return empty('not_stamped');
-  let pool = comps.filter(c => group === 'stamped' ? c.stamp !== 'attributed' : c.stamp === 'attributed');
-  if (pool.length < 2) return empty('too_few');
+
+  const pieceT = fold(o.pieceText || '');
+  const piecePlain = PLAIN_PIECE_RE.test(pieceT);
+  const pieceHasTrophy = TROPHY_RE.test(pieceT) || HEAVY_ORMOLU_RE.test(pieceT);
+  const perOf = (c: Comparable) => o.isAuction ? c.perPieceHammerEur : c.perPieceAllInEur;
+  const notes: CompMatchNote[] = [];
+
+  // 1. Stamp group
+  let pool = comps.filter(c => {
+    const ok = group === 'stamped' ? c.stamp !== 'attributed' : c.stamp === 'attributed';
+    if (!ok) notes.push({ url: c.url, title: c.title, kept: false, reason: 'stamp_status_mismatch', perPieceEur: perOf(c) });
+    return ok;
+  });
+  if (pool.length < 2) {
+    const nearest = [...notes, ...pool.map(c => ({ url: c.url, title: c.title, kept: true, reason: 'kept_stamp_group', perPieceEur: perOf(c) }))].slice(0, 12);
+    return { ...empty('too_few'), nearest };
+  }
+
+  // 2. Drop trophy / heavy-ormolu when the piece looks plain — never fall back to museum lots.
+  if (piecePlain || !pieceHasTrophy) {
+    const kept: Comparable[] = [];
+    for (const c of pool) {
+      const lt = lotTextOf(c);
+      if (TROPHY_RE.test(lt) && !pieceHasTrophy) {
+        notes.push({ url: c.url, title: c.title, kept: false, reason: 'trophy_or_museum_features', perPieceEur: perOf(c) });
+        continue;
+      }
+      if (HEAVY_ORMOLU_RE.test(lt) && !HEAVY_ORMOLU_RE.test(pieceT)) {
+        notes.push({ url: c.url, title: c.title, kept: false, reason: 'heavy_ormolu_vs_plain_piece', perPieceEur: perOf(c) });
+        continue;
+      }
+      kept.push(c);
+    }
+    pool = kept;
+  }
+
+  // 3. Outlier filter vs robust seed median (lower half when skewed)
+  const factor = o.outlierFactor ?? 3;
+  for (let pass = 0; pass < 3; pass++) {
+    if (pool.length < 2) break;
+    const prices = pool.map(perOf).sort((a, b) => a - b);
+    const seed = prices.length >= 3 ? quantile(prices.slice(0, Math.ceil(prices.length / 2)), 0.5) : quantile(prices, 0.5);
+    const next = pool.filter(c => {
+      const pr = perOf(c);
+      if (pr > seed * factor) {
+        notes.push({ url: c.url, title: c.title, kept: false, reason: `outlier_above_${factor}x_median`, perPieceEur: pr });
+        return false;
+      }
+      return true;
+    });
+    if (next.length === pool.length) break;
+    pool = next;
+  }
+
+  // 4. Prefer recent (2018+) when enough remain
   const recent = pool.filter(c => Number(String(c.date || '').slice(0, 4)) >= 2018);
-  if (recent.length >= 2) pool = recent;
-  if (o.material) { const same = pool.filter(c => c.material === o.material); if (same.length >= 2) pool = same; }
-  const per = pool.map(c => o.isAuction ? c.perPieceHammerEur : c.perPieceAllInEur);
+  if (recent.length >= 2) {
+    for (const c of pool) if (!recent.includes(c)) notes.push({ url: c.url, title: c.title, kept: false, reason: 'older_than_2018_prefer_recent', perPieceEur: perOf(c) });
+    pool = recent;
+  }
+
+  // 5. Prefer same material when enough remain
+  if (o.material) {
+    const same = pool.filter(c => c.material === o.material);
+    if (same.length >= 2) {
+      for (const c of pool) if (!same.includes(c)) notes.push({ url: c.url, title: c.title, kept: false, reason: `material_mismatch_${c.material || 'unknown'}`, perPieceEur: perOf(c) });
+      pool = same;
+    }
+  }
+
+  if (pool.length < 2) {
+    const nearest = [...notes, ...comps.slice(0, 6).map(c => ({ url: c.url, title: c.title, kept: false, reason: 'too_few_after_filters', perPieceEur: perOf(c) }))].slice(0, 12);
+    return { ...empty('too_few'), nearest };
+  }
+
+  for (const c of pool) notes.push({ url: c.url, title: c.title, kept: true, reason: 'kept_matched', perPieceEur: perOf(c) });
+
+  const per = pool.map(perOf);
   const med = quantile(per, 0.5);
   const n = Math.max(1, o.pieces);
-  const low = Math.min(quantile(per, 0.25), med * 0.85) * n;
-  const high = Math.max(quantile(per, 0.75), med * 1.15) * n;
+  let low = Math.min(quantile(per, 0.25), med * 0.85) * n;
+  let high = Math.max(quantile(per, 0.75), med * 1.15) * n;
+  let blended = false;
+  let capped = false;
+
+  // 6. Blend with prior when fewer than 3 good matches
+  const priorLo = Number(o.priorLow) || 0;
+  const priorHi = Number(o.priorHigh) || 0;
+  if (pool.length < 3 && priorHi > priorLo && priorLo > 0) {
+    low = 0.5 * low + 0.5 * priorLo;
+    high = 0.5 * high + 0.5 * priorHi;
+    blended = true;
+  }
+
+  // 7. Text-only: cap how far comps can lift above the prior high
+  if (o.textOnly && priorHi > 0) {
+    const cap = (o.textOnlyCap ?? 2.5) * priorHi;
+    if (high > cap) { high = cap; capped = true; }
+    if (low > high) low = high * 0.7;
+  }
+
   const round = (x: number) => x >= 10000 ? Math.round(x / 500) * 500 : x >= 1000 ? Math.round(x / 50) * 50 : Math.round(x / 10) * 10;
+  const nearest = notes.sort((a, b) => Number(b.kept) - Number(a.kept) || a.perPieceEur - b.perPieceEur).slice(0, 12);
   return {
-    applied: true, reason: 'anchored', group, used: pool, perPieceMedianEur: Math.round(med), pieces: n,
-    low: round(o.eurTo(low)), high: round(o.eurTo(high)), basis: o.isAuction ? 'hammer' : 'all_in',
+    applied: true,
+    reason: blended ? 'blended' : 'anchored',
+    group, used: pool, nearest,
+    perPieceMedianEur: Math.round(med), pieces: n,
+    low: round(o.eurTo(low)), high: round(o.eurTo(high)), basis,
+    blended, capped,
   };
 };
