@@ -1593,7 +1593,7 @@ check("field notes: illustration ids are 1:1; images optional and never shared",
   for (const id of ["stamp-jme", "buy-scam-listings"]) {
     assert.ok(!hasIllustration(id), `no inaccurate image for ${id}`);
   }
-  for (const id of ["per-n3", "per-lp", "per-transition", "sec-fall-front", "mirror-joints", "chair-webbing"]) {
+  for (const id of ["per-n3", "per-lp", "per-transition", "sec-fall-front", "mirror-joints", "chair-webbing", "commode-oxidation", "commode-mounts", "commode-married", "cabinet-doors"]) {
     assert.ok(hasIllustration(id), `batch3 note needs image: ${id}`);
   }
 });
