@@ -8,6 +8,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis } from '../services/appraisalMath';
 import { EvidenceStep } from './EvidenceStep';
+import { EvidenceLedgerPanel } from './EvidenceLedgerPanel';
 import { BeforeYouBuy } from './BeforeYouBuy';
 import { Negotiate } from './Negotiate';
 import { FieldNotesForPiece } from './fieldNotes/FieldNotesForPiece';
@@ -917,6 +918,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 3b. Need more evidence (period not established): shown on every plan, before any verdict */}
       {currentItem.evidence_check?.required && (
+        <EvidenceLedgerPanel ledger={currentItem.evidence_ledger} />
         <EvidenceStep check={currentItem.evidence_check} constructionSeen={currentItem.item_summary?.construction_evidence} onAddEvidence={onAddEvidence || onAddMoreDetails}>
           {currentItem.checklist?.items?.length > 0 && (
             <BeforeYouBuy embedded items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />

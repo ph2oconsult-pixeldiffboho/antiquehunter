@@ -13,6 +13,7 @@ import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
 import { buildValuation, validateValuation, assertValuationAgreement, type Valuation } from "./valuation";
+import { normaliseEvidenceLedger, ledgerHasContent, type EvidenceLedger } from "./evidenceLedger";
 
 /** Fixed seed + temperature 0: the same input gives the same appraisal (fix 9). */
 export const APPRAISAL_SEED = 20261009;
@@ -158,6 +159,16 @@ You must speak with the authority of an expert who has seen thousands of pieces.
   "ambiguous" = from the evidence available you cannot tell a period piece from a later style / revival piece (for example Empire vs Restauration vs a late 19th-century revival) and the value would differ materially;
   "later_style_or_revival" = clear evidence the piece is later (catalogue says "style", later construction, modern materials).
 - item_summary.reproduction_risk = true only when something specific suggests a later copy that could be passed off as period.
+
+### EVIDENCE LEDGER (CRITICAL — fill evidence_ledger)
+Split every observation into exactly one bucket. Do not mix.
+- facts: buyer-stated facts you treat as given ("stamp confirmed", "I measured 1.72 m", dimensions the buyer typed), or catalogue facts when the lot page was read successfully.
+- claims: catalogue or dealer claims not independently verified ("estampillé X" on a label with no stamp photo; "époque Louis XV" without construction proof).
+- photo_features: features you can actually see in the submitted photos (joinery, oxidation, stamp in photo 2, crack on the left rail). Empty array when there are no photos.
+- hypotheses: your inferences ("probably provincial walnut", "likely 19th-c revival"). Never present these as facts.
+- unknowns: anything you are not sure about. "Not sure", "cannot tell", "needs underside photo" belong here — never promote them to facts or hypotheses.
+- defects: grade each by severity (minor | moderate | major | structural) and location (e.g. "marble top, front-left corner", "seat rail underside"). Missing location → "unspecified".
+- style_note: when the piece is described as "style X" / "de style X" without époque/period, put the design description here. Style is NOT a period claim.
 
 ### LOT LINK (CRITICAL)
 ${lotFacts ? lotFactsPrompt(lotFacts, fmtCur) : '- No lot link was given.'}
@@ -324,6 +335,32 @@ ${getGlossaryPrompt(language)}`;
                   },
                   required: ["title", "category", "likely_origin", "likely_style", "likely_period", "value_tier", "snap_judgement", "confidence", "confidence_score", "confidence_breakdown", "confidence_reason", "confidence_improvement_suggestions", "evidence_gaps", "period_certainty", "reproduction_risk", "construction_evidence", "maker"]
                 },
+
+                evidence_ledger: {
+                  type: Type.OBJECT,
+                  description: "Split evidence: facts, claims, photo features, hypotheses, unknowns, graded defects.",
+                  properties: {
+                    facts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Buyer-stated or catalogue-confirmed facts." },
+                    claims: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Catalogue/dealer claims not yet verified." },
+                    photo_features: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Features supported by submitted photos; empty if no photos." },
+                    hypotheses: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Model inferences — not facts." },
+                    unknowns: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Explicit unknowns / not sure." },
+                    defects: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          text: { type: Type.STRING },
+                          severity: { type: Type.STRING, enum: ["minor", "moderate", "major", "structural"] },
+                          location: { type: Type.STRING }
+                        },
+                        required: ["text", "severity", "location"]
+                      }
+                    },
+                    style_note: { type: Type.STRING, description: "Design description when 'style X' without period claim; empty string if none." }
+                  },
+                  required: ["facts", "claims", "photo_features", "hypotheses", "unknowns", "defects", "style_note"]
+                },
                 buy_decision: {
                   type: Type.OBJECT,
                   properties: {
@@ -412,7 +449,7 @@ ${getGlossaryPrompt(language)}`;
                 teaser_insight: { type: Type.STRING, description: "A short, commercially sharp dealer warning or hint at risk/value impact for free users. e.g. 'There are signs this may not be a fully original set.'" }
               },
               required: [
-                "item_summary", "buy_decision", "price_guidance", "dealer_take",
+                "item_summary", "evidence_ledger", "buy_decision", "price_guidance", "dealer_take",
                 "negotiation_strategy", "walk_away_if", "top_checks", "red_flags",
                 "market_insight", "scoring_inputs", "disclaimer", "teaser_insight"
               ]
@@ -751,6 +788,11 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       basis, text: query, category,
     });
 
+
+    const evidenceLedger: EvidenceLedger = normaliseEvidenceLedger(item.evidence_ledger, {
+      hasPhotos,
+      styleText: `${item.item_summary.likely_style || ''} ${item.item_summary.likely_period || ''} ${query || ''}`,
+    });
     // Negotiate / bidding tips: only figures from the valuation object (no duplicate maths).
     const negotiationPlan = buildNegotiationPlan({
       sellerType, isAuction, askingPrice: valuation.askingPrice ?? undefined, currency: targetCurrency,
@@ -770,6 +812,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       ...item,
       valuation,
       valuation_errors: validateValuation(valuation),
+      evidence_ledger: evidenceLedger,
       negotiation_plan: negotiationPlan,
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, jme: !!maker.jme, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,

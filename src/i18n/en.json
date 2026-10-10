@@ -637,5 +637,22 @@
     "for_piece_title": "Field notes for this piece",
     "for_piece_intro": "Checks matched to the type, period and maker claim on this appraisal. Tendencies, not absolute rules.",
     "conservative_note": "These are dealer tendencies, not absolute rules. Confirm on the piece in front of you."
+  },
+  "ledger": {
+    "title": "Evidence ledger",
+    "facts": "Facts",
+    "claims": "Catalogue / dealer claims",
+    "photo_features": "Photo-supported features",
+    "hypotheses": "Hypotheses",
+    "unknowns": "Unknowns",
+    "defects": "Defects (graded)",
+    "style_note": "Style (design description)",
+    "style_not_period": "Style describes the design language — it is not a period claim.",
+    "severity": {
+      "minor": "Minor",
+      "moderate": "Moderate",
+      "major": "Major",
+      "structural": "Structural"
+    }
   }
 }

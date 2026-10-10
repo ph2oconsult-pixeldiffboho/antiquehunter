@@ -35,6 +35,7 @@ import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceChe
 import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker, hasJmeMention, anchorGroupFor, MAKERS } from "../src/services/makers.ts";
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
 import { buildValuation, validateValuation, assertValuationAgreement, allInFromHammer, hammerFromAllIn } from "../src/services/valuation.ts";
+import { normaliseEvidenceLedger, ledgerHasContent } from "../src/services/evidenceLedger.ts";
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS , knownLotSeeds} from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
@@ -1836,6 +1837,51 @@ check("valuation agreement: walk-away, warning, threshold and opening offer cann
   assert.ok(plan.happy_at! <= plan.walk_away);
 });
 
+
+
+check("evidence ledger: facts/claims/photo/hypotheses/unknowns split; style stays design; not-sure stays unknown; defects graded", () => {
+  const e = normaliseEvidenceLedger({
+    facts: ["Stamp confirmed by buyer", "Not sure about the marble"],
+    claims: ["Catalogue: époque Empire"],
+    photo_features: ["Hand-cut dovetails on drawer", "Oxidation under the top"],
+    hypotheses: ["Probably provincial walnut", "Not sure if revival"],
+    unknowns: ["Underside not shown"],
+    defects: [
+      { text: "Chip", severity: "minor", location: "marble top, front-left" },
+      { text: "Split rail", severity: "structural", location: "seat rail" },
+      { text: "Wear", severity: "bogus", location: "" },
+    ],
+    style_note: "Charles X style carving",
+  }, { hasPhotos: true });
+  assert.deepEqual(e.facts, ["Stamp confirmed by buyer"]);
+  assert.ok(e.unknowns.includes("Not sure about the marble"));
+  assert.ok(e.unknowns.includes("Not sure if revival"));
+  assert.ok(!e.hypotheses.includes("Not sure if revival"));
+  assert.deepEqual(e.hypotheses, ["Probably provincial walnut"]);
+  assert.equal(e.style_note, "Charles X style carving");
+  assert.equal(e.defects.length, 3);
+  assert.equal(e.defects[0].severity, "minor");
+  assert.equal(e.defects[0].location, "marble top, front-left");
+  assert.equal(e.defects[2].severity, "moderate"); // bogus → moderate
+  assert.equal(e.defects[2].location, "unspecified");
+  assert.ok(ledgerHasContent(e));
+  // No photos: photo_features demoted
+  const bare = normaliseEvidenceLedger({ photo_features: ["Looks old"], facts: [], claims: [], hypotheses: [], unknowns: [], defects: [], style_note: "" }, { hasPhotos: false });
+  assert.equal(bare.photo_features.length, 0);
+  assert.ok(bare.hypotheses.some(h => /unverified without photo/i.test(h)));
+  // postProcess attaches ledger
+  const withLedger = () => { const r: any = bellRaw(); r.items[0].evidence_ledger = {
+    facts: ["Buyer measured 1.7 m"], claims: ["Dealer says mercury glass"], photo_features: [],
+    hypotheses: ["Likely Louis-Philippe"], unknowns: ["Not sure about the glass"],
+    defects: [{ text: "Paint loss", severity: "moderate", location: "crest" }], style_note: "Louis-Philippe style frame",
+  }; return r; };
+  const a: any = postProcessAppraisal(withLedger(), dealerCtx("Large Louis-Philippe style mirror", { askingPrice: 950, category: "mirrors" }))[0];
+  assert.ok(a.evidence_ledger);
+  assert.deepEqual(a.evidence_ledger.facts, ["Buyer measured 1.7 m"]);
+  assert.ok(a.evidence_ledger.unknowns.includes("Not sure about the glass"));
+  assert.equal(a.evidence_ledger.style_note, "Louis-Philippe style frame");
+  assert.equal(a.evidence_ledger.defects[0].location, "crest");
+});
 
 console.log(`
 ${passed} checks passed`);

@@ -637,5 +637,22 @@
     "for_piece_title": "Notes pour cette pièce",
     "for_piece_intro": "Contrôles adaptés au type, à l’époque et à la mention de maker de cette évaluation. Des tendances, pas des règles absolues.",
     "conservative_note": "Ce sont des tendances de marchand, pas des règles absolues. Confirmez sur la pièce devant vous."
+  },
+  "ledger": {
+    "title": "Registre des preuves",
+    "facts": "Faits",
+    "claims": "Mentions catalogue / marchand",
+    "photo_features": "Éléments visibles sur photo",
+    "hypotheses": "Hypothèses",
+    "unknowns": "Inconnues",
+    "defects": "Défauts (classés)",
+    "style_note": "Style (description du décor)",
+    "style_not_period": "Le style décrit le langage formel — ce n'est pas une affirmation d'époque.",
+    "severity": {
+      "minor": "Mineur",
+      "moderate": "Modéré",
+      "major": "Majeur",
+      "structural": "Structurel"
+    }
   }
 }
