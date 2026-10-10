@@ -345,7 +345,9 @@
     "plan_pro_name": "Pro",
     "plan_pro_desc": "Advanced market insights",
     "plan_dealer_name": "Dealer",
-    "plan_dealer_desc": "Full commercial strategy"
+    "plan_dealer_desc": "Full commercial strategy",
+    "version_copied": "Copied",
+    "version_tap_to_copy": "Tap to copy version details"
   },
   "feedback": {
     "title": "THE FINAL DECISION",

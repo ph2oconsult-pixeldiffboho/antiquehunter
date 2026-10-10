@@ -345,7 +345,9 @@
     "plan_pro_name": "Pro",
     "plan_pro_desc": "Aperçus du marché avancés",
     "plan_dealer_name": "Antiquaire",
-    "plan_dealer_desc": "Stratégie commerciale complète"
+    "plan_dealer_desc": "Stratégie commerciale complète",
+    "version_copied": "Copié",
+    "version_tap_to_copy": "Appuyez pour copier les détails de version"
   },
   "feedback": {
     "title": "La décision finale",
