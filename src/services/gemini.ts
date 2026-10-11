@@ -8,7 +8,7 @@ import {
 import { lotFactsPrompt, type LotFacts } from "./lotFetch";
 import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
-import { anchorOnComparables, type CompsResponse } from "./compsMath";
+import { anchorOnComparables, filterContaminatingComps, type CompsResponse, type CompExclusion } from "./compsMath";
 import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
@@ -477,6 +477,8 @@ ${getGlossaryPrompt(language)}`;
 
 export interface PostProcessContext {
   query: string; hasPhotos: boolean; askingPrice?: number; isAuction: boolean; premiumPct: number; targetCurrency: string;
+  /** Benchmark leak control: drop the subject lot / same house+sale from comps. */
+  excludeComps?: CompExclusion | null;
   currencySymbol: string; language: string; sellerType?: string; lotUrl?: string;
   lotFacts?: LotFacts | null; fetchedEstimate: boolean; eurTo: (eur: number) => number;
   category?: string;
@@ -491,7 +493,7 @@ export interface PostProcessContext {
  * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
  */
 export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
-  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers, previousBase } = ctx;
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers, previousBase, excludeComps } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
@@ -537,7 +539,10 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const compsForStatus = (maker && maker.status === 'doubtful_stamp')
       ? { ok: true as const, comparables: [] as any[], unreachable: (comps as any)?.unreachable || [], searched: (comps as any)?.searched || [], stats: (comps as any)?.stats }
       : comps;
-    const compList = compsForStatus?.comparables || [];
+    const excl = excludeComps || (lotUrl ? { urls: [lotUrl] } : null);
+    const filtered = filterContaminatingComps(compsForStatus?.comparables || [], excl);
+    const compList = filtered.kept;
+    const compsContamination = filtered.dropped;
     const toTarget = (eur: number) => convertApprox(eur, 'EUR', targetCurrency) ?? eur;
     const priorLow = Number(item.price_guidance?.estimated_market_range_low) || 0;
     const priorHigh = Number(item.price_guidance?.estimated_market_range_high) || 0;
@@ -605,9 +610,11 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // changed or verified comparables now anchor it.
     const stampedNow = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
     const stampedBefore = ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(String(previousBase?.maker_status));
+    let restoredFromChecklistBase = false;
     if (checkAnswers && previousBase && previousBase.low > 0 && previousBase.high >= previousBase.low && !anchor.applied && stampedNow === stampedBefore) {
       pgA.estimated_market_range_low = previousBase.low; pgA.estimated_market_range_high = previousBase.high;
       pgA.fair_price_low = previousBase.fair_low; pgA.fair_price_high = previousBase.fair_high;
+      restoredFromChecklistBase = true;
     }
     // Checklist denials / confirmations adjust the market range before the valuation object is built.
     if (fx.rangeFactor !== 1 || fx.narrowLow > 0) {
@@ -650,24 +657,29 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       styleText: `${item.item_summary.likely_style || ''} ${item.item_summary.likely_period || ''} ${query || ''}`,
     });
     const catForPrior = category && category !== 'unknown' ? category : (item.item_summary.category || '');
-    const prior = applyBaseBandPriors({
-      marketLow: pg.estimated_market_range_low,
-      marketHigh: pg.estimated_market_range_high,
-      category: catForPrior,
-      periodCertainty: item.item_summary.period_certainty,
-      styleNote: draftLedger.style_note,
-      title: item.item_summary.title,
-      query,
-      defects: draftLedger.defects,
-      compsAnchored: !!anchor.applied,
-    });
-    if (prior.factors.length) {
-      pg.estimated_market_range_low = prior.low;
-      pg.estimated_market_range_high = prior.high;
-      (item as any)._band_priors = prior;
-      const note = prior.factors.filter(f => !f.endsWith('_note')).join(', ');
-      if (note) {
-        pg.pricing_reasoning = `${pg.pricing_reasoning || ''} [Band prior: ${note}].`.trim();
+    // Checklist-base restore already carries the prior-adjusted band; do not re-apply (width
+    // calibration would expand the locked high after confirmations raise the low).
+    if (!restoredFromChecklistBase) {
+      const prior = applyBaseBandPriors({
+        marketLow: pg.estimated_market_range_low,
+        marketHigh: pg.estimated_market_range_high,
+        category: catForPrior,
+        periodCertainty: item.item_summary.period_certainty,
+        styleNote: draftLedger.style_note,
+        title: item.item_summary.title,
+        query,
+        defects: draftLedger.defects,
+        claims: draftLedger.claims,
+        compsAnchored: !!anchor.applied,
+      });
+      if (prior.factors.length) {
+        pg.estimated_market_range_low = prior.low;
+        pg.estimated_market_range_high = prior.high;
+        (item as any)._band_priors = prior;
+        const note = prior.factors.filter(f => !f.endsWith('_note')).join(', ');
+        if (note) {
+          pg.pricing_reasoning = `${pg.pricing_reasoning || ''} [Band prior: ${note}].`.trim();
+        }
       }
     }
     const rawMidEur = convertApprox((pg.estimated_market_range_low + pg.estimated_market_range_high) / 2, targetCurrency, 'EUR') ?? 0;
@@ -833,6 +845,35 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       cleaned.buy_decision.narrative_money_stripped = narr.stripped || undefined;
     }
     item = cleaned;
+    // Final coherence: every displayed money figure is projected from the valuation object
+    // (narrative/align must not leave a divergent teaser or guidance card).
+    {
+      const moneyF = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
+      item.price_guidance = {
+        ...item.price_guidance,
+        estimated_market_range_low: valuation.expectedHammer.low,
+        estimated_market_range_high: valuation.expectedHammer.high,
+        fair_price_low: valuation.dealerRetail?.low ?? valuation.expectedHammer.low,
+        fair_price_high: valuation.dealerRetail?.high ?? valuation.expectedHammer.high,
+        good_buy_below: valuation.suggestedAcquisition ?? valuation.expectedHammer.low,
+        overpaying_above: valuation.overpayingAbove,
+        currency: targetCurrency,
+      };
+      item.negotiation_strategy = {
+        ...item.negotiation_strategy,
+        opening_offer: valuation.openingOffer ?? 0,
+        target_price_low: valuation.suggestedAcquisition ?? 0,
+        target_price_high: valuation.targetHigh ?? valuation.walkAway,
+        walk_away_price: valuation.walkAway,
+      };
+      if (valuation.dealerEvidence === 'none' && !isAuction) {
+        item.teaser_insight = `Auction/market range ${moneyF(valuation.expectedHammer.low)}–${moneyF(valuation.expectedHammer.high)}. No dealer-retail evidence — shop walk-away is the market high (${moneyF(valuation.walkAway)}), not an invented margin.`;
+      } else if (valuation.suggestedAcquisition != null) {
+        item.teaser_insight = valuation.dealerRetail
+          ? `A good shop price is below ${moneyF(valuation.suggestedAcquisition)}. Above ${moneyF(valuation.walkAway)} (dealer range top, labelled assumption), you are overpaying.`
+          : `Dealers would typically buy below ${moneyF(valuation.suggestedAcquisition)}${isAuction ? ' (hammer)' : ''}. Above ${moneyF(valuation.walkAway)}, you are overpaying.`;
+      }
+    }
     if (evidence.required) item.price_guidance = { ...item.price_guidance, provisional: true };
     if (anchor.applied) {
       const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
@@ -879,6 +920,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         reason: anchor.reason, group: anchor.group, pieces: anchor.pieces, per_piece_median_eur: anchor.perPieceMedianEur || null, basis: anchor.basis,
         blended: !!anchor.blended, capped: !!anchor.capped,
         list: compList, used_urls: anchor.used.map(x => x.url), nearest: anchor.nearest || [], unreachable: compsForStatus?.unreachable || [],
+        contamination: compsContamination,
       },
       checklist: { items: checklistItems, answers: checkAnswers || {}, base: checklistBase, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },
       appraisal_inputs: {

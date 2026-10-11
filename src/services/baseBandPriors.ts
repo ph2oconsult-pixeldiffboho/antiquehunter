@@ -1,5 +1,5 @@
-// Base-band priors when comps do not anchor: style-vs-period discount, condition grading,
-// and category priors (lighting). Pure; never tunes to a single lot. Applied before buildValuation.
+// Base-band priors when comps do not anchor: evidence-graded style/condition discounts,
+// category soft caps, and width calibration to typical residual spreads. Pure; not lot-tuned.
 
 export type PeriodCertainty = 'confirmed_period' | 'probable_period' | 'ambiguous' | 'later_style_or_revival' | string;
 
@@ -12,7 +12,8 @@ export interface BandPriorInput {
   title?: string;
   query?: string;
   defects?: Array<{ severity: string }>;
-  /** True when verified comps already anchored the range — priors become soft notes only. */
+  /** Evidence ledger claims (catalogue wording). */
+  claims?: string[];
   compsAnchored?: boolean;
 }
 
@@ -20,9 +21,10 @@ export interface BandPriorResult {
   low: number;
   high: number;
   factors: string[];
-  styleDiscount: number;      // 1 = none
-  conditionDiscount: number;  // 1 = none
+  styleDiscount: number;
+  conditionDiscount: number;
   categoryCapApplied: boolean;
+  widthCalibrated: boolean;
 }
 
 const roundBand = (x: number): number =>
@@ -30,20 +32,40 @@ const roundBand = (x: number): number =>
 
 /** Detect "style X" / "de style X" without époque/period claim. */
 export const isStyleNotPeriod = (periodCertainty?: string, styleNote?: string | null, text?: string): boolean => {
-  // Confirmed / probable period from construction or catalogue wins over wording.
   if (periodCertainty === 'confirmed_period' || periodCertainty === 'probable_period') return false;
   if (periodCertainty === 'later_style_or_revival') return true;
   if (styleNote && String(styleNote).trim()) return true;
   const t = String(text || '');
-  // Prefer explicit "de style X" / "in the style of" — avoid matching "Empire-Style" compounds alone.
   const styleClaim = /\bde\s+style\b|\bin\s+the\s+style\s+of\b|\bstyle\s+(?:of\s+)?(?:Louis|Charles|Empire|Restoration|Restauration|Directoire|Régence|Regence|Napoleon|Napoléon|Art\s*Deco|Art\s*Nouveau|Queen\s*Anne|Georgian|Victorian)\b/i.test(t);
   const periodClaim = /\b[ée]poque\b|\bperiod\b|\bfin\s+(xvii|xviii|xix|17|18|19)/i.test(t);
   return styleClaim && !periodClaim;
 };
 
-/** Condition discount from graded defects + catalogue condition words in the text. */
-export const conditionDiscountOf = (defects?: Array<{ severity: string }>, text?: string): { factor: number; note: string | null } => {
-  let worst = 0; // 0 ok … 3 structural
+/**
+ * Evidence-graded style discount (multiplies the HIGH; low is pulled more gently).
+ * - Strong: catalogue "de style X" / later_style_or_revival with no period claim → 0.70
+ * - Soft: style_note only or ambiguous wording → 0.85
+ * - None: confirmed/probable period → 1
+ */
+export const styleDiscountOf = (
+  periodCertainty?: string, styleNote?: string | null, text?: string, claims?: string[],
+): { factor: number; note: string | null } => {
+  if (periodCertainty === 'confirmed_period' || periodCertainty === 'probable_period') {
+    return { factor: 1, note: null };
+  }
+  const blob = `${text || ''} ${(claims || []).join(' ')}`;
+  const strongStyle = periodCertainty === 'later_style_or_revival'
+    || /\bde\s+style\b|\bin\s+the\s+style\s+of\b/i.test(blob);
+  const softStyle = !!(styleNote && String(styleNote).trim())
+    || (periodCertainty === 'ambiguous' && /\bstyle\b/i.test(blob));
+  if (strongStyle) return { factor: 0.70, note: 'style_strong' };
+  if (softStyle) return { factor: 0.85, note: 'style_soft' };
+  return { factor: 1, note: null };
+};
+
+/** Condition discount — evidence-graded; structural hits the high harder than the low. */
+export const conditionDiscountOf = (defects?: Array<{ severity: string }>, text?: string): { factorHigh: number; factorLow: number; note: string | null } => {
+  let worst = 0;
   for (const d of defects || []) {
     const s = String(d.severity || '');
     if (s === 'structural') worst = Math.max(worst, 3);
@@ -51,31 +73,26 @@ export const conditionDiscountOf = (defects?: Array<{ severity: string }>, text?
     else if (s === 'moderate') worst = Math.max(worst, 1);
   }
   const t = String(text || '').toLowerCase();
-  // Catalogue shorthand common at French provincial sales
   if (/\b(fendu|cassé|broken|structural)\b/.test(t)) worst = Math.max(worst, 3);
   else if (/\b(accidents?\s+et\s+manques?|manques?\s+importants?|heavy\s+damage|severe)\b/.test(t)) worst = Math.max(worst, 2);
   else if (/\b(fentes?|soul[èe]vements?|accidents?|manques?|restor[ée]e?s?|restored|chips?|cracks?)\b/.test(t)) worst = Math.max(worst, 1);
-  const map: Record<number, { factor: number; note: string | null }> = {
-    0: { factor: 1, note: null },
-    1: { factor: 0.85, note: 'condition_moderate' },
-    2: { factor: 0.65, note: 'condition_major' },
-    3: { factor: 0.45, note: 'condition_structural' },
+  const map: Record<number, { factorHigh: number; factorLow: number; note: string | null }> = {
+    0: { factorHigh: 1, factorLow: 1, note: null },
+    1: { factorHigh: 0.90, factorLow: 0.95, note: 'condition_moderate' },
+    2: { factorHigh: 0.75, factorLow: 0.85, note: 'condition_major' },
+    3: { factorHigh: 0.55, factorLow: 0.70, note: 'condition_structural' },
   };
   return map[worst];
 };
 
-/**
- * Soft category prior caps (auction hammer, unsigned / provincial, decent condition).
- * Used only to pull an unanchored model high down when it wildly exceeds the prior.
- * Not a floor — never inflate a low model range.
- */
+/** Soft category prior caps (unsigned / provincial auction hammer). */
 export const CATEGORY_PRIOR_HIGH_EUR: Record<string, number> = {
-  chandelier_lighting: 450,
-  lighting: 450,
-  lamp: 350,
-  mirrors: 600,
-  mirror: 600,
-  decorative_object: 400,
+  chandelier_lighting: 550,
+  lighting: 550,
+  lamp: 400,
+  mirrors: 700,
+  mirror: 700,
+  decorative_object: 500,
 };
 
 export const categoryPriorHigh = (category?: string): number | null => {
@@ -86,6 +103,41 @@ export const categoryPriorHigh = (category?: string): number | null => {
   return null;
 };
 
+/**
+ * Target high/low width ratios by mid-band (honest residual spreads for text-only provincial
+ * appraisals). Expand a too-narrow band around its mid; never shrink below the discounted range.
+ */
+export const TARGET_WIDTH_BY_MID: Array<{ maxMid: number; ratio: number }> = [
+  { maxMid: 300, ratio: 2.8 },
+  { maxMid: 1000, ratio: 2.4 },
+  { maxMid: 5000, ratio: 2.2 },
+  { maxMid: Infinity, ratio: 2.0 },
+];
+
+export const targetWidthRatio = (mid: number): number => {
+  for (const b of TARGET_WIDTH_BY_MID) if (mid <= b.maxMid) return b.ratio;
+  return 2.0;
+};
+
+export const calibrateWidth = (low: number, high: number): { low: number; high: number; calibrated: boolean } => {
+  if (!(low > 0 && high >= low)) return { low, high, calibrated: false };
+  const mid = (low + high) / 2;
+  const target = targetWidthRatio(mid);
+  const current = high / low;
+  if (current >= target * 0.95) return { low, high, calibrated: false };
+  // Expand symmetrically in log-space around mid
+  const half = Math.sqrt(target);
+  let nLo = mid / half;
+  let nHi = mid * half;
+  // Never raise the high above a previously discounted high by more than the expand;
+  // never drop the low below a floor of 40% of original low after discount.
+  nLo = Math.min(low, nLo);
+  nHi = Math.max(high, nHi);
+  // If still too narrow (e.g. low was already tiny), force the ratio on the high side
+  if (nHi / nLo < target) nHi = nLo * target;
+  return { low: nLo, high: nHi, calibrated: true };
+};
+
 export const applyBaseBandPriors = (i: BandPriorInput): BandPriorResult => {
   let low = Math.max(0, Number(i.marketLow) || 0);
   let high = Math.max(low, Number(i.marketHigh) || low);
@@ -93,42 +145,41 @@ export const applyBaseBandPriors = (i: BandPriorInput): BandPriorResult => {
   let styleDiscount = 1;
   let conditionDiscount = 1;
   let categoryCapApplied = false;
+  let widthCalibrated = false;
 
   if (i.compsAnchored) {
-    // Comps already set the band; only record soft notes for UI, do not move numbers.
     if (isStyleNotPeriod(i.periodCertainty, i.styleNote, `${i.query || ''} ${i.title || ''}`)) factors.push('style_not_period_note');
     const cond = conditionDiscountOf(i.defects, `${i.query || ''} ${i.title || ''}`);
     if (cond.note) factors.push(cond.note + '_note');
-    return { low: roundBand(low), high: roundBand(high), factors, styleDiscount: 1, conditionDiscount: 1, categoryCapApplied: false };
+    return { low: roundBand(low), high: roundBand(high), factors, styleDiscount: 1, conditionDiscount: 1, categoryCapApplied: false, widthCalibrated: false };
   }
 
   const text = `${i.query || ''} ${i.title || ''}`;
-  if (isStyleNotPeriod(i.periodCertainty, i.styleNote, text)) {
-    // Style / revival pieces typically trade well below period equivalents at provincial auction.
-    styleDiscount = 0.55;
-    factors.push('style_vs_period_discount');
-  }
+  const style = styleDiscountOf(i.periodCertainty, i.styleNote, text, i.claims);
+  styleDiscount = style.factor;
+  if (style.note) factors.push(style.note);
 
   const cond = conditionDiscountOf(i.defects, text);
-  conditionDiscount = cond.factor;
+  conditionDiscount = cond.factorHigh;
   if (cond.note) factors.push(cond.note);
 
-  const factor = styleDiscount * conditionDiscount;
-  if (factor < 1) {
-    // Pull the high down; keep low from collapsing below a useful floor of ~40% of original low.
-    high = Math.max(low * 0.5, high * factor);
-    low = Math.max(10, low * Math.max(0.4, factor));
-    if (low > high) low = high * 0.6;
+  if (styleDiscount < 1 || cond.factorHigh < 1) {
+    high = Math.max(low * 0.6, high * styleDiscount * cond.factorHigh);
+    low = Math.max(10, low * Math.max(0.55, styleDiscount * cond.factorLow));
+    if (low > high) low = high * 0.55;
   }
 
   const prior = categoryPriorHigh(i.category) ?? categoryPriorHigh(text);
-  if (prior != null && high > prior * 1.25) {
-    // Model high wildly above category prior with no comps → cap toward prior (keep some headroom).
-    high = Math.min(high, prior * 1.15);
-    if (low > high) low = Math.max(20, high * 0.4);
+  if (prior != null && high > prior * 1.35) {
+    high = Math.min(high, prior * 1.2);
+    if (low > high) low = Math.max(20, high * 0.45);
     categoryCapApplied = true;
     factors.push('category_prior_cap');
   }
+
+  const cal = calibrateWidth(low, high);
+  low = cal.low; high = cal.high; widthCalibrated = cal.calibrated;
+  if (widthCalibrated) factors.push('width_calibrated');
 
   return {
     low: roundBand(low),
@@ -137,5 +188,6 @@ export const applyBaseBandPriors = (i: BandPriorInput): BandPriorResult => {
     styleDiscount,
     conditionDiscount,
     categoryCapApplied,
+    widthCalibrated,
   };
 };

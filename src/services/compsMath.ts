@@ -409,3 +409,39 @@ export const anchorOnComparables = (
     blended, capped,
   };
 };
+
+/** Exclude the subject lot and its syndicated copies from comps (benchmark leak control). */
+export interface CompExclusion {
+  urls?: string[];
+  /** House name + sale date (YYYY-MM-DD) of the subject lot. */
+  house?: string;
+  saleDate?: string;
+}
+
+const normUrl = (u: string) => String(u || '').trim().toLowerCase().replace(/\/$/, '').split('?')[0];
+const normHouse = (h: string) => fold(String(h || '')).replace(/[^a-z0-9]/g, '');
+const sameDay = (a?: string, b?: string) => {
+  if (!a || !b) return false;
+  return String(a).slice(0, 10) === String(b).slice(0, 10);
+};
+
+export const filterContaminatingComps = (
+  comps: Comparable[],
+  excl?: CompExclusion | null,
+): { kept: Comparable[]; dropped: Array<{ url: string; reason: string }> } => {
+  if (!excl) return { kept: comps, dropped: [] };
+  const urls = new Set((excl.urls || []).map(normUrl).filter(Boolean));
+  const house = excl.house ? normHouse(excl.house) : '';
+  const dropped: Array<{ url: string; reason: string }> = [];
+  const kept: Comparable[] = [];
+  for (const c of comps) {
+    const u = normUrl(c.url);
+    if (urls.has(u)) { dropped.push({ url: c.url, reason: 'subject_url' }); continue; }
+    // Syndicated copies often share house + sale date + near-identical title start
+    if (house && sameDay(c.date, excl.saleDate) && normHouse(c.house) === house) {
+      dropped.push({ url: c.url, reason: 'same_house_sale' }); continue;
+    }
+    kept.push(c);
+  }
+  return { kept, dropped };
+};

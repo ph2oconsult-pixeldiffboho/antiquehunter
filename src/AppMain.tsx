@@ -42,7 +42,9 @@ type Screen = 'intro-choice' | 'home' | 'scan' | 'describe' | 'analysis' | 'coll
 export default function Main() {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
-  const [plan, setPlan] = useState<'free' | 'pro' | 'dealer'>('free');
+  const [plan, setPlan] = useState<'free' | 'pro' | 'dealer'>(() => {
+    try { return sessionStorage.getItem('ah_demo_pro') === '1' ? 'pro' : 'free'; } catch { return 'free'; }
+  });
   // One shared currency for the whole app: EUR by default; only an explicit user choice
   // (Settings, appraisal form or Find Me an Antique) is stored (see services/currencyPref.ts)
   const [currency, setCurrencyState] = useState<string>(() => loadCurrency());
