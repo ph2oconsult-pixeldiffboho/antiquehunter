@@ -1,0 +1,33 @@
+{
+  "n": 70,
+  "bands": {
+    "lt500": 37,
+    "1k_5k": 23,
+    "500_1k": 6,
+    "gt5k": 4
+  },
+  "cats": {
+    "furniture": 40,
+    "mirrors": 23,
+    "chandelier_lighting": 7
+  },
+  "style": 16,
+  "period": 17,
+  "gt5k_ids": [
+    "drouot-34994475",
+    "drouot-34803942",
+    "drouot-34803922",
+    "drouot-34785465"
+  ],
+  "lighting_ids": [
+    "g189",
+    "drouot-34803942",
+    "g190",
+    "g191",
+    "g192",
+    "g303",
+    "g304"
+  ],
+  "eval_sealed": "UNRUN",
+  "eval_hash_canonical": "89fb1b7e69da5489a253d5e91aab709262870708c72c207f647015b46e2c7f16"
+}

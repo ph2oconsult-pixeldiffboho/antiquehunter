@@ -2,17 +2,22 @@ import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
 import {
-  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, reconcileDealerNegotiation, saneDealerRange, dealerBands, dropContradictions, sanitizeDeep,
-  type PriceBasis, type ScoreBand, type VerdictBands,
+  alignProseRanges, enforceNarrativeConsistency, calibratedConfidence, confidenceLabel, evidenceCheck, normaliseConfidence, dropContradictions, sanitizeDeep,
+  type PriceBasis, type ScoreBand,
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFetch";
 import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
-import { anchorOnComparables, type CompsResponse } from "./compsMath";
+import { anchorOnComparables, filterContaminatingComps, type CompsResponse, type CompExclusion } from "./compsMath";
 import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
+import { buildValuation, validateValuation, assertValuationAgreement, type Valuation } from "./valuation";
+import { normaliseEvidenceLedger, ledgerHasContent, type EvidenceLedger } from "./evidenceLedger";
+import { applyBaseBandPriors } from "./baseBandPriors";
 
+import { postProcessAppraisal } from "./postProcess";
+export { postProcessAppraisal, type PostProcessContext } from "./postProcess";
 /** Fixed seed + temperature 0: the same input gives the same appraisal (fix 9). */
 export const APPRAISAL_SEED = 20261009;
 
@@ -157,6 +162,16 @@ You must speak with the authority of an expert who has seen thousands of pieces.
   "ambiguous" = from the evidence available you cannot tell a period piece from a later style / revival piece (for example Empire vs Restauration vs a late 19th-century revival) and the value would differ materially;
   "later_style_or_revival" = clear evidence the piece is later (catalogue says "style", later construction, modern materials).
 - item_summary.reproduction_risk = true only when something specific suggests a later copy that could be passed off as period.
+
+### EVIDENCE LEDGER (CRITICAL — fill evidence_ledger)
+Split every observation into exactly one bucket. Do not mix.
+- facts: buyer-stated facts you treat as given ("stamp confirmed", "I measured 1.72 m", dimensions the buyer typed), or catalogue facts when the lot page was read successfully.
+- claims: catalogue or dealer claims not independently verified ("estampillé X" on a label with no stamp photo; "époque Louis XV" without construction proof).
+- photo_features: features you can actually see in the submitted photos (joinery, oxidation, stamp in photo 2, crack on the left rail). Empty array when there are no photos.
+- hypotheses: your inferences ("probably provincial walnut", "likely 19th-c revival"). Never present these as facts.
+- unknowns: anything you are not sure about. "Not sure", "cannot tell", "needs underside photo" belong here — never promote them to facts or hypotheses.
+- defects: grade each by severity (minor | moderate | major | structural) and location (e.g. "marble top, front-left corner", "seat rail underside"). Missing location → "unspecified".
+- style_note: when the piece is described as "style X" / "de style X" without époque/period, put the design description here. Style is NOT a period claim.
 
 ### LOT LINK (CRITICAL)
 ${lotFacts ? lotFactsPrompt(lotFacts, fmtCur) : '- No lot link was given.'}
@@ -323,6 +338,32 @@ ${getGlossaryPrompt(language)}`;
                   },
                   required: ["title", "category", "likely_origin", "likely_style", "likely_period", "value_tier", "snap_judgement", "confidence", "confidence_score", "confidence_breakdown", "confidence_reason", "confidence_improvement_suggestions", "evidence_gaps", "period_certainty", "reproduction_risk", "construction_evidence", "maker"]
                 },
+
+                evidence_ledger: {
+                  type: Type.OBJECT,
+                  description: "Split evidence: facts, claims, photo features, hypotheses, unknowns, graded defects.",
+                  properties: {
+                    facts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Buyer-stated or catalogue-confirmed facts." },
+                    claims: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Catalogue/dealer claims not yet verified." },
+                    photo_features: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Features supported by submitted photos; empty if no photos." },
+                    hypotheses: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Model inferences — not facts." },
+                    unknowns: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Explicit unknowns / not sure." },
+                    defects: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          text: { type: Type.STRING },
+                          severity: { type: Type.STRING, enum: ["minor", "moderate", "major", "structural"] },
+                          location: { type: Type.STRING }
+                        },
+                        required: ["text", "severity", "location"]
+                      }
+                    },
+                    style_note: { type: Type.STRING, description: "Design description when 'style X' without period claim; empty string if none." }
+                  },
+                  required: ["facts", "claims", "photo_features", "hypotheses", "unknowns", "defects", "style_note"]
+                },
                 buy_decision: {
                   type: Type.OBJECT,
                   properties: {
@@ -411,7 +452,7 @@ ${getGlossaryPrompt(language)}`;
                 teaser_insight: { type: Type.STRING, description: "A short, commercially sharp dealer warning or hint at risk/value impact for free users. e.g. 'There are signs this may not be a fully original set.'" }
               },
               required: [
-                "item_summary", "buy_decision", "price_guidance", "dealer_take",
+                "item_summary", "evidence_ledger", "buy_decision", "price_guidance", "dealer_take",
                 "negotiation_strategy", "walk_away_if", "top_checks", "red_flags",
                 "market_insight", "scoring_inputs", "disclaimer", "teaser_insight"
               ]
@@ -436,376 +477,3 @@ ${getGlossaryPrompt(language)}`;
   });
 };
 
-export interface PostProcessContext {
-  query: string; hasPhotos: boolean; askingPrice?: number; isAuction: boolean; premiumPct: number; targetCurrency: string;
-  currencySymbol: string; language: string; sellerType?: string; lotUrl?: string;
-  lotFacts?: LotFacts | null; fetchedEstimate: boolean; eurTo: (eur: number) => number;
-  category?: string;
-  /** Verified auction comparables (null = lookup failed; undefined = not looked up) */
-  comps?: CompsResponse | null;
-  checkAnswers?: CheckAnswers;
-  previousBase?: ChecklistBase | null;
-}
-
-/**
- * Everything the app does to the model's JSON (exported so the accuracy harness can re-apply it to a captured answer):
- * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
- */
-export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
-  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers, previousBase } = ctx;
-  
-  // Scoring configuration for easy tuning
-  // Verdict label comes from the price band (never from the model), so label, reason and score always agree
-  const getBuyLabel = (basis: PriceBasis) => ({
-    strong_buy: "Strong Buy",
-    good_buy: "Good Buy",
-    fair: "Fair Price",
-    overpriced: "Overpriced",
-    walk_away: "Walk Away",
-    high_risk: "High Risk",
-    no_price: "Needs a Price",
-    need_evidence: "Need More Evidence",
-  } as Record<PriceBasis, string>)[basis];
-
-  // One source of truth for confidence: confidenceLabel() (appraisalMath.ts) from the calibrated score is used for
-  // item_summary.confidence AND buy_decision.confidence, and the UI renders both through the same analysis.confidence_* labels.
-
-  // Calculate Buy Score in code based on scoring_inputs
-  const items = result.items.map((item: any) => {
-    const s = item.scoring_inputs;
-    const c = item.item_summary.confidence_breakdown;
-    
-    // Confidence (fix 6): the breakdown back on its fixed scales, then calibrated with what the app knows about the
-    // evidence (real estimate read from the lot page, photos)
-    const nb = normaliseConfidence(c);
-    Object.assign(c, nb);
-    const words = query.trim().split(/\s+/).length;
-
-    // Maker: the buyer's words first, a stamp the model read in a photo next; the checklist answer on the stamp wins
-    const titleText = `${item.item_summary.title || ''}`;
-    const pieceText = `${query} ${titleText}`;
-    const pieces = countPieces(query) > 1 ? countPieces(query) : countPieces(titleText);
-    const pieceKind = pieceKindOf(category, `${titleText} ${query}`);
-    const fx = checksEffect(checkAnswers);
-    let maker = combineMakerStatus(detectMaker(query), item.item_summary.maker);
-    const makerAsClaimed = maker;
-    let stampAnswer: 'confirmed' | 'denied' | undefined = fx.stampOverride;
-    if (maker && stampAnswer === 'confirmed') maker = { ...maker, status: 'stamped_confirmed' };
-    if (maker && stampAnswer === 'denied') maker = { ...maker, status: 'mentioned' };
-    const compList = comps?.comparables || [];
-    const toTarget = (eur: number) => convertApprox(eur, 'EUR', targetCurrency) ?? eur;
-    const anchor = anchorOnComparables(compList, { status: maker?.status || null, pieces, material: materialOf(pieceText), isAuction, eurTo: toTarget });
-    const perPiece = anchor.used.map(x => isAuction ? x.perPieceHammerEur : x.perPieceAllInEur);
-    const spread = perPiece.length >= 2 ? Math.max(...perPiece) / Math.max(1, Math.min(...perPiece)) : undefined;
-
-    let confScore = calibratedConfidence(nb, {
-      hasPhotos, fetchedEstimate, closeComparables: anchor.applied ? anchor.used.length : 0, comparableSpread: spread,
-      vague: words <= 3 && !hasPhotos && !lotFacts?.ok,
-    });
-    confScore += fx.confidenceDelta;
-    if (maker && maker.status === 'stamped_confirmed' && !stampAnswer && anchor.applied) confScore += 3;
-    
-    // Strict Evidence Grounding:
-    // If NO photos were provided, confidence can NEVER be high, and evidence quality must be capped.
-    if (!hasPhotos) {
-      c.evidence_quality = Math.min(c.evidence_quality || 12, 14);
-      if (!item.item_summary.confidence_reason.includes('photographic') && !item.item_summary.confidence_reason.includes('photos')) {
-        item.item_summary.confidence_reason = `Unverified: Evaluated without physical photographs. Stamped marks, joinery, and authenticity cannot be confirmed without visual inspection. ${item.item_summary.confidence_reason}`;
-      }
-      if (!item.price_guidance.pricing_reasoning.includes('photos') && !item.price_guidance.pricing_reasoning.includes('photographs')) {
-        item.price_guidance.pricing_reasoning = `Preliminary text-only appraisal without photos. Actual valuation depends on physical condition and construction. ${item.price_guidance.pricing_reasoning}`;
-      }
-    }
-
-    // Vague queries (e.g. "old table", "chair") with no details
-    if (words <= 3 && !hasPhotos && !lotFacts?.ok) {
-      item.item_summary.confidence_reason = `Speculative estimate: Query '${query}' is too generic with no images or provenance. ${item.item_summary.confidence_reason}`;
-      item.price_guidance.pricing_reasoning = `Speculative valuation: A generic '${query}' can range from a modern utility piece to fine period antique. Inspect construction before relying on numbers. ${item.price_guidance.pricing_reasoning}`;
-    }
-
-    const finalConfScore = Math.max(1, Math.min(100, Math.round(confScore)));
-    const confLabel = confidenceLabel(finalConfScore);
-
-    // "Need more evidence": period not established -> no firm buy verdict, provisional range, ask for evidence
-    const evidence = evidenceCheck({
-      periodCertainty: item.item_summary.period_certainty,
-      reproductionRisk: item.item_summary.reproduction_risk,
-      confidence: confLabel,
-      typedText: query,
-      lotPageRead: !!lotFacts?.ok,
-      hasPhotos,
-      category,
-      title: `${item.item_summary.title || ''} ${query || ''}`,
-      styleText: `${item.item_summary.likely_style || ''} ${item.item_summary.likely_period || ''}`,
-      constructionEvidence: item.item_summary.construction_evidence,
-    });
-
-    if (fx.periodConfirmed && evidence.required) {
-      const keep = evidence.reasons.filter(r => r === 'low_confidence_brief' && confLabel !== 'medium' && confLabel !== 'high');
-      evidence.reasons = keep; evidence.required = keep.length > 0;
-    }
-
-    // Comparables anchor the market range (scaled to the number of pieces); the retail tier follows it
-    const pgA = item.price_guidance;
-    if (anchor.applied) {
-      pgA.estimated_market_range_low = anchor.low;
-      pgA.estimated_market_range_high = anchor.high;
-      pgA.fair_price_low = Math.round(anchor.low * 1.3);
-      pgA.fair_price_high = Math.round(anchor.high * 1.6);
-    }
-    // A re-run with answers starts from the range the checklist was shown with (the model's new numbers would otherwise
-    // move it at random), unless the answers changed the stamp basis or verified comparables now anchor it
-    const stampedNow = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
-    const stampedBefore = ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(String(previousBase?.maker_status));
-    if (checkAnswers && previousBase && previousBase.low > 0 && previousBase.high >= previousBase.low && !anchor.applied && stampedNow === stampedBefore) {
-      pgA.estimated_market_range_low = previousBase.low; pgA.estimated_market_range_high = previousBase.high;
-      pgA.fair_price_low = previousBase.fair_low; pgA.fair_price_high = previousBase.fair_high;
-    }
-    const checklistBase: ChecklistBase = { low: Number(pgA.estimated_market_range_low) || 0, high: Number(pgA.estimated_market_range_high) || 0,
-      fair_low: Number(pgA.fair_price_low) || 0, fair_high: Number(pgA.fair_price_high) || 0, maker_status: maker?.status || null };
-    // The buyer's checklist answers: denials lower the range, confirmations narrow it upwards
-    if (fx.rangeFactor !== 1 || fx.narrowLow > 0) {
-      const lo = Number(pgA.estimated_market_range_low) || 0, hi = Number(pgA.estimated_market_range_high) || lo;
-      const f = fx.rangeFactor;
-      const r = (x: number) => x >= 1000 ? Math.round(x / 50) * 50 : Math.round(x / 10) * 10;
-      pgA.estimated_market_range_low = r((lo + (hi - lo) * fx.narrowLow) * f);
-      pgA.estimated_market_range_high = r(hi * f);
-      pgA.fair_price_low = r((Number(pgA.fair_price_low) || lo) * f);
-      pgA.fair_price_high = r((Number(pgA.fair_price_high) || hi) * f);
-      if (Number(pgA.good_buy_below) > 0) pgA.good_buy_below = r(Number(pgA.good_buy_below) * f);
-    }
-    if (maker && (maker.status === 'stamped_confirmed' || maker.status === 'stamped_stated' || maker.status === 'stamp_in_photo'))
-      item.item_summary.title = String(item.item_summary.title || '').replace(/,?\s*\(?\s*attributed\s+to\s+[^),]*\)?/i, ` (stamped ${maker.name})`).replace(/,?\s*\(?\s*attribu[ée]e?s?\s+[àa]\s+[^),]*\)?/i, ` (estampillé ${maker.name})`).replace(/\s{2,}/g, ' ').trim();
-
-    // Value Tier Consistency Check:
-    // If estimated market range is under 5000, it cannot be Tier A ("Investment")
-    const maxEstimate = Number(item.price_guidance.estimated_market_range_high) || 0;
-    if (maxEstimate < 5000 && item.item_summary.value_tier === 'A') {
-      item.item_summary.value_tier = maxEstimate >= 200 ? 'B' : maxEstimate >= 20 ? 'C' : 'D';
-    }
-
-    // Fix contradictory qualitative text (e.g. calling an €800 piece a "five-figure investment")
-    const cleanContradictions = (text: string) => {
-      if (!text) return text;
-      if (maxEstimate < 10000) {
-        return text.replace(/five-figure\s*(investment|sum|value)?/gi, 'three-to-four-figure')
-                   .replace(/5-figure\s*(investment|sum|value)?/gi, 'modest mid-tier')
-                   .replace(/museum-grade/gi, 'collectible quality');
-      }
-      return text;
-    };
-
-    item.item_summary.snap_judgement = cleanContradictions(item.item_summary.snap_judgement);
-    item.buy_decision.investment_insight = cleanContradictions(item.buy_decision.investment_insight);
-    item.buy_decision.resale_insight = cleanContradictions(item.buy_decision.resale_insight);
-
-    // Mathematical Price Relationship Consistency & Correction
-    const pg = item.price_guidance;
-    const ns = item.negotiation_strategy;
-
-    // Ensure positive numbers
-    pg.estimated_market_range_low = Math.max(0, Number(pg.estimated_market_range_low) || 0);
-    pg.estimated_market_range_high = Math.max(pg.estimated_market_range_low, Number(pg.estimated_market_range_high) || pg.estimated_market_range_low * 1.5);
-    const rawMidEur = convertApprox((pg.estimated_market_range_low + pg.estimated_market_range_high) / 2, targetCurrency, 'EUR') ?? 0;
-    
-    // Retail bounds: fair_price_low <= fair_price_high
-    pg.fair_price_low = Math.max(pg.estimated_market_range_low, Number(pg.fair_price_low) || Math.round(pg.estimated_market_range_low * 1.5));
-    pg.fair_price_high = Math.max(pg.fair_price_low, pg.estimated_market_range_high, Number(pg.fair_price_high) || Math.round(pg.estimated_market_range_high * 2));
-
-    // Smart buy + negotiation figures, consistent with the buy-score bands:
-    // smart buy within [market low, market mid]; opening <= smart buy <= walk-away;
-    // opening <= target low <= target high <= walk-away; walk-away = market high (auction: max hammer bid)
-    // Dealer, shop and private prices are judged against the DEALER range (the retail tier), not the auction range:
-    // the dealer range is made sane first (dealer low >= auction mid, dealer high >= auction high), the walk-away is
-    // the dealer high. Auction mode is unchanged.
-    let bands: VerdictBands | undefined;
-    if (!isAuction) {
-      const dr = saneDealerRange(pg.estimated_market_range_low, pg.estimated_market_range_high, pg.fair_price_low, pg.fair_price_high);
-      pg.fair_price_low = dr.low; pg.fair_price_high = dr.high;
-      bands = dealerBands(pg.estimated_market_range_low, pg.estimated_market_range_high, dr.low, dr.high);
-    }
-    const nf = bands ? reconcileDealerNegotiation(bands, pg.fair_price_low) : reconcileNegotiation(
-      { good_buy_below: pg.good_buy_below, ...(ns || {}) },
-      pg.estimated_market_range_low, pg.estimated_market_range_high, premiumPct, isAuction
-    );
-    pg.good_buy_below = nf.good_buy_below;
-    // "Overpaying" starts exactly at the walk-away price (same units: hammer at auction), so every price maps to
-    // one band: <= smart buy (good) / <= walk-away (fair) / above walk-away (overpriced) / above retail (walk away)
-    pg.overpaying_above = nf.walk_away_price;
-    if (ns) {
-      ns.opening_offer = nf.opening_offer;
-      ns.target_price_low = nf.target_price_low;
-      ns.target_price_high = nf.target_price_high;
-      ns.walk_away_price = nf.walk_away_price;
-    }
-    const dt = item.dealer_take;
-    if (dt) {
-      dt.target_buy_price_low = Math.max(0, Math.round(Number(dt.target_buy_price_low) || 0));
-      dt.target_buy_price_high = Math.max(dt.target_buy_price_low, Math.round(Number(dt.target_buy_price_high) || 0));
-    }
-
-    // Ensure currency consistency
-    item.price_guidance.currency = targetCurrency;
-
-    // Teaser: any figure in it must be the app's own smart-buy / walk-away (the model's teaser sometimes quoted a
-    // "buy below" figure above the market high). Qualitative teasers without money amounts are kept.
-    const teaserHasMoney = /(\d[\d\s.,]*\s?(€|£|\$|kr|eur|gbp|usd|sek))|((€|£|\$)\s?\d)/i.test(String(item.teaser_insight || ''));
-    if (!item.teaser_insight || teaserHasMoney) {
-      if (item.price_guidance?.good_buy_below) {
-        const money = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
-        item.teaser_insight = bands
-          ? `A good shop price is below ${money(item.price_guidance.good_buy_below)}. Above ${money(nf.walk_away_price)} (the top of the dealer range), you are overpaying.`
-          : `Dealers would typically buy below ${money(item.price_guidance.good_buy_below)}${isAuction ? ' (hammer)' : ''}. Above ${money(nf.walk_away_price)}, you are overpaying.`;
-      } else {
-        item.teaser_insight = `Dealers typically negotiate 30–50% below retail on this category.`;
-      }
-    }
-
-    const calculatedScore = 
-      (s.authenticity || 0) +
-      (s.condition || 0) +
-      (s.rarity_desirability || 0) +
-      (s.market_demand || 0) +
-      (s.price_vs_market || 0) +
-      (s.liquidity || 0) +
-      (s.risk_penalty || 0);
-
-    // Buy score is driven by the price compared like with like (hammer vs the hammer range at auction; all-in shown separately),
-    // not by the model's self-scored inputs (which tended to sum to 100 -> a constant 90 in the UI).
-    const decision = decideBuy({
-      askingPrice: Number(askingPrice),
-      isAuction,
-      premiumPct,
-      hasPhotos,
-      marketLow: pg.estimated_market_range_low,
-      marketHigh: pg.estimated_market_range_high,
-      retailHigh: pg.fair_price_high,
-      smartBuy: nf.good_buy_below,
-      walkAway: nf.walk_away_price,
-      riskPenalty: Number(s.risk_penalty) || 0,
-      itemScore: calculatedScore,
-      valueTier: item.item_summary.value_tier,
-      needsEvidence: evidence.required,
-      bands,
-    });
-    const allIn = decision.effectivePrice;
-    const finalScore = decision.score;
-    const scoreBand: ScoreBand = decision.band;
-    const basis: PriceBasis = decision.basis;
-    const cappedScore = Math.max(1, Math.min(100, Math.round(finalScore)));
-
-    // Dealer mode: the model's notes must not contradict the verdict (it often calls a fair shop price "full retail" /
-    // "too expensive", judging it as a dealer buying for resale). Contradicting sentences are dropped, and the pricing
-    // notes open with the verdict explained from the bands. Auction mode is untouched.
-    let proseRemoved = 0;
-    if (bands && Number(askingPrice) > 0 && ['strong_buy', 'good_buy', 'fair', 'overpriced', 'walk_away'].includes(basis)) {
-      const fr = String(language || '').toLowerCase().startsWith('fr');
-      const m = (n: number) => { try { return new Intl.NumberFormat(fr ? 'fr-FR' : (language || 'en'), { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
-      const ask = m(Number(askingPrice)), dl = m(pg.fair_price_low), dh = m(pg.fair_price_high), al = m(pg.estimated_market_range_low), ah = m(pg.estimated_market_range_high);
-      const band: Record<string, [string, string]> = {
-        strong_buy: [`${ask} is at or below the middle of the auction range: a strong buy for a shop price.`, `${ask} est au niveau ou en dessous du milieu de la fourchette aux enchères : un excellent prix en boutique.`],
-        good_buy: [`${ask} is below the dealer range (${dl}–${dh}): a good shop price.`, `${ask} est sous la fourchette marchand (${dl}–${dh}) : un bon prix en boutique.`],
-        fair: [`${ask} is within the dealer range (${dl}–${dh}): a fair shop price.`, `${ask} est dans la fourchette marchand (${dl}–${dh}) : un prix correct en boutique.`],
-        overpriced: [`${ask} is above the dealer range (${dl}–${dh}): overpriced, even for a shop.`, `${ask} dépasse la fourchette marchand (${dl}–${dh}) : trop cher, même en boutique.`],
-        walk_away: [`${ask} is well above the dealer range (${dl}–${dh}): walk away.`, `${ask} est bien au-dessus de la fourchette marchand (${dl}–${dh}) : passez votre chemin.`],
-      };
-      const verdictLine = band[basis][fr ? 1 : 0];
-      const auctionLine = fr ? `Aux enchères, la pièce ferait environ ${al}–${ah} (marteau).` : `At auction it would make about ${al}–${ah} (hammer).`;
-      const fix = (t: any) => { if (typeof t !== 'string') return t; const r = dropContradictions(t, basis); proseRemoved += r.removed; return r.text || verdictLine; };
-      const fixList = (a: any) => { if (!Array.isArray(a)) return a; const out = a.map((x: any) => { const r = dropContradictions(String(x || ''), basis); proseRemoved += r.removed; return r.text; }).filter((x: string) => x); return out.length ? out : [verdictLine]; };
-      const is = item.item_summary || {}, bd = item.buy_decision || {}, dtk = item.dealer_take || {};
-      is.snap_judgement = fix(is.snap_judgement);
-      bd.decision_summary = fixList(bd.decision_summary);
-      bd.investment_insight = fix(bd.investment_insight); bd.must_have_insight = fix(bd.must_have_insight); bd.resale_insight = fix(bd.resale_insight);
-      dtk.dealer_view = fixList(dtk.dealer_view); dtk.resale_strategy = fix(dtk.resale_strategy);
-      item.teaser_insight = fix(item.teaser_insight);
-      const pr = dropContradictions(String(pg.pricing_reasoning || ''), basis); proseRemoved += pr.removed;
-      pg.pricing_reasoning = `${verdictLine} ${auctionLine} ${pr.text}`.trim();
-    }
-
-    // Text clean-up: no JSON field names in prose, and restated market/retail ranges must equal the cards
-    const fmtMoney = (n: number) => {
-      try {
-        return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(Math.round(n));
-      } catch {
-        return `${currencySymbol}${Math.round(n).toLocaleString()}`;
-      }
-    };
-    const ranges = {
-      market: [pg.estimated_market_range_low, pg.estimated_market_range_high] as [number, number],
-      retail: [pg.fair_price_low, pg.fair_price_high] as [number, number],
-    };
-    const align = (v: any): any => typeof v === 'string' ? alignProseRanges(v, ranges, fmtMoney)
-      : Array.isArray(v) ? v.map(align)
-      : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, align(x)]))
-      : v;
-    const cleaned: any = align(sanitizeDeep(item));
-    item = cleaned;
-    if (evidence.required) item.price_guidance = { ...item.price_guidance, provisional: true };
-    if (anchor.applied) {
-      const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
-      item.price_guidance = { ...item.price_guidance, pricing_reasoning: `Anchored on ${anchor.used.length} verified auction results for ${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}). ${item.price_guidance.pricing_reasoning || ''}`.trim() };
-    }
-    const checklistItems = buildChecklist({
-      pieceKind, pieces, period: item.item_summary.likely_period, maker: makerAsClaimed ? { name: makerAsClaimed.name, status: makerAsClaimed.status } : null,
-      basis, text: `${query} ${titleText} ${item.item_summary.likely_style || ''} ${(item.walk_away_if || []).join(' ')}`, category,
-    });
-
-    const nsF = item.negotiation_strategy || {};
-    const negotiationPlan = buildNegotiationPlan({
-      sellerType, isAuction, askingPrice: Number(askingPrice) || undefined, currency: targetCurrency,
-      walkAway: Number(nsF.walk_away_price) || Number(item.price_guidance?.estimated_market_range_high) || 0,
-      openingOffer: Number(nsF.opening_offer) || undefined, targetHigh: Number(nsF.target_price_high) || undefined, premiumPct,
-      dealerLow: bands ? Number(item.price_guidance?.fair_price_low) || undefined : undefined,
-      checklist: checklistItems, answers: checkAnswers, maker: makerAsClaimed && !['mentioned', 'dealer_label'].includes(makerAsClaimed.status) ? makerAsClaimed.name : null,
-      period: item.item_summary.likely_period, text: `${query} ${titleText}`, pieces, pieceKind,
-    });
-
-    return {
-      ...item,
-      negotiation_plan: negotiationPlan,
-      evidence_check: evidence,
-      maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
-      comparables: {
-        status: comps === undefined ? (maker ? 'not_searched' : 'no_maker') : comps === null || comps.ok === false ? 'error' : compList.length === 0 ? 'none_verified' : anchor.applied ? 'anchored' : 'shown',
-        reason: anchor.reason, group: anchor.group, pieces: anchor.pieces, per_piece_median_eur: anchor.perPieceMedianEur || null, basis: anchor.basis,
-        list: compList, used_urls: anchor.used.map(x => x.url), unreachable: comps?.unreachable || [],
-      },
-      checklist: { items: checklistItems, answers: checkAnswers || {}, base: checklistBase, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },
-      appraisal_inputs: {
-        lot_page_read: !!lotFacts?.ok, estimate_read: fetchedEstimate, band_factor: 1, raw_mid_eur: Math.round(rawMidEur),
-      },
-      seller_context: {
-        sellerType: sellerType || 'Market/Fair',
-        isAuction,
-        lotUrl: lotUrl || null,
-        buyerPremiumRate: premiumPct,
-        allInPrice: allIn || null
-      },
-      item_summary: {
-        ...item.item_summary,
-        confidence: confLabel,
-        confidence_score: finalConfScore
-      },
-      buy_decision: {
-        ...item.buy_decision,
-        score: cappedScore,
-        score_band: scoreBand,
-        price_basis: basis,
-        price_cap: decision.cap || null,
-        smart_buy_all_in: decision.smartBuyAllIn || null,
-        walk_away_all_in: decision.walkAwayAllIn || null,
-        effective_price: allIn || null,
-        compare_price: decision.comparePrice || null,
-        // which range the price was judged against: 'dealer' (shop / dealer / private) or 'auction'
-        price_scale: bands ? 'dealer' : 'auction',
-        prose_sentences_removed: bands ? proseRemoved : undefined,
-        dealer_bands: bands ? { strong_buy_to: Math.round(bands.strongTop), good_buy_to: Math.round(bands.goodTop), fair_to: Math.round(bands.fairTop), overpriced_to: Math.round(bands.overTop) } : null,
-        label: getBuyLabel(basis),
-        confidence: confLabel
-      }
-    };
-  });
-
-  return items;
-};

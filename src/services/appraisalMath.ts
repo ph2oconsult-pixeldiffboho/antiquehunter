@@ -283,6 +283,101 @@ export const alignProseRanges = (
   });
 };
 
+/** Canonical money figures from the valuation object that prose may quote. */
+export type AllowedMoney = {
+  marketLow: number; marketHigh: number;
+  retailLow?: number; retailHigh?: number;
+  smartBuy?: number; walkAway?: number; opening?: number;
+  asking?: number | null; buyerCostLow?: number; buyerCostHigh?: number;
+  maxBidHammer?: number | null; maxBidAllIn?: number | null;
+};
+
+const allowedSet = (a: AllowedMoney): Set<number> => {
+  const s = new Set<number>();
+  for (const n of [a.marketLow, a.marketHigh, a.retailLow, a.retailHigh, a.smartBuy, a.walkAway, a.opening, a.asking, a.buyerCostLow, a.buyerCostHigh, a.maxBidHammer, a.maxBidAllIn]) {
+    if (n != null && Number(n) > 0) s.add(Math.round(Number(n)));
+  }
+  return s;
+};
+
+const MONEY_RE = new RegExp(
+  String.raw`(${SYM}\s?)?${AMOUNT}(\s?${SYM})?`,
+  'gi'
+);
+
+/**
+ * Strip or blank out euro/£/$ figures in prose that are not in the valuation object.
+ * Range phrases already aligned by alignProseRanges are kept. Catalogue estimate
+ * mentions (estimate / estimation / mise à prix) are left alone.
+ */
+export const stripMismatchedMoney = (text: string, allowed: AllowedMoney): { text: string; stripped: number } => {
+  if (!text || typeof text !== 'string') return { text, stripped: 0 };
+  const ok = allowedSet(allowed);
+  if (!ok.size) return { text, stripped: 0 };
+  let stripped = 0;
+  // Protect catalogue-estimate phrases
+  const protectedSpans: Array<[number, number]> = [];
+  const prot = /\b(catalogue estimate|estimation|mise à prix|estimate of|estimée?\s+[àa])\b[^.;]{0,40}/gi;
+  let m: RegExpExecArray | null;
+  while ((m = prot.exec(text))) protectedSpans.push([m.index, m.index + m[0].length]);
+  const isProtected = (i: number) => protectedSpans.some(([a, b]) => i >= a && i < b);
+
+  const out = text.replace(MONEY_RE, (whole, s1, amt: string, s2, offset: number) => {
+    if (!(s1 || s2)) return whole; // bare number without currency symbol — leave (years, dims)
+    if (isProtected(offset)) return whole;
+    const n = parseAmount(amt);
+    if (!Number.isFinite(n) || n <= 0) return whole;
+    if (ok.has(Math.round(n))) return whole;
+    // Within 1% of an allowed figure (rounding noise)
+    for (const a of ok) if (Math.abs(a - n) / a < 0.01) return whole;
+    stripped++;
+    return s1 || s2 ? `${s1 || ''}${s2 || ''}[…]`.replace(/\s+/g, '') : whole;
+  });
+  // Clean awkward leftovers like "€[…]" → remove the token
+  const cleaned = out.replace(/(?:€|£|\$|EUR|GBP|USD)\s*\[…\]/g, '').replace(/\s{2,}/g, ' ').replace(/\s+([.,;])/g, '$1').trim();
+  return { text: cleaned, stripped };
+};
+
+/**
+ * Put valuation numbers into key prose fields and strip mismatched euro figures.
+ * Returns the updated item fields plus a count of stripped tokens.
+ */
+export const enforceNarrativeConsistency = (
+  fields: { pricing_reasoning?: string; snap_judgement?: string; teaser_insight?: string; resale_insight?: string; decision_summary?: string[] },
+  allowed: AllowedMoney,
+  fmt: (n: number) => string,
+): { fields: typeof fields; stripped: number } => {
+  const ranges = {
+    market: [allowed.marketLow, allowed.marketHigh] as [number, number],
+    retail: [allowed.retailLow || allowed.marketLow, allowed.retailHigh || allowed.marketHigh] as [number, number],
+  };
+  let stripped = 0;
+  const one = (s?: string) => {
+    if (!s) return s;
+    const aligned = alignProseRanges(s, ranges, fmt);
+    const r = stripMismatchedMoney(aligned, allowed);
+    stripped += r.stripped;
+    return r.text;
+  };
+  const out = {
+    pricing_reasoning: one(fields.pricing_reasoning),
+    snap_judgement: one(fields.snap_judgement),
+    teaser_insight: one(fields.teaser_insight),
+    resale_insight: one(fields.resale_insight),
+    decision_summary: Array.isArray(fields.decision_summary) ? fields.decision_summary.map(x => one(x) || '').filter(Boolean) : fields.decision_summary,
+  };
+  // Ensure pricing_reasoning mentions the market range from the valuation object
+  if (out.pricing_reasoning && allowed.marketLow > 0 && allowed.marketHigh > 0) {
+    const compact = out.pricing_reasoning.replace(/[€£$\s]/g, '');
+    const hasRange = compact.includes(String(allowed.marketLow)) && compact.includes(String(allowed.marketHigh));
+    if (!hasRange && !/market range|auction range|hammer/i.test(out.pricing_reasoning)) {
+      out.pricing_reasoning = `${out.pricing_reasoning} Market range ${fmt(allowed.marketLow)}–${fmt(allowed.marketHigh)}.`.trim();
+    }
+  }
+  return { fields: out, stripped };
+};
+
+
 // ---------------------------------------------------------------------------
 // Final buy decision (used by gemini.ts after the model answers; unit-tested with the road-test cases)
 // ---------------------------------------------------------------------------

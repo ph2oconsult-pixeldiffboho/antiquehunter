@@ -5,7 +5,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { FindCard } from './FindCard';
 import { Loader2, Search, Filter, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { analysisItems, deleteLocalFind, loadLocalFinds } from '../services/localFinds';
+import { analysisItems, deleteLocalFind, loadLocalFinds, commitDraftToLocalFinds } from '../services/localFinds';
 
 interface CollectionProps {
   onViewFind: (find: any) => void;
@@ -24,6 +24,9 @@ export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) =>
   const [localFinds, setLocalFinds] = useState<any[]>(() => loadLocalFinds());
 
   useEffect(() => {
+    // Recover a draft left by a cancelled/failed Save-to-Log (empty log / slow auth / offline).
+    if (commitDraftToLocalFinds()) setLocalFinds(loadLocalFinds());
+
     // Not signed in: only finds saved on this device
     if (!auth.currentUser) { setLoading(false); return; }
 
@@ -33,16 +36,21 @@ export const Collection: React.FC<CollectionProps> = ({ onViewFind, onBack }) =>
       orderBy('createdAt', 'desc')
     );
 
+    // Empty collection / missing index / offline: never spin forever.
+    const loadCeiling = setTimeout(() => setLoading(false), 8_000);
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setFinds(data);
       setLoading(false);
+      clearTimeout(loadCeiling);
     }, (error) => {
       setLoading(false);
+      clearTimeout(loadCeiling);
       try { handleFirestoreError(error, OperationType.LIST, 'finds'); } catch { /* logged */ }
     });
 
-    return () => unsubscribe();
+    return () => { clearTimeout(loadCeiling); unsubscribe(); };
   }, []);
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {

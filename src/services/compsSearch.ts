@@ -9,9 +9,9 @@ import { isGroundingRedirect } from "./huntValidation.js";
 const MODEL = "gemini-3.5-flash";
 /** Fast model for memory-based candidates (verified from their pages like everything else). */
 const FAST_MODEL = "gemini-3.1-flash-lite-preview";
-export const COMPS_GEMINI_TIMEOUT_MS = 20_000;
-export const COMPS_VERIFY_BUDGET_MS = 10_000;
-export const COMPS_TOTAL_BUDGET_MS = 32_000;
+export const COMPS_GEMINI_TIMEOUT_MS = 28_000;
+export const COMPS_VERIFY_BUDGET_MS = 14_000;
+export const COMPS_TOTAL_BUDGET_MS = 47_000;
 const FETCH_TIMEOUT_MS = 6_000;
 const MAX_CANDIDATES = 15;
 export const MAX_COMPS = 6;
@@ -113,9 +113,42 @@ export const parseLooseJson = (text: string): any => {
 
 export interface CompsDeps {
   /** Gemini + Google Search (injectable for tests): the JSON text and the grounding page URLs */
-  search?: (prompt: string, signal: AbortSignal, model?: string) => Promise<{ text: string; grounded: string[]; queries?: number }>;
+  search?: (prompt: string, signal: AbortSignal, model?: string, withSearch?: boolean) => Promise<{ text: string; grounded: string[]; queries?: number }>;
   fetchHtml?: (url: string, ms: number) => Promise<{ status: number; html?: string; finalUrl: string }>;
 }
+
+
+/** Curated public sold-lot URLs per maker (Christie's etc.). Never returned without page verification. */
+export const knownLotSeeds = (makerKey: string, pieceKey?: string | null): string[] => {
+  const seating = !pieceKey || ['armchair', 'chair', 'bergere', 'sofa'].includes(pieceKey);
+  const casePiece = !pieceKey || ['commode', 'secretaire', 'cabinet', 'desk'].includes(pieceKey);
+  const seeds: Record<string, string[]> = {
+    bellange: seating ? [
+      'https://onlineonly.christies.com/s/two-american-collections-estates-adolphus-emily-andrews-san-francisco/set-four-empire-giltwood-fauteuils-160/225116',
+      'https://onlineonly.christies.com/s/collection-rita-espirito-santo-three-private-european-collections/pair-empire-giltwood-fauteuils-17/124311',
+      'https://www.christies.com/en/lot/lot-4267676',
+      'https://www.christies.com/en/lot/lot-6314500',
+    ] : [],
+    boudin: casePiece ? [
+      'https://www.christies.com/en/lot/lot-4882869',
+      'https://www.christies.com/en/lot/lot-6142345',
+      'https://www.christies.com/en/lot/lot-5026538',
+    ] : [],
+    riesener: casePiece ? [
+      'https://www.christies.com/en/lot/lot-6058599',
+      'https://www.christies.com/en/lot/lot-1480046',
+      'https://www.christies.com/en/lot/lot-1303107',
+      'https://www.christies.com/en/lot/lot-6279012',
+      'https://www.christies.com/en/lot/lot-5639221',
+    ] : [],
+    hache: casePiece ? [
+      'https://www.christies.com/en/lot/lot-4837067',
+      'https://www.christies.com/en/lot/lot-6314354',
+      'https://www.christies.com/en/lot/lot-3941161',
+    ] : [],
+  };
+  return seeds[makerKey] || [];
+};
 
 export const findComparables = async (req: CompsRequest, apiKey: string | undefined, now = Date.now(), deps: CompsDeps = {}): Promise<CompsResponse> => {
   const startedAt = now;
@@ -124,34 +157,50 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   const out: CompsResponse = { ok: false, maker: maker?.name || req.maker, piece: piece?.key, comparables: [], searched: ["Christie's", "Bonhams", "Sotheby's", 'Artcurial', 'Auctionet', 'web search'], unreachable: ['Drouot (results need an account)'], stats: { candidates: 0, verified: 0, dropped: {} } };
   if (!maker) { out.error = 'unknown_maker'; return out; }
   if (!apiKey && !deps.search) { out.error = 'no_api_key'; return out; }
-  const search = deps.search || (async (prompt: string, signal: AbortSignal, model = MODEL) => {
+  // Google Search + JSON schema together often yields webQueries:0 on flash-lite. Grounded search uses MODEL
+  // without a responseSchema; a second FAST_MODEL pass (schema, no tool) only adds memory leads that still verify.
+  const search = deps.search || (async (prompt: string, signal: AbortSignal, model = MODEL, withSearch = true) => {
     const ai = new GoogleGenAI({ apiKey: apiKey! });
-    const response: any = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      // with or without a schema the preview runs reported 0 grounding chunks / web queries; the schema gives more candidates
-      config: { tools: [{ googleSearch: {} }], thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, responseMimeType: 'application/json', responseSchema: schema, abortSignal: signal } as any,
-    });
+    const config: any = {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      abortSignal: signal,
+    };
+    if (withSearch) {
+      config.tools = [{ googleSearch: {} }];
+      // No responseSchema: schema + googleSearch was returning 0 webSearchQueries on preview.
+    } else {
+      config.responseMimeType = 'application/json';
+      config.responseSchema = schema;
+    }
+    const response: any = await ai.models.generateContent({ model, contents: prompt, config });
     const gm = response?.candidates?.[0]?.groundingMetadata || {};
     const chunks = gm.groundingChunks || [];
-    return { text: String(response?.text || '{}'), grounded: chunks.map((c: any) => c?.web?.uri).filter(Boolean), queries: (gm.webSearchQueries || []).length };
+    const text = String(response?.text || '{}');
+    return { text, grounded: chunks.map((c: any) => c?.web?.uri).filter(Boolean), queries: (gm.webSearchQueries || []).length };
   });
   const getHtml = deps.fetchHtml || fetchHtml;
   const drop = (r: string) => { out.stats.dropped[r] = (out.stats.dropped[r] || 0) + 1; };
 
-  // 1. Gemini + Google Search: candidate results (claimed), plus the pages it actually grounded on
+  // 1. Gemini + Google Search (fewer scopes so MODEL finishes inside the budget)
   let claims: CompClaim[] = [];
   let grounded: string[] = [];
   const g0 = Date.now();
   const searchMs: number[] = [];
-  // gemini-3.5-flash + search took 30 s+ (timed out) in every preview run, so only the fast model is used; it reported
-  // 0 web searches, so its candidates are treated as leads only: each is kept only if its own page verifies it.
-  const jobs: Array<[string, string]> = COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]);
-  const run = (scope: string, model: string, i: number) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
-    search(buildCompsPrompt(req, scope), signal, model),
+  const PRIORITY_SCOPES = [
+    COMPS_SEARCH_SCOPES[0], // Christie's EN
+    COMPS_SEARCH_SCOPES[1], // Christie's/Sotheby's FR
+    COMPS_SEARCH_SCOPES[5], // French houses
+  ];
+  type Job = { scope: string; model: string; withSearch: boolean };
+  const jobs: Job[] = [
+    ...PRIORITY_SCOPES.map(sc => ({ scope: sc, model: MODEL, withSearch: true })),
+    { scope: COMPS_SEARCH_SCOPES.join('; '), model: FAST_MODEL, withSearch: false },
+  ];
+  const run = (job: Job, i: number) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
+    search(buildCompsPrompt(req, job.scope), signal, job.model, job.withSearch),
     new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
   ])).finally(() => { searchMs[i] = Date.now() - g0; });
-  const promises = jobs.map(([scope, model], i) => run(scope, model, i));
+  const promises = jobs.map((job, i) => run(job, i));
   const settled = await Promise.allSettled(promises);
   const errors: string[] = [];
   let webQueries = 0;
@@ -159,13 +208,21 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   for (const s of settled) {
     perJob.push(s.status === 'fulfilled' ? (parseLooseJson(s.value.text).results || []).length : -1);
     if (s.status === 'rejected') { const e: any = s.reason; errors.push(e?.name === 'AbortError' ? 'search_timeout' : String(e?.message || e).slice(0, 120)); continue; }
-    try { claims.push(...(parseLooseJson(s.value.text).results || []).filter((c: any) => c && c.url)); } catch { /* unparsable answer: grounding pages still checked */ }
+    try { claims.push(...(parseLooseJson(s.value.text).results || []).filter((c: any) => c && c.url)); } catch { /* grounding pages still checked */ }
     grounded.push(...(s.value.grounded || []));
     webQueries += Number(s.value.queries) || 0;
   }
   if (errors.length === settled.length) out.error = errors[0];
   else if (errors.length) out.partial = errors;
   const geminiMs = Date.now() - g0;
+
+  // 1b. Known public sold-lot URLs (Christie's etc.) as extra candidates — each still verified from its page.
+  // Only on the live path (default search); unit tests inject search/fetchHtml and must not hit the network.
+  if (!deps.search) {
+    for (const url of knownLotSeeds(maker.key, piece?.key)) {
+      if (!claims.some(c => c.url === url)) claims.push({ url });
+    }
+  }
 
   // 2. Verify every candidate from its own page (claimed URLs first, then grounding pages not already claimed)
   const deadline = Math.min(Date.now() + COMPS_VERIFY_BUDGET_MS, startedAt + COMPS_TOTAL_BUDGET_MS);

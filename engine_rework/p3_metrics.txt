@@ -1,0 +1,10 @@
+leak []
+0 0
+Traceback (most recent call last):
+  File "/workspace/p3an.py", line 19, in <module>
+    print(name,'B',m(B,ks),'A',m(A,ks))
+                   ~^^^^^^
+  File "/workspace/p3an.py", line 13, in m
+    return dict(n=n,cov=round(h/n,3),under=round(sum(r['underval'] for r in rs)/n,3),over=round(sum(r['overval'] for r in rs)/n,3),
+                              ~^~
+ZeroDivisionError: division by zero

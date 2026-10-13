@@ -38,7 +38,7 @@ import {
 } from "./huntGeo.js";
 import {
   periodProblemFor,
-  candidateToMatch, DIRECT_ENRICH_BUDGET_MS, DIRECT_SEARCH_BUDGET_MS, directSitesFor, finishDirect, MAX_DIRECT_RESULTS,
+  candidateToMatch, materialVerdict, DIRECT_ENRICH_BUDGET_MS, DIRECT_SEARCH_BUDGET_MS, directSitesFor, finishDirect, MAX_DIRECT_RESULTS,
   searchDirectSites, SITE_DOMAIN, type DirectCandidate, type DirectSearchResult, type DirectSourceStat,
 } from "./directSearch.js";
 import { requestUrlFor } from "./sources/fetchSource.js";
@@ -84,6 +84,10 @@ export interface HuntMatch {
   allInHigh?: number;
   /** Premium used for the all-in figure (published, or assumed when premiumAssumed) */
   premiumPct?: number;
+  /** Approximate alternative (material unconfirmed, slight budget overrun) — labelled, not a primary hit. */
+  approximate?: boolean;
+  approxReason?: string;
+  labels?: string[];
 }
 
 export interface HuntResults {
@@ -468,10 +472,27 @@ export const auctionetToMatch = (it: AuctionetItem, params: HuntParams, plan: Hu
   const allInHigh = conv(f.estimateHigh) ?? allInLow;
   const fmt = (n: number) => { try { return new Intl.NumberFormat('en-GB', { style: 'currency', currency: userCur, maximumFractionDigits: 0 }).format(n); } catch { return `${Math.round(n)} ${userCur}`; } };
   const max = budgetMax(params.priceRange);
-  if (max && (allInLow ? allInLow > max : !withinBudget(f.estimateLow, f.estimateCurrency, max, params.currency))) return { dropReason: 'over_budget' };
+  const mat = materialVerdict(params.query, `${f.title || ''} ${f.description || ''}`);
+  if (mat === 'mismatch') return { dropReason: 'material_mismatch' };
+  let approximate = false;
+  let approxReason: string | undefined;
+  const labels: string[] = [];
+  if (mat === 'unconfirmed') { labels.push('material_unconfirmed'); approximate = true; approxReason = 'material_unconfirmed'; }
+  if (mat === 'match') labels.push('material_match');
+  if (max && allInLow && allInLow > max) {
+    if (allInLow <= max * 1.15) { approximate = true; approxReason = approxReason || 'near_budget'; labels.push('near_budget'); }
+    else return { dropReason: 'over_budget' };
+  } else if (max && !allInLow && !withinBudget(f.estimateLow, f.estimateCurrency, max, params.currency)) {
+    return { dropReason: 'over_budget' };
+  }
   const allInEstimate = allInLow
     ? `All-in ≈ ${allInHigh && allInHigh !== allInLow ? `${fmt(allInLow)} – ${fmt(allInHigh)}` : fmt(allInLow)} ~${AUCTIONET_PREMIUM_PCT}% fees assumed`
     : undefined;
+  const approxNote = approximate
+    ? (approxReason === 'near_budget'
+      ? ' Approximate alternative: all-in is slightly above your budget.'
+      : ' Approximate alternative: the wood/material you asked for is not confirmed in the catalogue text.')
+    : '';
   return {
     match: {
       allInLow, allInHigh, allInEstimate, premiumAssumed: true, premiumPct: AUCTIONET_PREMIUM_PCT, house: it.house,
@@ -482,10 +503,11 @@ export const auctionetToMatch = (it: AuctionetItem, params: HuntParams, plan: Hu
       location: [it.location, country].filter(Boolean).join(', '),
       date: f.saleDate ? formatSaleDate(f.saleDate) : undefined,
       description: f.description || undefined,
-      dealerAnalysis: `Found directly on Auctionet (${it.house || 'auction house'}). Estimate and closing time are from the auction house; ask for a condition report and photos of the back, drawers and any stamp before bidding.`,
+      dealerAnalysis: `Found directly on Auctionet (${it.house || 'auction house'}). Estimate and closing time are from the auction house; ask for a condition report and photos of the back, drawers and any stamp before bidding.${approxNote}`,
       imageUrl: f.image,
       verification: 'verified',
       source: 'auctionet_api',
+      approximate: approximate || undefined, approxReason, labels: labels.length ? labels : undefined,
     },
   };
 };
@@ -722,6 +744,7 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
 
   const directRanked = direct.result ? applyRanking(direct.result.candidates, direct.ranking) : { kept: [], rejected: 0 };
   const directMatches: HuntMatch[] = directRanked.kept.slice(0, MAX_DIRECT_RESULTS).map(({ c, analysis }) => candidateToMatch(c, params, analysis));
+  const approxDirect: HuntMatch[] = (direct.result?.approximate || []).slice(0, 3).map(c => candidateToMatch(c, params));
 
   // A web-search error with nothing else found still fails; a web-search TIMEOUT returns what the direct sources
   // found (possibly nothing) with a notice instead of failing the whole request (fix 8)
@@ -741,6 +764,11 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
   const titleKey = (t?: string) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 28);
   const directTitles = new Set(directMatches.map(m => titleKey(m.title)).filter(k => k.length >= 20));
   for (const m of directMatches) { seen.add(lotKey(m.url)); matches.push(m); }
+  for (const m of approxDirect) {
+    if (seen.has(lotKey(m.url))) continue;
+    seen.add(lotKey(m.url));
+    matches.push(m);
+  }
   for (const o of outcomes) {
     // the same lot found by web search on the other site (Interencheres <-> Drouot cross-listing)
     if (o.match && o.match.source === 'web_search' && directTitles.has(titleKey(o.match.title))) { addDrop('cross_listed'); continue; }
