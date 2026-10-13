@@ -2265,6 +2265,8 @@ check("photo judgement: stamped minor-maker cap (read or stated), top makers exe
   assert.ok(!tapestry.factors.includes("stamped_minor_maker_cap") && tapestry.high > 3000, "stamp cap is furniture-only");
   const painting = applyPhotoJudgement({ hasPhotos: true, userText: "oil on canvas, signed", modelText: "", styleEvidence: false, periodCertainty: "confirmed_period", low: 3000, high: 9000 });
   assert.ok(!painting.factors.includes("stamped_minor_maker_cap"), "no category: non-furniture words keep the cap off");
+  const carpet = applyPhotoJudgement({ hasPhotos: true, userText: "", category: "furniture", modelText: "Large Spanish Carpet, Real Fábrica de Tapices", modelMakerStatus: "stamp_visible_in_photo", styleEvidence: false, periodCertainty: "confirmed_period", low: 2000, high: 6000 });
+  assert.ok(!carpet.factors.includes("stamped_minor_maker_cap"), "a carpet filed under furniture is not capped");
   const thin = applyPhotoJudgement({ hasPhotos: true, userText: "mirror", category: "mirrors", modelText: "", confidence: "medium", styleEvidence: false, periodCertainty: "ambiguous", low: 300, high: 800 });
   assert.ok(thin.factors.includes("model_signal_cheap_floor") && thin.low <= 140 && thin.high === 800, `${thin.low}-${thin.high}`);
   const firm = applyPhotoJudgement({ hasPhotos: true, userText: "commode", category: "furniture", modelText: "", confidence: "high", constructionEvidence: "hand-cut dovetails", styleEvidence: false, periodCertainty: "probable_period", low: 800, high: 1800 });

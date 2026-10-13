@@ -128,7 +128,10 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
   const anyStamp = photoStamp || (STAMP_IN_TEXT_RE.test(i.userText) && /\b(stamp|estampill|jme)/i.test(i.userText));
   const topMaker = TOP_MAKER_RE.test(`${i.userText} ${String(i.modelText || '').slice(0, 600)}`);
   const cat = String(i.category || '').toLowerCase();
-  const isFurniture = FURNITURE_CATS.has(cat) || ((!cat || cat === 'unknown') && !NON_FURNITURE_RE.test(`${i.userText} ${String(i.modelText || '').slice(0, 200)}`));
+  // The picked category can be wrong (a carpet filed under furniture), so the model's title / the user's text naming a
+  // non-furniture object also keeps the cap off.
+  const namesOther = NON_FURNITURE_RE.test(`${i.userText} ${String(i.modelText || '').slice(0, 120)}`);
+  const isFurniture = (FURNITURE_CATS.has(cat) || !cat || cat === 'unknown') && !namesOther;
   if (anyStamp && !topMaker && isFurniture && high > STAMPED_MINOR_HIGH_CAP) {
     high = STAMPED_MINOR_HIGH_CAP;
     low = Math.min(low, high / 3);
