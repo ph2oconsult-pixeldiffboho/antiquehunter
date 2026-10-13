@@ -545,7 +545,8 @@
       "none_verified": "Aucun résultat de vente vérifié pour {{maker}} — la fourchette est l'estimation de l'expert.",
       "error": "La recherche de résultats de ventes a échoué — la fourchette est l'estimation de l'expert.",
       "not_searched": "Les résultats de ventes n'ont pas été recherchés.",
-      "no_maker": ""
+      "no_maker": "",
+      "none_relevant": "Aucune vente vérifiée assez proche (même type de meuble, niveau de prix comparable) — aucune n'est affichée ; la fourchette est l'estimation de l'expert."
     },
     "pieces_one": "{{count}} pièce",
     "pieces_other": "{{count}} pièces",
@@ -570,7 +571,9 @@
     "verified_note": "Chaque résultat a été ouvert et vérifié sur la page de la maison de ventes (ébéniste, pièce, prix d'adjudication). Rien de non vérifié n'est affiché.",
     "nearest_title": "Lots proches — pourquoi retenus ou écartés",
     "kept": "Retenu",
-    "dropped": "Écarté"
+    "dropped": "Écarté",
+    "generic_title": "Ventes comparables (sans auteur)",
+    "generic_note": "Aucun auteur connu : ce sont des ventes du même type de meuble, de la même époque et du même matériau. C'est une preuve plus faible que les résultats d'un auteur ; elles sont mélangées à l'estimation."
   },
   "negotiate": {
     "title": "Négocier",

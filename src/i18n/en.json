@@ -545,7 +545,8 @@
       "none_verified": "No verified auction results found for {{maker}} — the range is the appraiser's estimate.",
       "error": "The auction results search failed — the range is the appraiser's estimate.",
       "not_searched": "Auction results were not searched.",
-      "no_maker": ""
+      "no_maker": "",
+      "none_relevant": "No verified sale was close enough (same kind of piece, similar price level) — none are shown; the range is the expert estimate."
     },
     "pieces_one": "{{count}} piece",
     "pieces_other": "{{count}} pieces",
@@ -570,7 +571,9 @@
     "verified_note": "Each result was opened and checked on the auction house's own page (maker, piece and sold price). Nothing unverified is shown.",
     "nearest_title": "Nearest lots — why kept or dropped",
     "kept": "Kept",
-    "dropped": "Dropped"
+    "dropped": "Dropped",
+    "generic_title": "Comparable sales (no maker)",
+    "generic_note": "No maker is known, so these are sales of the same kind of piece, period and material. They are weaker evidence than a maker's own results and are blended with the estimate."
   },
   "negotiate": {
     "title": "Negotiate",

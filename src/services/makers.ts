@@ -196,7 +196,19 @@ export const PIECES: PieceQuery[] = [
   { key: 'table', en: 'table', fr: 'table', re: /\b(tables?|gueridons?|consoles?)\b/ },
   { key: 'cabinet', en: 'cabinet', fr: 'meuble', re: /\b(cabinets?|armoires?|bibliotheques?|bookcases?|encoignures?|corner\s+cupboards?|chiffonniers?|semainiers?)\b/ },
   { key: 'mirror', en: 'mirror', fr: 'miroir', re: /\b(mirrors?|miroirs?|trumeaux?)\b/ },
+  { key: 'screen', en: 'fire screen', fr: 'écran de cheminée', re: /\b(fire\s?screens?|firescreens?|ecrans?(\s+de\s+(cheminee|feu|foyer))?|pare-?feux?|paravents?|folding\s+screens?)\b/ },
+  { key: 'bed', en: 'bed', fr: 'lit', re: /\b(beds?|lits?(\s+de\s+repos)?|daybeds?|meridiennes?)\b/ },
+  { key: 'clock', en: 'clock', fr: 'pendule', re: /\b(clocks?|pendules?|cartels?|horloges?|regulateurs?)\b/ },
+  { key: 'lighting', en: 'chandelier', fr: 'lustre', re: /\b(chandeliers?|lustres?|appliques?|sconces?|candelabr\w*|lamps?|lampes?|flambeaux?|candlesticks?|bougeoirs?)\b/ },
 ];
+
+/** Piece families that may stand in for each other as comparables (a chair set for armchairs, never a table for a mirror). */
+export const pieceFamily = (key?: string | null): string | null => {
+  if (!key) return null;
+  if (key === 'chair' || key === 'armchair' || key === 'bergere') return 'seat';
+  if (key === 'desk' || key === 'secretaire') return 'desk';
+  return key;
+};
 
 export const pieceOf = (text: string, category?: string): PieceQuery | null => {
   const t = fold(text);

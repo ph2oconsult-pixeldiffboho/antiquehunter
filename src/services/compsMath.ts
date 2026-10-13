@@ -2,7 +2,7 @@
 // stamped / attributed classification, per-piece prices, and the range anchored on them. Pure (unit-tested);
 // the network side is in compsSearch.ts (server only).
 import { convertApprox } from "./budget.js";
-import { countPieces, findMaker, fold, materialOf, type MakerStatus } from "./makers.js";
+import { countPieces, findMaker, fold, materialOf, pieceFamily, pieceOf, type MakerStatus } from "./makers.js";
 import { decodeEntities } from "./huntValidation.js";
 
 export type CompStamp = 'stamped' | 'by' | 'attributed';
@@ -42,6 +42,8 @@ export interface CompsResponse {
   partial?: string[];
   /** Every candidate page checked, with the verification outcome (transparency / debugging). */
   checked?: Array<{ url: string; result: string }>;
+  /** No maker: comparables found by piece type / period / material / region (weaker evidence, always blended). */
+  generic?: boolean;
 }
 
 /** Typical buyer's premium incl. VAT, used to move between hammer and all-in when a house publishes only one. */
@@ -172,7 +174,7 @@ const yearOk = (d?: string) => { const y = Number(String(d || '').slice(0, 4)); 
  * word). Returns null (with the reason) when the page does not prove it.
  */
 export const verifyComparable = (
-  html: string, url: string, claim: CompClaim | null, makerKey: string, pieceRe: RegExp | null,
+  html: string, url: string, claim: CompClaim | null, makerKey: string | null, pieceRe: RegExp | null,
 ): { comp?: Comparable; reason?: string } => {
   const { house, feesIncluded: houseFees } = houseOf(url);
   let parsed: ParsedLot | null = null;
@@ -191,13 +193,15 @@ export const verifyComparable = (
     parsed = { title: t || claim.title || '', description: pageText(html).slice(0, 4000), price: claim.price, currency: String(claim.currency || 'EUR').toUpperCase() };
   }
   const lotText = `${parsed.title} ${parsed.description || ''}`;
-  const maker = findMaker(`${parsed.title}. ${(parsed.description || '').slice(0, 1500)}`);
-  if (!maker || maker.key !== makerKey) {
+  const maker = makerKey ? findMaker(`${parsed.title}. ${(parsed.description || '').slice(0, 1500)}`) : null;
+  if (makerKey && (!maker || maker.key !== makerKey)) {
     // the maker may be named further down the house's description
     const m2 = findMaker(lotText);
     if (!m2 || m2.key !== makerKey) return { reason: 'maker_not_on_page' };
   }
   if (pieceRe && !pieceRe.test(fold(parsed.title)) && !pieceRe.test(fold((parsed.description || '').slice(0, 600)))) return { reason: 'other_piece' };
+  // No maker to tie the lot to the piece: the lot's own title must name the same kind of piece.
+  if (!makerKey && (!pieceRe || !pieceRe.test(fold(parsed.title)))) return { reason: 'other_piece' };
   const currency = parsed.currency || String(claim?.currency || '').toUpperCase();
   const eur = convertApprox(parsed.price, currency, 'EUR');
   if (!eur || eur <= 0) return { reason: 'currency' };
@@ -233,9 +237,11 @@ export interface CompMatchNote {
 
 export interface CompsAnchor {
   applied: boolean;
-  reason: 'anchored' | 'blended' | 'too_few' | 'not_stamped' | 'none';
-  group: 'stamped' | 'attributed' | null;
+  reason: 'anchored' | 'blended' | 'too_few' | 'not_stamped' | 'none' | 'no_relevant';
+  group: 'stamped' | 'attributed' | 'generic' | null;
   used: Comparable[];
+  /** Comps that pass the relevance filter (same kind of piece, not a price outlier). Only these are shown. */
+  relevant: Comparable[];
   nearest: CompMatchNote[];
   perPieceMedianEur: number;
   pieces: number;
@@ -279,7 +285,55 @@ export interface AnchorOptions {
   textOnlyCap?: number;
   /** Outlier threshold vs median (default 3). */
   outlierFactor?: number;
+  /** Kind of piece being appraised (makers.PIECES key); derived from pieceText when absent. */
+  pieceKey?: string | null;
+  /** Comps came from a no-maker search (type / period / material / region). */
+  generic?: boolean;
+  /** Relevance: drop comps more than this factor from the candidates' median or outside the prior band (default 5). */
+  relevanceFactor?: number;
 }
+
+const kindOfComp = (c: Comparable): string | null => pieceOf(c.title)?.key || null;
+
+/**
+ * Relevance gate shared by maker and generic comps: the same kind of piece (a mirror is never matched with a dressing
+ * table, a fire screen never with chairs), and no candidate more than ~×5 from the candidates' median or from the
+ * prior (base) band. Pure.
+ */
+export const filterRelevantComps = (
+  comps: Comparable[], o: { pieceKey?: string | null; pieceText?: string; generic?: boolean; isAuction: boolean; eurTo?: (eur: number) => number; priorLow?: number; priorHigh?: number; relevanceFactor?: number },
+): { kept: Comparable[]; notes: CompMatchNote[] } => {
+  const perOf = (c: Comparable) => o.isAuction ? c.perPieceHammerEur : c.perPieceAllInEur;
+  const subject = o.pieceKey !== undefined ? o.pieceKey : (pieceOf(o.pieceText || '')?.key || null);
+  const fam = pieceFamily(subject);
+  const notes: CompMatchNote[] = [];
+  let pool = comps.filter(c => {
+    const k = kindOfComp(c);
+    if (fam && k && pieceFamily(k) !== fam) { notes.push({ url: c.url, title: c.title, kept: false, reason: `other_piece_type_${k}`, perPieceEur: perOf(c) }); return false; }
+    if (o.generic && (!fam || !k)) { notes.push({ url: c.url, title: c.title, kept: false, reason: 'piece_type_unconfirmed', perPieceEur: perOf(c) }); return false; }
+    return true;
+  });
+  const f = o.relevanceFactor ?? 5;
+  const to = o.eurTo || ((e: number) => e);
+  const pLo = Number(o.priorLow) || 0, pHi = Number(o.priorHigh) || 0;
+  if (pHi > 0) {
+    pool = pool.filter(c => {
+      const v = to(perOf(c));
+      if (v > pHi * f) { notes.push({ url: c.url, title: c.title, kept: false, reason: `over_${f}x_base_band`, perPieceEur: perOf(c) }); return false; }
+      if (pLo > 0 && v < pLo / f) { notes.push({ url: c.url, title: c.title, kept: false, reason: `under_base_band_div_${f}`, perPieceEur: perOf(c) }); return false; }
+      return true;
+    });
+  }
+  if (pool.length >= 3) {
+    const med = quantile(pool.map(perOf), 0.5);
+    pool = pool.filter(c => {
+      const v = perOf(c);
+      if (v > med * f || v < med / f) { notes.push({ url: c.url, title: c.title, kept: false, reason: `outlier_${f}x_candidates_median`, perPieceEur: v }); return false; }
+      return true;
+    });
+  }
+  return { kept: pool, notes };
+};
 
 /**
  * Match verified comps to the piece (stamp status, material, plain vs trophy quality), drop outliers
@@ -289,23 +343,27 @@ export interface AnchorOptions {
 export const anchorOnComparables = (
   comps: Comparable[], o: AnchorOptions,
 ): CompsAnchor => {
-  const group = o.status === 'stamped_confirmed' || o.status === 'stamped_stated' || o.status === 'stamp_in_photo' ? 'stamped'
-    : o.status === 'attributed' ? 'attributed' : null;
+  const group: CompsAnchor['group'] = o.status === 'stamped_confirmed' || o.status === 'stamped_stated' || o.status === 'stamp_in_photo' ? 'stamped'
+    : o.status === 'attributed' ? 'attributed' : o.generic ? 'generic' : null;
   const basis: 'hammer' | 'all_in' = o.isAuction ? 'hammer' : 'all_in';
+  const rel = filterRelevantComps(comps, { ...o, priorLow: o.priorLow, priorHigh: o.priorHigh });
   const empty = (reason: CompsAnchor['reason']): CompsAnchor => ({
-    applied: false, reason, group, used: [], nearest: [], perPieceMedianEur: 0, pieces: o.pieces, low: 0, high: 0, basis, blended: false, capped: false,
+    applied: false, reason, group, used: [], relevant: rel.kept, nearest: [], perPieceMedianEur: 0, pieces: o.pieces, low: 0, high: 0, basis, blended: false, capped: false,
   });
   if (!comps.length) return empty('none');
+  if (!rel.kept.length) return { ...empty('no_relevant'), nearest: rel.notes.slice(0, 12) };
   if (!group) return empty('not_stamped');
+  comps = rel.kept;
 
   const pieceT = fold(o.pieceText || '');
   const piecePlain = PLAIN_PIECE_RE.test(pieceT);
   const pieceHasTrophy = TROPHY_RE.test(pieceT) || HEAVY_ORMOLU_RE.test(pieceT);
   const perOf = (c: Comparable) => o.isAuction ? c.perPieceHammerEur : c.perPieceAllInEur;
-  const notes: CompMatchNote[] = [];
+  const notes: CompMatchNote[] = [...rel.notes];
 
-  // 1. Stamp group
+  // 1. Stamp group (generic comps: no maker, so no stamp group)
   let pool = comps.filter(c => {
+    if (group === 'generic') return true;
     const ok = group === 'stamped' ? c.stamp !== 'attributed' : c.stamp === 'attributed';
     if (!ok) notes.push({ url: c.url, title: c.title, kept: false, reason: 'stamp_status_mismatch', perPieceEur: perOf(c) });
     return ok;
@@ -385,7 +443,8 @@ export const anchorOnComparables = (
   // 6. Blend with prior when fewer than 3 good matches
   const priorLo = Number(o.priorLow) || 0;
   const priorHi = Number(o.priorHigh) || 0;
-  if (pool.length < 3 && priorHi > priorLo && priorLo > 0) {
+  // Generic (no-maker) comps are weaker evidence than the maker's own results: always blend.
+  if ((pool.length < 3 || group === 'generic') && priorHi > priorLo && priorLo > 0) {
     low = 0.5 * low + 0.5 * priorLo;
     high = 0.5 * high + 0.5 * priorHi;
     blended = true;
@@ -403,7 +462,7 @@ export const anchorOnComparables = (
   return {
     applied: true,
     reason: blended ? 'blended' : 'anchored',
-    group, used: pool, nearest,
+    group, used: pool, relevant: rel.kept, nearest,
     perPieceMedianEur: Math.round(med), pieces: n,
     low: round(o.eurTo(low)), high: round(o.eurTo(high)), basis,
     blended, capped,

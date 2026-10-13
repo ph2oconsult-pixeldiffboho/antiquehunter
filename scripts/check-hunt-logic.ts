@@ -37,7 +37,10 @@ import { filterContaminatingComps, parseChristiesLot, parseBonhamsLot, priceOnPa
 import { buildValuation, validateValuation, assertValuationAgreement, allInFromHammer, hammerFromAllIn } from "../src/services/valuation.ts";
 import { normaliseEvidenceLedger, ledgerHasContent } from "../src/services/evidenceLedger.ts";
 import { preserveAppraisalDraft, loadAppraisalDraft, clearAppraisalDraft, commitDraftToLocalFinds, loadLocalFinds, saveLocalFind } from "../src/services/localFinds.ts";
-import { applyBaseBandPriors, isStyleNotPeriod, conditionDiscountOf, categoryPriorHigh, styleDiscountOf, calibrateWidth } from "../src/services/baseBandPriors.ts";
+import { applyBaseBandPriors, isStyleNotPeriod, conditionDiscountOf, categoryPriorHigh, styleDiscountOf, calibrateWidth, styleEvidenceOf } from "../src/services/baseBandPriors.ts";
+import { genericCompsRequestFor, fetchGenericComps } from "../src/services/genericComps.ts";
+import { buildCompsPrompt } from "../src/services/compsSearch.ts";
+import { filterRelevantComps } from "../src/services/compsMath.ts";
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS , knownLotSeeds} from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
@@ -1309,7 +1312,7 @@ check("comps anchor: drop trophy/outlier lots; plain Hache and modest Boudin sta
   assert.ok(ha.high <= 3500 * 2.5 + 1, `Hache high ${ha.high}`);
   assert.ok(ha.perPieceMedianEur <= 6000, `Hache median ${ha.perPieceMedianEur}`);
   assert.ok(ha.used.every(c => c.perPieceAllInEur < 20000), JSON.stringify(ha.used.map(c => c.perPieceAllInEur)));
-  assert.ok(ha.nearest.some(n => !n.kept && /trophy|outlier|ormolu|material_mismatch/i.test(n.reason)), JSON.stringify(ha.nearest));
+  assert.ok(ha.nearest.some(n => !n.kept && /trophy|outlier|ormolu|material_mismatch|base_band/i.test(n.reason)), JSON.stringify(ha.nearest));
 
   // Modest Boudin: should not anchor on €75k+ Christie's trophies
   const boudin: Comparable[] = [
@@ -2117,6 +2120,96 @@ check("comps contamination: subject URL and same house+sale are excluded from an
   assert.equal(kept[0].url, "https://drouot.com/l/OTHER");
   assert.ok(dropped.some(d => d.reason === "subject_url"));
   assert.ok(dropped.some(d => d.reason === "same_house_sale"));
+});
+
+
+// ---- Engine fixes 2026-10-13 ----
+const checkAsync = async (name: string, fn: () => Promise<void>) => { await fn(); passed++; console.log("ok -", name); };
+check("fix 1: revival verdict from appearance only is a hypothesis — keeps the high, widens the low", () => {
+  const base = { marketLow: 400, marketHigh: 1200, category: "furniture", periodCertainty: "later_style_or_revival", title: "Commode", query: "Photos of: commode offered at auction. Dimensions: 120 cm." };
+  const hyp = applyBaseBandPriors({ ...base, styleEvidence: false });
+  const ev = applyBaseBandPriors({ ...base, styleEvidence: true });
+  assert.ok(hyp.factors.includes("style_hypothesis_widened_down"), JSON.stringify(hyp));
+  assert.ok(hyp.high >= 1200, `high kept: ${hyp.high}`);
+  assert.ok(hyp.low < 400, `low widened: ${hyp.low}`);
+  assert.ok(ev.factors.includes("style_strong") && ev.high < 1200, JSON.stringify(ev));
+  assert.ok(applyBaseBandPriors(base).high < 1200, "legacy (undefined) keeps the discount");
+});
+
+check("fix 1: style evidence = catalogue/user words or a modern construction cue, not the model's label", () => {
+  assert.equal(styleEvidenceOf({ userOrCatalogueText: "Commode de style Louis XV en noyer", constructionEvidence: "none shown" }), true);
+  assert.equal(styleEvidenceOf({ userOrCatalogueText: "Louis XV style commode", constructionEvidence: "" }), true);
+  assert.equal(styleEvidenceOf({ userOrCatalogueText: "Photos of: commode", constructionEvidence: "Machine-cut dovetails and plywood back panel" }), true);
+  assert.equal(styleEvidenceOf({ userOrCatalogueText: "Photos of: commode", constructionEvidence: "none shown" }), false);
+  assert.equal(styleEvidenceOf({ userOrCatalogueText: "Commode Louis XV en noyer, XVIIIe siècle", constructionEvidence: "Hand-cut dovetails, no plywood" }), false);
+});
+
+check("fix 2: no maker → generic comps request from type, period, material, region", () => {
+  const r = genericCompsRequestFor("Commode Louis XV en noyer, travail lyonnais, XVIIIe", "furniture", undefined, "fr");
+  assert.ok(r);
+  assert.equal(r!.piece, "commode"); assert.equal(r!.period, "Louis XV"); assert.equal(r!.material, "walnut"); assert.equal(r!.region, "Lyon");
+  assert.equal(r!.generic, true); assert.equal(r!.maker, "");
+  assert.equal(genericCompsRequestFor("Commode estampillée L. Boudin", "furniture", undefined, "fr"), null, "maker search runs instead");
+  assert.equal(genericCompsRequestFor("an old thing", "unknown", undefined, "en"), null, "nothing to match on");
+  assert.equal(genericCompsRequestFor("Photos of: mirror offered at auction", "mirrors", "Bordeaux", "en")!.region, "Bordeaux");
+  const p = buildCompsPrompt({ maker: "", generic: true, piece: "commode", period: "Louis XV", material: "walnut", region: "Lyon" }, "French houses");
+  assert.ok(/No maker is known/.test(p) && /Louis XV walnut commode/.test(p) && !/French maker/.test(p), p);
+});
+
+await checkAsync("fix 2: /api/comps accepts a no-maker generic request (piece required) and verifies by lot title", async () => {
+  const bad = await handleCompsRequest({ generic: true }, "k");
+  assert.equal(bad.status, 400);
+  const noGen = await handleCompsRequest({ piece: "commode" }, "k");
+  assert.equal(noGen.status, 400, "plain requests still need a maker");
+  const page = (title: string, price: string) => `<html><head><title>${title}</title></head><body><h1>${title}</h1><p>Adjugé ${price} €</p><p>2023</p></body></html>`;
+  const res = await findComparables({ maker: "", generic: true, piece: "commode", material: "walnut" }, undefined, Date.now(), {
+    search: async () => ({ text: JSON.stringify({ results: [
+      { url: "https://www.interencheres.com/a/lot-1.html", house: "X", title: "Commode Louis XV en noyer", price: 900, currency: "EUR", sale_date: "2023-05-01" },
+      { url: "https://www.interencheres.com/a/lot-2.html", house: "X", title: "Table de toilette", price: 700, currency: "EUR", sale_date: "2023-05-01" },
+    ] }), grounded: [] }),
+    fetchHtml: async (url: string) => ({ status: 200, finalUrl: url, html: url.endsWith("1.html") ? page("Commode Louis XV en noyer", "900") : page("Table de toilette en acajou", "700") }),
+  });
+  assert.equal(res.generic, true);
+  assert.equal(res.comparables.length, 1, JSON.stringify(res.checked));
+  assert.ok(/Commode/.test(res.comparables[0].title));
+});
+
+await checkAsync("fix 2: fetchGenericComps marks the response generic and returns null on failure", async () => {
+  const ok = await fetchGenericComps({ maker: "", generic: true, piece: "commode", pieces: 1, language: "en" }, (async () => ({ ok: true, json: async () => ({ ok: true, comparables: [] }) })) as any);
+  assert.equal(ok?.generic, true);
+  const ko = await fetchGenericComps({ maker: "", generic: true, piece: "commode", pieces: 1, language: "en" }, (async () => ({ ok: false })) as any);
+  assert.equal(ko, null);
+});
+
+const mkComp = (title: string, per: number, extra: any = {}) => ({ url: `https://x.test/${encodeURIComponent(title)}/${per}`, house: "X", date: "2022-01-01", title, pieces: 1, stamp: "by", price: per, currency: "EUR", feesIncluded: false, allInEur: per, hammerEur: per, perPieceAllInEur: per, perPieceHammerEur: per, verifiedBy: "price_on_page", ...extra }) as Comparable;
+
+check("fix 3: relevance — a mirror is never matched with a dressing table, a fire screen never with chairs", () => {
+  const mirrorComps = [mkComp("Miroir en bois doré, Hache", 3000), mkComp("Table de toilette à miroir, Hache", 140000), mkComp("Trumeau Louis XVI", 1800)];
+  const r = filterRelevantComps(mirrorComps, { pieceKey: "mirror", isAuction: true });
+  assert.deepEqual(r.kept.map(c => c.title), ["Miroir en bois doré, Hache", "Trumeau Louis XVI"]);
+  assert.ok(r.notes.some(n => /other_piece_type_table/.test(n.reason)));
+  const screen = filterRelevantComps([mkComp("Paire de fauteuils, Jacob", 300000), mkComp("Écran de cheminée Louis XVI", 900)], { pieceText: "Fire screen, Louis XVI, giltwood", isAuction: true });
+  assert.deepEqual(screen.kept.map(c => c.title), ["Écran de cheminée Louis XVI"]);
+});
+
+check("fix 3: relevance — ×5 outliers vs candidates' median and vs the base band are dropped; none left → none shown", () => {
+  const c = [mkComp("Commode noyer", 800), mkComp("Commode noyer", 1000), mkComp("Commode noyer", 1200), mkComp("Commode royale", 60000)];
+  const r = filterRelevantComps(c, { pieceKey: "commode", isAuction: true });
+  assert.equal(r.kept.length, 3);
+  const band = filterRelevantComps([mkComp("Commode", 9000), mkComp("Commode", 50)], { pieceKey: "commode", isAuction: true, priorLow: 400, priorHigh: 1200 });
+  assert.equal(band.kept.length, 0, JSON.stringify(band.notes));
+  const a = anchorOnComparables([mkComp("Table de toilette", 5000), mkComp("Table de toilette", 6000)], { status: null, generic: true, pieces: 1, isAuction: true, eurTo: (e) => e, pieceKey: "mirror", priorLow: 300, priorHigh: 900 });
+  assert.equal(a.applied, false); assert.equal(a.reason, "no_relevant"); assert.equal(a.relevant.length, 0);
+});
+
+check("fix 2+3: generic comps anchor (always blended) when ≥2 relevant same-type sales remain", () => {
+  const comps = [mkComp("Commode Louis XV en noyer", 1500), mkComp("Commode en noyer XVIIIe", 2000), mkComp("Commode provençale noyer", 2500), mkComp("Fauteuil", 2000)];
+  const a = anchorOnComparables(comps, { status: null, generic: true, pieces: 1, isAuction: true, eurTo: (e) => e, pieceKey: "commode", priorLow: 400, priorHigh: 1200 });
+  assert.ok(a.applied, JSON.stringify(a));
+  assert.equal(a.group, "generic"); assert.ok(a.blended);
+  assert.equal(a.used.length, 3);
+  assert.ok(a.high > 1200 && a.low > 400, `${a.low}-${a.high}`);
+  assert.equal(anchorOnComparables(comps, { status: null, pieces: 1, isAuction: true, eurTo: (e) => e, pieceKey: "commode" }).applied, false, "maker comps without a stamp group still do not anchor");
 });
 
 console.log(`

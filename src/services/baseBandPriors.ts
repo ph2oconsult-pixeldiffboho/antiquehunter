@@ -15,6 +15,12 @@ export interface BandPriorInput {
   /** Evidence ledger claims (catalogue wording). */
   claims?: string[];
   compsAnchored?: boolean;
+  /**
+   * Is a 'later style / revival' verdict backed by real evidence? (catalogue or user says "de style" / copy /
+   * reproduction, or a modern construction cue). false = the verdict rests on appearance only → hypothesis.
+   * undefined = legacy behaviour (treated as evidenced).
+   */
+  styleEvidence?: boolean;
 }
 
 export interface BandPriorResult {
@@ -61,6 +67,20 @@ export const styleDiscountOf = (
   if (strongStyle) return { factor: 0.70, note: 'style_strong' };
   if (softStyle) return { factor: 0.85, note: 'style_soft' };
   return { factor: 1, note: null };
+};
+
+const STYLE_WORDS_RE = /\b(de\s+style|dans\s+le\s+(gout|go[uû]t|style)|in\s+the\s+style\s+of|style\s+(louis|charles|empire|restauration|restoration|directoire|regence|régence|napol|transition|gustavian|georgian|regency|victorian|queen|henri|renaissance)|[a-z]+[\s-]+style\b|revival|reproduction|repro\b|copie|copy|later\s+(copy|version|made)|fac[\s-]?simile|xxe|20th[\s-]+century|vingtieme|modern)/i;
+const MODERN_CONSTRUCTION_RE = /\b(plywood|contreplaqu\w*|contre-plaqu\w*|mdf|particle\s?board|chipboard|agglom\w*|staples?|agrafes?|phillips|cross-head|machine[\s-]+(cut\s+)?dovetails?|machine[\s-]+made|wire\s+nails?|modern\s+screws?|vis\s+modernes?|aggloméré|isorel|hardboard|formica|polyurethane)\b/i;
+
+/**
+ * Evidence for a later-style / revival verdict that does not come from the look of the piece: the catalogue or the
+ * user's own words, or a modern construction cue actually reported. The model's own style label is NOT evidence.
+ */
+export const styleEvidenceOf = (i: { userOrCatalogueText?: string; constructionEvidence?: string }): boolean => {
+  if (STYLE_WORDS_RE.test(String(i.userOrCatalogueText || ''))) return true;
+  const ce = String(i.constructionEvidence || '');
+  if (/^\s*(none(\s+shown)?|n\/a|-)?\s*$/i.test(ce)) return false;
+  return MODERN_CONSTRUCTION_RE.test(ce) && !/\b(no|without|not|aucun\w*|sans)\s+(\w+\s+){0,3}(plywood|mdf|staples|phillips|machine|wire|modern)/i.test(ce);
 };
 
 /** Condition discount — evidence-graded; structural hits the high harder than the low. */
@@ -157,7 +177,15 @@ export const applyBaseBandPriors = (i: BandPriorInput): BandPriorResult => {
   const text = `${i.query || ''} ${i.title || ''}`;
   const style = styleDiscountOf(i.periodCertainty, i.styleNote, text, i.claims);
   styleDiscount = style.factor;
-  if (style.note) factors.push(style.note);
+  // Fix: a later-style / revival call from appearance alone is a hypothesis, not a fact. Keep the period-piece upper
+  // bound (no discount on the high) and widen the range downward by the style factor instead.
+  let styleHypothesis = false;
+  if (i.styleEvidence === false && i.periodCertainty === 'later_style_or_revival' && styleDiscount < 1) {
+    styleHypothesis = true;
+    factors.push('style_hypothesis_widened_down');
+    low = Math.max(10, low * 0.55);
+    styleDiscount = 1;
+  } else if (style.note) factors.push(style.note);
 
   const cond = conditionDiscountOf(i.defects, text);
   conditionDiscount = cond.factorHigh;
@@ -177,6 +205,7 @@ export const applyBaseBandPriors = (i: BandPriorInput): BandPriorResult => {
     factors.push('category_prior_cap');
   }
 
+  if (styleHypothesis && low > 0 && high / low < 3) low = high / 3;
   const cal = calibrateWidth(low, high);
   low = cal.low; high = cal.high; widthCalibrated = cal.calibrated;
   if (widthCalibrated) factors.push('width_calibrated');

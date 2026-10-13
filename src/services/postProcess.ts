@@ -10,7 +10,8 @@ import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, type CheckAnswers } from "./checklist";
 import { buildValuation, validateValuation, assertValuationAgreement, type Valuation } from "./valuation";
 import { normaliseEvidenceLedger, type EvidenceLedger } from "./evidenceLedger";
-import { applyBaseBandPriors } from "./baseBandPriors";
+import { applyBaseBandPriors, styleEvidenceOf } from "./baseBandPriors";
+import { pieceOf } from "./makers";
 import type { ChecklistBase } from "./gemini";
 
 /** Appraisal post-processing (engine). Split out of gemini.ts so the model-call file stays thin. */
@@ -88,6 +89,9 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const anchor = anchorOnComparables(compList, {
       status: maker?.status || null, pieces, material: materialOf(pieceText), isAuction, eurTo: toTarget,
       pieceText, priorLow, priorHigh, textOnly: !hasPhotos,
+      // Kind of piece from the buyer's words / category first (the model title can drift), then the title
+      pieceKey: (pieceOf(query, category) || pieceOf(titleText, item.item_summary.category))?.key || null,
+      generic: !maker && !!(compsForStatus as any)?.generic,
     });
     const perPiece = anchor.used.map(x => isAuction ? x.perPieceHammerEur : x.perPieceAllInEur);
     const spread = perPiece.length >= 2 ? Math.max(...perPiece) / Math.max(1, Math.min(...perPiece)) : undefined;
@@ -210,7 +214,15 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         defects: draftLedger.defects,
         claims: draftLedger.claims,
         compsAnchored: !!anchor.applied,
+        styleEvidence: styleEvidenceOf({
+          userOrCatalogueText: `${query || ''} ${lotFacts?.ok ? `${lotFacts.title || ''} ${(lotFacts as any).description || ''}` : ''}`,
+          constructionEvidence: item.item_summary.construction_evidence,
+        }),
       });
+      if (prior.factors.includes('style_hypothesis_widened_down')) {
+        (item.item_summary as any).period_hypothesis = 'later_style_or_revival';
+        pg.pricing_reasoning = `${pg.pricing_reasoning || ''} Hypothesis: the "later style / revival" reading comes from the look of the piece only (no stamp, construction or catalogue evidence), so the range is widened downward rather than cut; a period piece could reach the upper figure.`.trim();
+      }
       if (prior.factors.length) {
         pg.estimated_market_range_low = prior.low;
         pg.estimated_market_range_high = prior.high;
@@ -418,7 +430,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
       const how = anchor.blended ? 'Blended prior range with' : 'Anchored on';
       const capNote = anchor.capped ? ' Text-only lift capped against the prior range.' : '';
-      item.price_guidance = { ...item.price_guidance, pricing_reasoning: `${how} ${anchor.used.length} matched verified auction results for ${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}).${capNote} ${item.price_guidance.pricing_reasoning || ''}`.trim() };
+      item.price_guidance = { ...item.price_guidance, pricing_reasoning: `${how} ${anchor.used.length} matched verified auction results for ${anchor.group === 'generic' ? `comparable unsigned ${anchor.used.length > 1 ? 'pieces of the same type' : 'piece'} (no maker; weaker evidence, blended)` : `${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces`} (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}).${capNote} ${item.price_guidance.pricing_reasoning || ''}`.trim() };
     }
     const checklistItems = buildChecklist({
       pieceKind, pieces, period: item.item_summary.likely_period, maker: makerAsClaimed ? { name: makerAsClaimed.name, status: makerAsClaimed.status } : null,
@@ -455,10 +467,12 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, jme: !!maker.jme, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
       comparables: {
-        status: compsForStatus === undefined ? (maker ? 'not_searched' : 'no_maker') : compsForStatus === null || compsForStatus.ok === false ? 'error' : maker?.status === 'doubtful_stamp' ? 'not_stamped' : compList.length === 0 ? 'none_verified' : anchor.applied ? (anchor.blended ? 'anchored' : 'anchored') : 'shown',
+        status: compsForStatus === undefined ? (maker ? 'not_searched' : 'no_maker') : compsForStatus === null || compsForStatus.ok === false ? 'error' : maker?.status === 'doubtful_stamp' ? 'not_stamped' : compList.length === 0 ? 'none_verified' : anchor.relevant.length === 0 ? 'none_relevant' : anchor.applied ? (anchor.blended ? 'anchored' : 'anchored') : 'shown',
+        generic: !maker && !!(compsForStatus as any)?.generic,
         reason: anchor.reason, group: anchor.group, pieces: anchor.pieces, per_piece_median_eur: anchor.perPieceMedianEur || null, basis: anchor.basis,
         blended: !!anchor.blended, capped: !!anchor.capped,
-        list: compList, used_urls: anchor.used.map(x => x.url), nearest: anchor.nearest || [], unreachable: compsForStatus?.unreachable || [],
+        // Only comps that pass the relevance gate (same kind of piece, not a ×5 outlier) are shown; none if none pass.
+        list: anchor.relevant, used_urls: anchor.used.map(x => x.url), nearest: anchor.nearest || [], unreachable: compsForStatus?.unreachable || [],
         contamination: compsContamination,
       },
       checklist: { items: checklistItems, answers: checkAnswers || {}, base: checklistBase, effect: { confidence_delta: fx.confidenceDelta, range_factor: fx.rangeFactor, yes: fx.yes, no: fx.no } },

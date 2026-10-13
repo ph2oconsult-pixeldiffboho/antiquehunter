@@ -8,21 +8,23 @@ export const MakerAndComparables: React.FC<{ item: any }> = ({ item }) => {
   const { t, i18n } = useTranslation();
   const maker = item?.maker_attribution;
   const comps = item?.comparables;
-  if (!maker) return null;
+  const generic = !maker && !!comps?.generic;
+  if (!maker && !generic) return null;
   const list: Comparable[] = comps?.list || [];
   const used = new Set<string>(comps?.used_urls || []);
   const money = (n: number, cur = 'EUR') => { try { return new Intl.NumberFormat(i18n.language || 'en', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${Math.round(n)} ${cur}`; } };
   const date = (d?: string) => { if (!d) return '—'; const x = new Date(d.length === 4 ? `${d}-01-01` : d); return isNaN(x.getTime()) ? d : d.length === 4 ? d : x.toLocaleDateString(i18n.language || 'en', { year: 'numeric', month: 'short', day: 'numeric' }); };
   return (
     <section data-testid="comparables" className="p-6 bg-white border border-border-custom rounded-[32px] space-y-4 shadow-sm">
-      <div className="flex items-center gap-2"><Gavel className="w-5 h-5 text-gold" /><h3 className="serif text-2xl font-normal">{t('comps.title')}</h3></div>
-      <div data-testid="maker-status" className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2"><Gavel className="w-5 h-5 text-gold" /><h3 className="serif text-2xl font-normal">{generic ? t('comps.generic_title') : t('comps.title')}</h3></div>
+      {generic && <p className="text-xs text-muted" data-testid="comps-generic-note">{t('comps.generic_note')}</p>}
+      {maker && <><div data-testid="maker-status" className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-ink">{maker.name}</span>
         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${(['stamped_confirmed','stamped_stated','stamp_in_photo'].includes(maker.status) ? 'bg-emerald-100 text-emerald-800' : maker.status === 'attributed' ? 'bg-amber-100 text-amber-800' : maker.status === 'doubtful_stamp' ? 'bg-orange-100 text-orange-900' : 'bg-red-50 text-red-700')}`}>{t(`comps.status.${maker.status}`)}</span>
       </div>
-      <p className="text-xs text-muted">{t(`comps.status_note.${maker.status}`)}</p>
-      {maker.jme && <p className="text-[11px] text-muted" data-testid="jme-mention">{t('comps.jme_note')}</p>}
-      {['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status) && (
+      <p className="text-xs text-muted">{t(`comps.status_note.${maker.status}`)}</p></>}
+      {maker?.jme && <p className="text-[11px] text-muted" data-testid="jme-mention">{t('comps.jme_note')}</p>}
+      {maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status) && (
         <div data-testid="stamp-warning" className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-2xl">
           <ShieldAlert className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
           <p className="text-xs text-ink leading-relaxed">{t('comps.stamp_warning', { maker: maker.name })}</p>
@@ -31,8 +33,8 @@ export const MakerAndComparables: React.FC<{ item: any }> = ({ item }) => {
       {comps?.status === 'anchored' && (
         <p className="text-sm text-ink" data-testid="comps-anchor">{t(comps.basis === 'hammer' ? 'comps.anchored_hammer' : 'comps.anchored_all_in', { n: (comps.used_urls || []).length, median: money(comps.per_piece_median_eur), pieces: comps.pieces })}</p>
       )}
-      {comps?.status !== 'anchored' && <p className="text-sm text-ink" data-testid="comps-fallback">{t(`comps.fallback.${comps?.status === 'shown' ? (comps.reason || 'too_few') : comps?.status || 'not_searched'}`, { maker: maker.name })}</p>}
-      {list.length > 0 && maker.status !== 'doubtful_stamp' && (
+      {comps?.status !== 'anchored' && <p className="text-sm text-ink" data-testid="comps-fallback">{t(`comps.fallback.${comps?.status === 'shown' ? (comps.reason || 'too_few') : comps?.status || 'not_searched'}`, { maker: maker?.name || '' })}</p>}
+      {list.length > 0 && maker?.status !== 'doubtful_stamp' && (
         <ul className="space-y-3">
           {list.map(c => (
             <li key={c.url} className={`p-3 rounded-2xl border ${used.has(c.url) ? 'border-gold/50 bg-gold/5' : 'border-border-custom'}`}>

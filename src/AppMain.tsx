@@ -19,6 +19,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AntiqueHunter } from './components/AntiqueHunter';
 import { IntroChoice } from './components/IntroChoice';
 import { searchAntiques } from './services/gemini';
+import { fetchGenericComps, genericCompsRequestFor } from './services/genericComps';
+import type { CompsResponse } from './services/compsMath';
 import { loadCurrency, saveCurrency } from './services/currencyPref';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
@@ -161,6 +163,13 @@ export default function Main() {
       const sellerType = details.sellerType || (isAuctionSite ? 'Auction' : undefined);
       // The fee published by the sale wins over the default 25% (but not over a figure the user typed)
       const premium = details.premiumTouched ? details.buyerPremiumRate : (lotFacts?.ok && lotFacts.premiumPct ? lotFacts.premiumPct : details.buyerPremiumRate);
+      // No maker named: look up comparables by piece type / period / material / region in parallel with the appraisal.
+      // (searchAntiques only searches when a maker is named; it awaits whatever is passed as extra.comps.)
+      const genericReq = genericCompsRequestFor(
+        [text, lotFacts?.ok ? lotFacts.title : ''].filter(Boolean).join(' '), details.category,
+        details.location || (lotFacts?.ok ? lotFacts.city : undefined), i18n.language,
+      );
+      const genericComps = genericReq ? (fetchGenericComps(genericReq) as unknown as CompsResponse) : undefined;
       const result = await searchAntiques(
         text,
         allImages.length > 0 ? allImages : undefined,
@@ -173,7 +182,7 @@ export default function Main() {
         details.location || (lotFacts?.ok ? [lotFacts.city].filter(Boolean).join(', ') : undefined),
         details.lotUrl,
         premium,
-        { lotFacts, checkAnswers, previousBase }
+        { lotFacts, checkAnswers, previousBase, ...(genericComps !== undefined ? { comps: genericComps } : {}) }
       );
       
       if (result) {

@@ -23,7 +23,11 @@ const HEADERS = {
   'Upgrade-Insecure-Requests': '1', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'none', 'Sec-Fetch-User': '?1',
 };
 
-export interface CompsRequest { maker: string; piece?: string; material?: string; pieces?: number; language?: string }
+export interface CompsRequest {
+  maker: string; piece?: string; material?: string; pieces?: number; language?: string;
+  /** No maker: search by piece type + period/style + material + region. */
+  generic?: boolean; period?: string; region?: string;
+}
 
 const withDeadline = async <T>(ms: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> => {
   const c = new AbortController();
@@ -89,7 +93,24 @@ const schema = {
   required: ["results"],
 };
 
+/** No-maker search: piece type, period / style, material and region (never a maker). */
+export const buildGenericCompsPrompt = (r: CompsRequest, scope: string): string => {
+  const piece = PIECES.find(p => p.key === r.piece);
+  const what = piece ? `${piece.en} (${piece.fr})` : 'piece of furniture';
+  const desc = [r.period, r.material, what, r.region ? `from ${r.region}` : ''].filter(Boolean).join(' ');
+  const fr = [piece?.fr.split(/[ ,/]/)[0], r.period, r.material, r.region].filter(Boolean).join(' ');
+  const en = [r.period, r.material, piece?.en.split(/[ ,/]/)[0], r.region].filter(Boolean).join(' ');
+  return `Find past auction RESULTS (sold lots, with the hammer price / price realised) for a ${desc}. No maker is known: match the KIND of piece first (a ${piece?.en || 'piece'} only, not other furniture), then period/style, material and region.
+Prefer ordinary provincial and Paris sales from 2018 onwards, not museum or royal-provenance lots.
+Where to look: ${scope}. Use Google searches such as: ${fr} adjugé ; ${en} sold. One or two searches are enough.
+Copy each URL EXACTLY from the search results - never construct or guess a lot number. If you are not sure of a URL, leave the result out.
+Return up to 6 results. Each must be ONE lot page URL whose lot title names a ${piece?.en || 'piece'} and that shows the sold price (not a search page, not a dealer's shop listing, not an unsold lot).
+Give the price exactly as printed on the page, its currency, the sale date, the number of pieces in the lot, and whether the price includes the buyer's premium.
+Never invent a result: only return pages you actually found.`;
+};
+
 export const buildCompsPrompt = (r: CompsRequest, scope = COMPS_SEARCH_SCOPES.join('; ')): string => {
+  if (r.generic || !String(r.maker || '').trim()) return buildGenericCompsPrompt(r, scope);
   const piece = PIECES.find(p => p.key === r.piece);
   const what = piece ? `${piece.en} (${piece.fr})` : 'furniture';
   const site = /Christie/.test(scope) ? 'site:christies.com ' : /Bonhams/.test(scope) ? 'site:bonhams.com ' : '';
@@ -152,10 +173,13 @@ export const knownLotSeeds = (makerKey: string, pieceKey?: string | null): strin
 
 export const findComparables = async (req: CompsRequest, apiKey: string | undefined, now = Date.now(), deps: CompsDeps = {}): Promise<CompsResponse> => {
   const startedAt = now;
-  const maker = findMaker(req.maker);
+  const generic = !!req.generic || !String(req.maker || '').trim();
+  const maker = generic ? null : findMaker(req.maker);
   const piece = PIECES.find(p => p.key === req.piece) || null;
-  const out: CompsResponse = { ok: false, maker: maker?.name || req.maker, piece: piece?.key, comparables: [], searched: ["Christie's", "Bonhams", "Sotheby's", 'Artcurial', 'Auctionet', 'web search'], unreachable: ['Drouot (results need an account)'], stats: { candidates: 0, verified: 0, dropped: {} } };
-  if (!maker) { out.error = 'unknown_maker'; return out; }
+  const out: CompsResponse = { ok: false, maker: generic ? undefined : (maker?.name || req.maker), piece: piece?.key, comparables: [], searched: generic ? ['Artcurial', 'Auctionet', 'French houses', 'web search'] : ["Christie's", "Bonhams", "Sotheby's", 'Artcurial', 'Auctionet', 'web search'], unreachable: ['Drouot (results need an account)'], stats: { candidates: 0, verified: 0, dropped: {} } };
+  if (generic) out.generic = true;
+  if (generic && !piece) { out.error = 'piece_type_required'; return out; }
+  if (!generic && !maker) { out.error = 'unknown_maker'; return out; }
   if (!apiKey && !deps.search) { out.error = 'no_api_key'; return out; }
   // Google Search + JSON schema together often yields webQueries:0 on flash-lite. Grounded search uses MODEL
   // without a responseSchema; a second FAST_MODEL pass (schema, no tool) only adds memory leads that still verify.
@@ -186,7 +210,11 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   let grounded: string[] = [];
   const g0 = Date.now();
   const searchMs: number[] = [];
-  const PRIORITY_SCOPES = [
+  const PRIORITY_SCOPES = generic ? [
+    COMPS_SEARCH_SCOPES[5], // French houses
+    COMPS_SEARCH_SCOPES[6], // European houses (Auctionet etc.)
+    "Interenchères and Drouot result pages, searching in French (\"adjugé\", \"résultat\")",
+  ] : [
     COMPS_SEARCH_SCOPES[0], // Christie's EN
     COMPS_SEARCH_SCOPES[1], // Christie's/Sotheby's FR
     COMPS_SEARCH_SCOPES[5], // French houses
@@ -218,7 +246,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
 
   // 1b. Known public sold-lot URLs (Christie's etc.) as extra candidates — each still verified from its page.
   // Only on the live path (default search); unit tests inject search/fetchHtml and must not hit the network.
-  if (!deps.search) {
+  if (!deps.search && maker) {
     for (const url of knownLotSeeds(maker.key, piece?.key)) {
       if (!claims.some(c => c.url === url)) claims.push({ url });
     }
@@ -244,7 +272,7 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
     if (remaining() < 500) return { reason: 'no_time' };
     const page = await getHtml(url, remaining());
     if (!page.html) return { reason: page.status ? `http_${page.status}` : 'unreachable' };
-    try { return verifyComparable(page.html, page.finalUrl || url, claim, maker.key, pieceRe); } catch { return { reason: 'parse_error' }; }
+    try { return verifyComparable(page.html, page.finalUrl || url, claim, maker ? maker.key : null, pieceRe); } catch { return { reason: 'parse_error' }; }
   }));
   const comps: Comparable[] = [];
   const lotSeen = new Set<string>();
@@ -277,9 +305,12 @@ export const handleCompsRequest = async (rawBody: unknown, apiKey = process.env.
   if (typeof body === 'string') { try { body = JSON.parse(body || '{}'); } catch { return { status: 400, body: { ok: false, error: 'Invalid JSON body' } }; } }
   body = body || {};
   const makerText = String(body.maker || '').slice(0, 120);
-  if (!makerText.trim()) return { status: 400, body: { ok: false, error: 'maker is required' } };
+  const generic = !makerText.trim() && body.generic === true;
+  if (!makerText.trim() && !generic) return { status: 400, body: { ok: false, error: 'maker is required' } };
+  if (generic && !body.piece) return { status: 400, body: { ok: false, error: 'piece is required without a maker' } };
   const res = await findComparables({
-    maker: makerText, piece: body.piece ? String(body.piece).slice(0, 30) : undefined,
+    maker: makerText, generic, period: body.period ? String(body.period).slice(0, 60) : undefined, region: body.region ? String(body.region).slice(0, 60) : undefined,
+    piece: body.piece ? String(body.piece).slice(0, 30) : undefined,
     material: body.material ? String(body.material).slice(0, 30) : undefined,
     pieces: Number(body.pieces) || 1, language: String(body.language || 'en').slice(0, 5),
   }, apiKey);
