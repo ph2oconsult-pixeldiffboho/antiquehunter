@@ -99,3 +99,12 @@
 - Captured: `engine_rework/shots/g245_phone_full.png`, `g245_max_bid.png`, `g245_bidding_vp.png`, body extract.
 - Visible: text-only confidence blurb, Charles X title, Before-you-buy checklist, Bidding tips (25% premium / max bid unlock), teaser “buy below €510 / above €900”.
 - Free plan still paywalls Price Guidance / Evidence ledger / Comparables testids; demo Unlock opens pack picker (did not persist Pro in headless). Full wired panels need Pro session — code path covered by unit tests + AnalysisView wiring.
+
+### 2026-10-13 — Phase 3
+- Merged origin/main (A #20, C #19) into branch, no rebase. Build failure root cause: AnalysisView.tsx:921 two JSX siblings in one `&&` (EvidenceLedgerPanel). Fixed (8162d80); also typed test fixture. lint/check(101)/build pass; preview green.
+- a982020: auction price card shows "no dealer evidence" instead of repeating hammer as "retail".
+- 54a0701: postProcessAppraisal moved to src/services/postProcess.ts; gemini.ts re-exports.
+- Real pipeline 70 dev lots prod vs preview + 2 repeat runs. Results in runs/p3_metrics.txt, runs/real_p3_*.
+- Finding: engine changes barely move text-only metrics (cov 38%→38%, MdAE 0.92→0.85). Ranges compress to ~€300–1,500; root cause candidate: hardcoded hammer reference anchors in the gemini.ts prompt (lines 138–146, e.g. "Provincial walnut commode €300–€1,200"). Not changed: it's in the hold-list file, and changing it should be measured.
+- Width from residuals: LOO calibration → 50% coverage needs ~x5.5, 80% needs ~x15. Not shipped.
+- PROPOSED_TARGETS.md rewritten. Sealed eval not run.
