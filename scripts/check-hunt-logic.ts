@@ -1,5 +1,6 @@
 // Quick self-checks for the hunt URL filters and appraisal maths.
 // Run: npx tsx scripts/check-hunt-logic.ts
+import { applyThinEvidenceCap } from "../src/services/thinEvidenceCap";
 import assert from "node:assert/strict";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -1653,6 +1654,16 @@ check("field notes: cash-cap note matches negotiation constants", () => {
   assert.ok(teaserNotes({ count: 2 }).length === 2);
 });
 
+
+check("thin-evidence high cap: high kept near the model mid; stamp, top maker, confirmed period, comps, high confidence exempt", () => {
+  const thin = applyThinEvidenceCap({ low: 200, high: 800, periodCertainty: "ambiguous", confidence: "low", text: "walnut chest of drawers" });
+  assert.ok(thin.applied && thin.high === 650 && thin.low === 200, JSON.stringify(thin));
+  for (const x of [{ text: "commode estampillée P. Durand" }, { text: "after Riesener" }, { periodCertainty: "confirmed_period" }, { confidence: "high" }, { compsAnchored: true }, { constructionEvidence: "hand-cut dovetails" }]) {
+    const k = applyThinEvidenceCap({ low: 200, high: 800, periodCertainty: "ambiguous", confidence: "low", text: "chest", ...x });
+    assert.equal(k.applied, false, JSON.stringify(x));
+  }
+  assert.equal(applyThinEvidenceCap({ low: 200, high: 300, periodCertainty: "ambiguous", confidence: "low", text: "" }).applied, false, "already narrow");
+});
 
 console.log(`
 ${passed} checks passed`);
