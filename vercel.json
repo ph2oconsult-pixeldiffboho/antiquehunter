@@ -35,7 +35,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(self), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\"), usb=(), serial=(), bluetooth=(), hid=(), midi=(), magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()"
+          "value": "camera=(self), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\"), usb=(), serial=(), hid=(), midi=(), magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()"
         },
         {
           "key": "Strict-Transport-Security",
