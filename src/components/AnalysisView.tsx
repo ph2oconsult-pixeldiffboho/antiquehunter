@@ -859,7 +859,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 </span>
               </div>
               <p className="text-[8px] text-muted/60 font-medium italic pr-1">
-                {t(`analysis.confidence_${currentItem.item_summary.confidence}_desc`)}
+                {(currentItem as any).valuation?.textOnly === false && ['low', 'very_low'].includes(String(currentItem.item_summary.confidence)) ? t('analysis.confidence_low_photo_desc', { defaultValue: 'Based on your photos. Close-ups of the construction (drawer joints, back, underside), any stamp and the mounts would firm up this estimate.' }) : t(`analysis.confidence_${currentItem.item_summary.confidence}_desc`)}
               </p>
             </div>
           )}
@@ -989,7 +989,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 {t(`analysis.confidence_${currentItem.item_summary.confidence}`)}
               </p>
               <p className="text-xs text-muted font-medium italic mt-2 leading-relaxed">
-                {t(`analysis.confidence_${currentItem.item_summary.confidence}_desc`)}
+                {(currentItem as any).valuation?.textOnly === false && ['low', 'very_low'].includes(String(currentItem.item_summary.confidence)) ? t('analysis.confidence_low_photo_desc', { defaultValue: 'Based on your photos. Close-ups of the construction (drawer joints, back, underside), any stamp and the mounts would firm up this estimate.' }) : t(`analysis.confidence_${currentItem.item_summary.confidence}_desc`)}
               </p>
             </div>
           </div>

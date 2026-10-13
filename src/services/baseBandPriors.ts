@@ -21,6 +21,11 @@ export interface BandPriorInput {
    * undefined = legacy behaviour (treated as evidenced).
    */
   styleEvidence?: boolean;
+  /**
+   * Text-only run: the model already read the condition wording in the description, so the regex condition
+   * discount on that same text is not applied again (only graded major/structural defects count).
+   */
+  textOnly?: boolean;
 }
 
 export interface BandPriorResult {
@@ -60,6 +65,12 @@ export const styleDiscountOf = (
     return { factor: 1, note: null };
   }
   const blob = `${text || ''} ${(claims || []).join(' ')}`;
+  // A technique word ("Boulle-style marquetry", "Savonnerie-style") next to an explicit period claim
+  // ("Napoleon III period", "18th century", "époque") is not a style-not-period statement.
+  const periodClaim = /\b[ée]poque\b|\bperiod\b|\b(1[6-9]th|xvii|xviii|xix)e?\s*(century|si[èe]cle|s\.)|\b(xvii|xviii|xix)e\b/i.test(blob);
+  if (periodCertainty !== 'later_style_or_revival' && periodClaim && !/\bde\s+style\b|\bin\s+the\s+style\s+of\b/i.test(blob)) {
+    return { factor: 1, note: null };
+  }
   const strongStyle = periodCertainty === 'later_style_or_revival'
     || /\bde\s+style\b|\bin\s+the\s+style\s+of\b/i.test(blob);
   const softStyle = !!(styleNote && String(styleNote).trim())
@@ -187,7 +198,9 @@ export const applyBaseBandPriors = (i: BandPriorInput): BandPriorResult => {
     styleDiscount = 1;
   } else if (style.note) factors.push(style.note);
 
-  const cond = conditionDiscountOf(i.defects, text);
+  const cond = i.textOnly
+    ? conditionDiscountOf((i.defects || []).filter(d => ['major', 'structural'].includes(String(d.severity || ''))), '')
+    : conditionDiscountOf(i.defects, text);
   conditionDiscount = cond.factorHigh;
   if (cond.note) factors.push(cond.note);
 

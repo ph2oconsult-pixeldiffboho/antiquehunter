@@ -76,6 +76,7 @@
     "confidence_medium_desc": "Good match — key details missing",
     "confidence_low_desc": "Based on your description only. Photos of construction, condition and any stamps would change this estimate.",
     "confidence_very_low_desc": "Based on your description only. Photos of construction, condition and any stamps would change this estimate.",
+    "confidence_low_photo_desc": "Based on your photos. Close-ups of the construction (drawer joints, back, underside), any stamp and the mounts would firm up this estimate.",
     "data_quality_assessment": "How confident this is",
     "how_to_improve_accuracy": "To tighten this assessment:",
     "provide_more_details": "Improve Accuracy",

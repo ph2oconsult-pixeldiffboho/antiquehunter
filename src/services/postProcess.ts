@@ -12,6 +12,7 @@ import { buildValuation, validateValuation, assertValuationAgreement, type Valua
 import { normaliseEvidenceLedger, type EvidenceLedger } from "./evidenceLedger";
 import { applyBaseBandPriors, styleEvidenceOf } from "./baseBandPriors";
 import { pieceOf } from "./makers";
+import { applyPhotoJudgement } from "./photoJudgement";
 import type { ChecklistBase } from "./gemini";
 
 /** Appraisal post-processing (engine). Split out of gemini.ts so the model-call file stays thin. */
@@ -121,6 +122,25 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       item.price_guidance.pricing_reasoning = `Speculative valuation: A generic '${query}' can range from a modern utility piece to fine period antique. Inspect construction before relying on numbers. ${item.price_guidance.pricing_reasoning}`;
     }
 
+    // Photo judgement (period / confidence part): a stamp read from a photo or signs of later additions cannot by
+    // themselves mean "confirmed period". The range part is applied after the base-band priors below.
+    const originalPeriodCertainty = item.item_summary.period_certainty;
+    const pjStyleEvidence = styleEvidenceOf({
+      userOrCatalogueText: `${query || ''} ${lotFacts?.ok ? `${lotFacts.title || ''} ${(lotFacts as any).description || ''}` : ''}`,
+      constructionEvidence: item.item_summary.construction_evidence,
+    });
+    const pjModelText = [item.item_summary.title, item.item_summary.snap_judgement, item.item_summary.condition_summary,
+      item.item_summary.confidence_reason, item.price_guidance?.pricing_reasoning,
+      JSON.stringify(item.evidence_ledger || {}), JSON.stringify(item.condition || '')].filter(Boolean).join(' ');
+    const pjInput = {
+      hasPhotos, userText: `${query || ''} ${lotFacts?.ok ? `${lotFacts.title || ''} ${(lotFacts as any).description || ''}` : ''}`,
+      periodCertainty: originalPeriodCertainty, modelMakerStatus: item.item_summary?.maker?.status, makerStatus: maker?.status || null,
+      constructionEvidence: item.item_summary.construction_evidence, modelText: pjModelText, styleEvidence: pjStyleEvidence,
+    };
+    const pjEarly = applyPhotoJudgement({ ...pjInput, low: Number(item.price_guidance?.estimated_market_range_low) || 0, high: Number(item.price_guidance?.estimated_market_range_high) || 0 });
+    if (pjEarly.periodCertainty !== originalPeriodCertainty) item.item_summary.period_certainty = pjEarly.periodCertainty;
+    confScore = Math.min(confScore, pjEarly.confidenceCap);
+
     const finalConfScore = Math.max(1, Math.min(100, Math.round(confScore)));
     const confLabel = confidenceLabel(finalConfScore);
 
@@ -214,6 +234,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         defects: draftLedger.defects,
         claims: draftLedger.claims,
         compsAnchored: !!anchor.applied,
+        textOnly: !hasPhotos,
         styleEvidence: styleEvidenceOf({
           userOrCatalogueText: `${query || ''} ${lotFacts?.ok ? `${lotFacts.title || ''} ${(lotFacts as any).description || ''}` : ''}`,
           constructionEvidence: item.item_summary.construction_evidence,
@@ -231,6 +252,15 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         if (note) {
           pg.pricing_reasoning = `${pg.pricing_reasoning || ''} [Band prior: ${note}].`.trim();
         }
+      }
+    }
+    if (!restoredFromChecklistBase && !anchor.applied) {
+      const pj = applyPhotoJudgement({ ...pjInput, low: pg.estimated_market_range_low, high: pg.estimated_market_range_high });
+      if (pj.factors.length) {
+        pg.estimated_market_range_low = pj.low;
+        pg.estimated_market_range_high = pj.high;
+        (item as any)._photo_judgement = { factors: pj.factors, period_certainty_model: originalPeriodCertainty, period_certainty: item.item_summary.period_certainty };
+        pg.pricing_reasoning = `${pg.pricing_reasoning || ''} ${pj.notes.join(' ')}`.trim();
       }
     }
     const rawMidEur = convertApprox((pg.estimated_market_range_low + pg.estimated_market_range_high) / 2, targetCurrency, 'EUR') ?? 0;
@@ -463,6 +493,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       valuation_errors: validateValuation(valuation),
       evidence_ledger: evidenceLedger,
       band_priors: (item as any)._band_priors || null,
+      photo_judgement: (item as any)._photo_judgement || null,
       negotiation_plan: negotiationPlan,
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, jme: !!maker.jme, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,

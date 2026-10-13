@@ -83,6 +83,7 @@
     "confidence_medium_desc": "Bonne correspondance — détails clés manquants",
     "confidence_low_desc": "D'après votre description uniquement. Des photos de la construction, de l'état et des estampilles modifieraient cette estimation.",
     "confidence_very_low_desc": "D'après votre description uniquement. Des photos de la construction, de l'état et des estampilles modifieraient cette estimation.",
+    "confidence_low_photo_desc": "D'après vos photos. Des gros plans de la construction (assemblages des tiroirs, dos, dessous), d'une estampille éventuelle et des bronzes affineraient cette estimation.",
     "data_quality_assessment": "Niveau de confiance",
     "how_to_improve_accuracy": "Pour affiner cette évaluation :",
     "provide_more_details": "Améliorer la précision",

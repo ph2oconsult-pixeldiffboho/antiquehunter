@@ -37,6 +37,7 @@ import { filterContaminatingComps, parseChristiesLot, parseBonhamsLot, priceOnPa
 import { buildValuation, validateValuation, assertValuationAgreement, allInFromHammer, hammerFromAllIn } from "../src/services/valuation.ts";
 import { normaliseEvidenceLedger, ledgerHasContent } from "../src/services/evidenceLedger.ts";
 import { preserveAppraisalDraft, loadAppraisalDraft, clearAppraisalDraft, commitDraftToLocalFinds, loadLocalFinds, saveLocalFind } from "../src/services/localFinds.ts";
+import { applyPhotoJudgement, hasAdditionsCue, hasPeriodConstruction } from "../src/services/photoJudgement.ts";
 import { applyBaseBandPriors, isStyleNotPeriod, conditionDiscountOf, categoryPriorHigh, styleDiscountOf, calibrateWidth, styleEvidenceOf } from "../src/services/baseBandPriors.ts";
 import { genericCompsRequestFor, fetchGenericComps } from "../src/services/genericComps.ts";
 import { buildCompsPrompt } from "../src/services/compsSearch.ts";
@@ -2211,6 +2212,39 @@ check("fix 2+3: generic comps anchor (always blended) when ≥2 relevant same-ty
   assert.equal(a.used.length, 3);
   assert.ok(a.high > 1200 && a.low > 400, `${a.low}-${a.high}`);
   assert.equal(anchorOnComparables(comps, { status: null, pieces: 1, isAuction: true, eurTo: (e) => e, pieceKey: "commode" }).applied, false, "maker comps without a stamp group still do not anchor");
+});
+
+check("photo judgement: stamp read from a photo alone cannot mean confirmed period or full uplift", () => {
+  const base = { hasPhotos: true, userText: "chest of drawers, 85 x 131 cm", modelText: "", styleEvidence: false, low: 1500, high: 3500 };
+  const r = applyPhotoJudgement({ ...base, periodCertainty: "confirmed_period", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "" });
+  assert.equal(r.periodCertainty, "probable_period"); assert.ok(r.confidenceCap <= 60);
+  assert.ok(r.low < 1500 && r.high < 3500, `${r.low}-${r.high}`);
+  const withJoints = applyPhotoJudgement({ ...base, periodCertainty: "confirmed_period", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "hand-cut dovetails, oak secondary" });
+  assert.equal(withJoints.periodCertainty, "confirmed_period"); assert.equal(withJoints.low, 1500);
+  const stated = applyPhotoJudgement({ ...base, userText: "commode stamped Flechy", periodCertainty: "confirmed_period", modelMakerStatus: "stamp_visible_in_photo" });
+  assert.equal(stated.periodCertainty, "confirmed_period", "a stamp the buyer stated is not a photo-only read");
+});
+check("photo judgement: later additions / composed of parts are discounted when still called period", () => {
+  assert.ok(hasAdditionsCue("Marble top and gilt-bronze ornamentation added later"));
+  assert.ok(hasAdditionsCue("Composed of period components"));
+  assert.ok(!hasAdditionsCue("no sign of a marriage"));
+  const r = applyPhotoJudgement({ hasPhotos: true, userText: "", modelText: "the marble top is a later replacement; later bronzes", styleEvidence: false, periodCertainty: "confirmed_period", low: 1000, high: 2500 });
+  assert.ok(r.factors.includes("additions_or_marriage_discount")); assert.ok(r.high < 2500);
+  const text = applyPhotoJudgement({ hasPhotos: false, userText: "composed of period components", modelText: "", styleEvidence: false, periodCertainty: "ambiguous", low: 400, high: 1200 });
+  assert.equal(text.factors.length, 0, "a text run the model already priced as ambiguous is left alone");
+});
+check("photo judgement: later-copy verdict from photos alone widens up (more with period signs), not a cut", () => {
+  assert.ok(hasPeriodConstruction("pegged mortise and tenon, gesso"));
+  assert.ok(!hasPeriodConstruction("no hand-cut joints visible"));
+  const a = applyPhotoJudgement({ hasPhotos: true, userText: "table", modelText: "", styleEvidence: false, periodCertainty: "later_style_or_revival", constructionEvidence: "softwood frame, mortise and tenon", low: 150, high: 450 });
+  assert.equal(a.high, 900); assert.equal(a.low, 150);
+  const b = applyPhotoJudgement({ hasPhotos: true, userText: "table de style Louis XV", modelText: "", styleEvidence: true, periodCertainty: "later_style_or_revival", low: 150, high: 450 });
+  assert.equal(b.high, 450, "catalogue says de style: no widening");
+});
+check("text runs: technique word next to a period claim is not a style discount; condition wording not double-counted", () => {
+  assert.equal(styleDiscountOf("ambiguous", null, "Boulle-style marquetry. Napoleon III period.").factor, 1);
+  const t = applyBaseBandPriors({ marketLow: 200, marketHigh: 700, periodCertainty: "ambiguous", query: "Boulle-style marquetry. Napoleon III period. Dents, lifting of the veneer, scratches", textOnly: true });
+  assert.ok(t.high >= 700, JSON.stringify(t));
 });
 
 console.log(`
