@@ -2245,7 +2245,7 @@ check("photo judgement: later-copy verdict from photos alone widens up (more wit
   const a = applyPhotoJudgement({ hasPhotos: true, userText: "table", modelText: "", styleEvidence: false, periodCertainty: "later_style_or_revival", constructionEvidence: "softwood frame, mortise and tenon", low: 150, high: 450 });
   assert.equal(a.high, 900); assert.equal(a.low, 150);
   const b = applyPhotoJudgement({ hasPhotos: true, userText: "table de style Louis XV", modelText: "", styleEvidence: true, periodCertainty: "later_style_or_revival", low: 150, high: 450 });
-  assert.ok(b.high <= 450 && b.high >= 350, "catalogue says de style: no widening, cheap cap may trim");
+  assert.equal(b.high, 450, "catalogue says de style: no widening");
 });
 check("text runs: technique word next to a period claim is not a style discount; condition wording not double-counted", () => {
   assert.equal(styleDiscountOf("ambiguous", null, "Boulle-style marquetry. Napoleon III period.").factor, 1);
@@ -2253,7 +2253,7 @@ check("text runs: technique word next to a period claim is not a style discount;
   assert.ok(t.high >= 700, JSON.stringify(t));
 });
 
-check("photo judgement: stamped minor-maker cap (read or stated), top makers exempt; cheap signals keep the range tight", () => {
+check("photo judgement: stamped minor-maker cap (read or stated), top makers exempt, furniture only; model-signal floor for thin photo runs", () => {
   const read = applyPhotoJudgement({ hasPhotos: true, userText: "chest of drawers", modelText: "Louis XV stamped commode", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "hand-cut dovetails", styleEvidence: false, periodCertainty: "confirmed_period", low: 3000, high: 7000 });
   assert.ok(read.high <= 3000 && read.low <= 1000, `${read.low}-${read.high}`);
   assert.equal(read.periodCertainty, "confirmed_period", "construction evidence keeps the label, not the premium");
@@ -2261,10 +2261,16 @@ check("photo judgement: stamped minor-maker cap (read or stated), top makers exe
   assert.ok(stated.high <= 3000);
   const top = applyPhotoJudgement({ hasPhotos: true, userText: "commode stamped Riesener JME", modelText: "", styleEvidence: false, periodCertainty: "confirmed_period", low: 30000, high: 60000 });
   assert.equal(top.high, 60000);
-  const resin = applyPhotoJudgement({ hasPhotos: true, userText: "wall console", modelText: "gilt resin wall console", styleEvidence: false, periodCertainty: "later_style_or_revival", low: 40, high: 200 });
-  assert.ok(resin.high <= 100, `${resin.low}-${resin.high}`);
-  const styleLate = applyPhotoJudgement({ hasPhotos: false, userText: "Large mirror. Louis XV style. Late 19th century.", modelText: "", styleEvidence: true, periodCertainty: "later_style_or_revival", low: 200, high: 700 });
-  assert.ok(styleLate.high <= 500);
+  const tapestry = applyPhotoJudgement({ hasPhotos: true, userText: "tapestry", category: "rug_textile", modelText: "Flemish verdure tapestry, signed in the border", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "hand-woven wool", styleEvidence: false, periodCertainty: "confirmed_period", low: 3000, high: 8000 });
+  assert.ok(!tapestry.factors.includes("stamped_minor_maker_cap") && tapestry.high > 3000, "stamp cap is furniture-only");
+  const painting = applyPhotoJudgement({ hasPhotos: true, userText: "oil on canvas, signed", modelText: "", styleEvidence: false, periodCertainty: "confirmed_period", low: 3000, high: 9000 });
+  assert.ok(!painting.factors.includes("stamped_minor_maker_cap"), "no category: non-furniture words keep the cap off");
+  const thin = applyPhotoJudgement({ hasPhotos: true, userText: "mirror", category: "mirrors", modelText: "", confidence: "medium", styleEvidence: false, periodCertainty: "ambiguous", low: 300, high: 800 });
+  assert.ok(thin.factors.includes("model_signal_cheap_floor") && thin.low <= 140 && thin.high === 800, `${thin.low}-${thin.high}`);
+  const firm = applyPhotoJudgement({ hasPhotos: true, userText: "commode", category: "furniture", modelText: "", confidence: "high", constructionEvidence: "hand-cut dovetails", styleEvidence: false, periodCertainty: "probable_period", low: 800, high: 1800 });
+  assert.ok(!firm.factors.includes("model_signal_cheap_floor"), "period construction or a high estimate: no floor");
+  const textRun = applyPhotoJudgement({ hasPhotos: false, userText: "mirror", modelText: "", confidence: "medium", styleEvidence: false, periodCertainty: "ambiguous", low: 300, high: 800 });
+  assert.ok(!textRun.factors.includes("model_signal_cheap_floor"), "photo runs only");
 });
 
 console.log(`

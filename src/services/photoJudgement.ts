@@ -24,6 +24,14 @@ export interface PhotoJudgementInput {
   alterations?: { later_additions?: string[]; marriage?: string; composed_of_parts?: string; reconstruction?: string } | null;
   low: number;
   high: number;
+  /** App/model category (furniture, mirrors, rug_textile, painting_art, chandelier_lighting…) */
+  category?: string;
+  /** Model's own confidence label (high / medium / low / very_low) */
+  confidence?: string;
+  /** Model's reproduction_risk flag */
+  reproductionRisk?: boolean;
+  /** Number of defects the model listed */
+  defectCount?: number;
 }
 
 export interface PhotoJudgementResult {
@@ -45,8 +53,10 @@ const NEGATED_ADD_RE = /\b(no|not|without|aucun\w*|sans)\s+(\w+\s+){0,3}(marriag
 const TOP_MAKER_RE = /\b(riesener|oeben|bvrb|van\s+risen\s?burgh|weisweiler|carlin|cressent|roentgen|leleu|dubois|jacob|desmalter|bellang[ée]|hache|delanois|tilliard|foliot|s[ée]n[ée]|gourdin|boulle\s+(andr[ée]|charles)|andr[ée][\s-]+charles\s+boulle|majorelle|gall[ée]|ruhlmann|linke|sormani|zwiener|beurdeley)(?![a-z])/i;
 /** Upper level for stamped pieces by recorded, non-top maîtres at regional auction (EUR hammer). */
 export const STAMPED_MINOR_HIGH_CAP = 3000;
-const CHEAP_MATERIAL_RE = /\b(resin|r[ée]sine|plaster|pl[âa]tre|cast\s+(composition|resin|plaster)|polyurethane|plastic|mdf|plywood|reproduction|repro\b|replica|copie|machine[\s-]+(woven|made|carved)|20th[\s-]+century|xxe|modern)\b/i;
-const STYLE_LATE_RE = /\b(louis\s+(xiii|xiv|xv|xvi)|r[ée]gence|empire|rococo|neoclassical)[\s-]+style\b.*\b(late\s+19th|19th[\s-]century|20th)|\b(late\s+19th|19th[\s-]century|20th)\b.*\b(louis\s+(xiii|xiv|xv|xvi)|r[ée]gence|empire|rococo)[\s-]+style\b|\bde\s+style\b|\bstyle\s+(louis|r[ée]gence|empire)/i;
+const FURNITURE_CATS = new Set(['furniture', 'bedroom_furniture', 'chairs', 'mirrors']);
+const NON_FURNITURE_RE = /\b(rug|carpet|tapis|tapestry|tapisserie|textile|portiere|porti[èe]re|verdure|aubusson|painting|tableau|oil\s+on|huile|canvas|toile|portrait|landscape|watercolou?r|print|engraving|lamp|lighting|chandelier|lustre|sconce|applique|wall\s+light|candelabr\w*|bronze\s+sculpture|sculpture|statue|vase|porcelain|ceramic|clock|pendule)\b/i;
+/** Model-signal floor: the model's raw upper figure below which a thinly evidenced piece is widened down to the cheap end. */
+export const CHEAP_FLOOR_MAX_HIGH = 1500;
 
 const r = (x: number) => x >= 10000 ? Math.round(x / 500) * 500 : x >= 1000 ? Math.round(x / 50) * 50 : Math.round(x / 10) * 10;
 
@@ -117,21 +127,25 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
   //    piece into high four figures. Cap the top at STAMPED_MINOR_HIGH_CAP unless a top maker is named.
   const anyStamp = photoStamp || (STAMP_IN_TEXT_RE.test(i.userText) && /\b(stamp|estampill|jme)/i.test(i.userText));
   const topMaker = TOP_MAKER_RE.test(`${i.userText} ${String(i.modelText || '').slice(0, 600)}`);
-  if (anyStamp && !topMaker && high > STAMPED_MINOR_HIGH_CAP) {
+  const cat = String(i.category || '').toLowerCase();
+  const isFurniture = FURNITURE_CATS.has(cat) || ((!cat || cat === 'unknown') && !NON_FURNITURE_RE.test(`${i.userText} ${String(i.modelText || '').slice(0, 200)}`));
+  if (anyStamp && !topMaker && isFurniture && high > STAMPED_MINOR_HIGH_CAP) {
     high = STAMPED_MINOR_HIGH_CAP;
     low = Math.min(low, high / 3);
     factors.push('stamped_minor_maker_cap');
     notes.push('A stamp by a recorded maker who is not a top name adds a premium, not a multiple: the top of the range is capped at the level such stamped pieces typically make at regional auction.');
   }
 
-  // 5. Cheap signals: modern or cheap materials / reproduction / explicit "style" with a later date → tight and low.
-  const cheapText = `${i.userText} ${String(i.modelText || '').slice(0, 800)} ${i.constructionEvidence || ''}`;
-  const cheap = CHEAP_MATERIAL_RE.test(cheapText) || (STYLE_LATE_RE.test(cheapText) && !anyStamp);
-  if (cheap) {
-    // undo any hypothesis widening and keep the range tight
-    if (factors.some(f => f.startsWith('revival_hypothesis'))) { high = high / (periodBuilt ? 2.0 : 1.5); }
-    if (low > 0 && high > low * 2.5) high = low * 2.5;
-    factors.push('cheap_signal_tight');
+  // 5. Model-signal floor. In the dev set the model gives cheap lots and €1k–5k lots the same mid-hundreds raw range, so
+  //    the upper figure cannot be cut without losing the €1k–5k hits. Instead, when the model's own signals are thin
+  //    (raw upper figure in the hundreds, period not confirmed, no stamp, no period construction, and not high
+  //    confidence, or reproduction risk / defects flagged), the low end is opened down to the cheap level.
+  const thin = high <= CHEAP_FLOOR_MAX_HIGH && pc !== 'confirmed_period' && !anyStamp && !periodBuilt
+    && (i.confidence !== 'high' || i.reproductionRisk === true || (i.defectCount || 0) > 0 || pc === 'later_style_or_revival');
+  if (i.hasPhotos && thin && low > high / 6) {
+    low = high / 6;
+    factors.push('model_signal_cheap_floor');
+    notes.push('The model\'s own signals are thin (mid-hundreds estimate, period unconfirmed, no stamp or construction evidence): the lower figure is opened to the level such pieces often make when they turn out later or tired.');
   }
 
   if (low > 0 && high / low > 6) low = high / 6;
