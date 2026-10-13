@@ -917,8 +917,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       </section>
 
       {/* 3b. Need more evidence (period not established): shown on every plan, before any verdict */}
+      {currentItem.evidence_ledger && <EvidenceLedgerPanel ledger={currentItem.evidence_ledger} />}
       {currentItem.evidence_check?.required && (
-        <EvidenceLedgerPanel ledger={currentItem.evidence_ledger} />
         <EvidenceStep check={currentItem.evidence_check} constructionSeen={currentItem.item_summary?.construction_evidence} onAddEvidence={onAddEvidence || onAddMoreDetails}>
           {currentItem.checklist?.items?.length > 0 && (
             <BeforeYouBuy embedded items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />

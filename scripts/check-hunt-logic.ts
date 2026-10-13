@@ -2036,7 +2036,7 @@ check("hunt: enforce material + budget; label approximate alternatives", () => {
 
   const plan = { regions: null, itemTypes: ["commode"], allowedDomains: ["drouot.com"] } as any;
   const baseLot = (over: Partial<any> = {}) => ({
-    site: "drouot", id: "1", url: "https://drouot.com/l/1", title: "Commode Louis XV en chêne",
+    site: "drouot" as const, id: "1", url: "https://drouot.com/l/1", title: "Commode Louis XV en chêne",
     description: "époque Louis XV", estimateLow: 200, estimateHigh: 400, currency: "EUR",
     saleDate: new Date(Date.now() + 86400_000), soldOrEnded: false, ...over,
   });
