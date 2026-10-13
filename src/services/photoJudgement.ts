@@ -55,6 +55,15 @@ const TOP_MAKER_RE = /\b(riesener|oeben|bvrb|van\s+risen\s?burgh|weisweiler|carl
 export const STAMPED_MINOR_HIGH_CAP = 3000;
 const FURNITURE_CATS = new Set(['furniture', 'bedroom_furniture', 'chairs', 'mirrors']);
 const NON_FURNITURE_RE = /\b(rug|carpet|tapis|tapestry|tapisserie|textile|portiere|porti[èe]re|verdure|aubusson|painting|tableau|oil\s+on|huile|canvas|toile|portrait|landscape|watercolou?r|print|engraving|lamp|lighting|chandelier|lustre|sconce|applique|wall\s+light|candelabr\w*|bronze\s+sculpture|sculpture|statue|vase|porcelain|ceramic|clock|pendule)\b/i;
+/** Text runs: an unsupported period / stamp claim, cheap-material wording, explicit "style" wording. */
+export const TEXT_THIN_LOW_RATIO = 5;
+export const TEXT_CLAIM_HIGH_FACTOR = 0.85;
+export const TEXT_CHEAP_FACTOR = 0.6;
+export const TEXT_STYLE_FACTOR = 0.8;
+const TEXT_PERIOD_RE = /\b(d'?[ée]poque|period|1[6-9]th[\s-]century|xviii|1700-tal)\b/i;
+const TEXT_STAMP_RE = /\b(stamp\w*|estampill\w*|jme|sign[ée]e?|signed)\b/i;
+const TEXT_CHEAP_RE = /\b(stuc\w*|stucco|p[âa]te\s+dor[ée]e|gilded\s+paste|resin|r[ée]sine|pampilles|crystal\s+drops|m[ée]tal|metal|laiton|brass|plaster|pl[âa]tre|r[ée]gule|spelter|composition)\b/i;
+const TEXT_STYLE_RE = /\b(de\s+style|dans\s+le\s+style|in\s+the\s+style|style\s+(louis|empire|rocaille|r[ée]gence|napol|george|gustav)|[a-zé]+[\s-]+style\b|stil)\b/i;
 /** Model-signal floor: the model's raw upper figure below which a thinly evidenced piece is widened down to the cheap end. */
 export const CHEAP_FLOOR_MAX_HIGH = 1500;
 
@@ -149,6 +158,27 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
     low = high / 6;
     factors.push('model_signal_cheap_floor');
     notes.push('The model\'s own signals are thin (mid-hundreds estimate, period unconfirmed, no stamp or construction evidence): the lower figure is opened to the level such pieces often make when they turn out later or tired.');
+  }
+
+  // 6. Text runs (no photos, so nothing can corroborate a claim). The words "period" or "stamped" in a description
+  //    are not evidence on their own: while the model's own signals stay thin (period not confirmed, low confidence),
+  //    the claim does not lift the top and the low end is opened to the cheap level. Cheap-material wording (stucco,
+  //    gilded paste, metal, resin, crystal drops) and explicit "style" wording without a period claim lower the band.
+  //    Never uses an auction estimate (app users do not have one).
+  if (!i.hasPhotos) {
+    const t = String(i.userText || '');
+    const thinText = pc !== 'confirmed_period' && (i.confidence === 'low' || i.confidence === 'very_low');
+    if (thinText && (TEXT_PERIOD_RE.test(t) || TEXT_STAMP_RE.test(t)) && !topMaker) {
+      high = Math.max(low * 1.5, high * TEXT_CLAIM_HIGH_FACTOR);
+      factors.push('text_claim_unsupported_high_tempered');
+      notes.push('The period or stamp claim comes from the description only, with no photo showing construction or the mark: it is not allowed to lift the upper figure on its own.');
+    }
+    if (thinText && low > high / TEXT_THIN_LOW_RATIO) {
+      low = high / TEXT_THIN_LOW_RATIO;
+      factors.push('text_thin_low_opened');
+    }
+    if (TEXT_CHEAP_RE.test(t)) { low *= TEXT_CHEAP_FACTOR; high *= TEXT_CHEAP_FACTOR; factors.push('text_cheap_material'); }
+    if (TEXT_STYLE_RE.test(t) && !TEXT_PERIOD_RE.test(t)) { low *= TEXT_STYLE_FACTOR; high *= TEXT_STYLE_FACTOR; factors.push('text_style_wording'); }
   }
 
   if (low > 0 && high / low > 6) low = high / 6;

@@ -2275,6 +2275,20 @@ check("photo judgement: stamped minor-maker cap (read or stated), top makers exe
   assert.ok(!textRun.factors.includes("model_signal_cheap_floor"), "photo runs only");
 });
 
+check("text claims: unsupported period/stamp tempered, low opened; cheap material and style wording lower; top makers and photos exempt", () => {
+  const claim = applyPhotoJudgement({ hasPhotos: false, userText: "Commode d'époque Louis XV, estampillée", modelText: "", confidence: "low", styleEvidence: false, periodCertainty: "probable_period", low: 1000, high: 3000 });
+  assert.ok(claim.high < 3000 && claim.low <= claim.high / 5 + 10, `${claim.low}-${claim.high}`);
+  assert.ok(claim.factors.includes("text_claim_unsupported_high_tempered"));
+  const confirmed = applyPhotoJudgement({ hasPhotos: false, userText: "Commode d'époque Louis XV", modelText: "", confidence: "medium", styleEvidence: false, periodCertainty: "confirmed_period", low: 1000, high: 3000 });
+  assert.ok(!confirmed.factors.some(f => f.startsWith("text_")), "confirmed / not-low confidence: untouched");
+  const stucco = applyPhotoJudgement({ hasPhotos: false, userText: "Miroir en bois et stuc doré", modelText: "", confidence: "medium", styleEvidence: false, periodCertainty: "ambiguous", low: 200, high: 600 });
+  assert.ok(stucco.high <= 360 && stucco.factors.includes("text_cheap_material"));
+  const style = applyPhotoJudgement({ hasPhotos: false, userText: "Commode de style Louis XVI", modelText: "", confidence: "medium", styleEvidence: true, periodCertainty: "later_style_or_revival", low: 200, high: 600 });
+  assert.ok(style.factors.includes("text_style_wording") && style.high <= 480);
+  const photo = applyPhotoJudgement({ hasPhotos: true, userText: "Miroir en bois et stuc doré d'époque", modelText: "", confidence: "low", styleEvidence: false, periodCertainty: "ambiguous", low: 200, high: 600 });
+  assert.ok(!photo.factors.some(f => f.startsWith("text_")), "photo runs: text rule off");
+});
+
 console.log(`
 ${passed} checks passed`);
 
