@@ -1,8 +1,9 @@
 // Vercel serverless function: read a pasted lot link (Drouot, Auctionet, Interencheres, other sites' meta tags)
 // so the appraisal uses the real catalogue text, estimate and photos. Never returns the hammer result.
 import { fetchLotFacts } from "../src/services/lotFetch.js";
+import { withApiGuard } from "../src/services/apiGuard.js";
 
-export default async function handler(req: any, res: any) {
+async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -12,3 +13,6 @@ export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
   return res.status(200).json(facts);
 }
+
+// Auth (flag-gated), App Check (flag-gated) and per-identity/IP rate limiting: see src/services/apiGuard.ts.
+export default withApiGuard(handler, { route: "lot" });
