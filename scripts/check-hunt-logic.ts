@@ -978,9 +978,11 @@ check("fix 6: confidence inputs on fixed scales, calibrated with the app's own e
   assert.equal(confidenceLabel(80), "high"); assert.equal(confidenceLabel(60), "medium"); assert.equal(confidenceLabel(40), "low"); assert.equal(confidenceLabel(10), "very_low");
 });
 
-check("step 1 split: the original valuation path (fixed reference price ranges, no comparables, no band correction)", () => {
+check("prompt: no fixed reference price list (anchoring removed, approved 13 Oct 2026); no comparables prompt or band correction", () => {
   const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8") + readFileSync(new URL("../src/services/postProcess.ts", import.meta.url), "utf8");
-  assert.match(gem, /Provincial walnut commode, 18th c\.: €300/);
+  assert.ok(!/Provincial walnut commode, 18th c\.: €300/.test(gem));
+  assert.match(gem, /Do NOT anchor on a fixed price list/);
+  assert.match(gem, /ALTERATIONS CHECK/);
   assert.ok(!/comparablesPrompt|bandFactor/.test(gem));
 });
 
@@ -2230,6 +2232,10 @@ check("photo judgement: later additions / composed of parts are discounted when 
   assert.ok(!hasAdditionsCue("no sign of a marriage"));
   const r = applyPhotoJudgement({ hasPhotos: true, userText: "", modelText: "the marble top is a later replacement; later bronzes", styleEvidence: false, periodCertainty: "confirmed_period", low: 1000, high: 2500 });
   assert.ok(r.factors.includes("additions_or_marriage_discount")); assert.ok(r.high < 2500);
+  const alt = applyPhotoJudgement({ hasPhotos: true, userText: "", modelText: "", styleEvidence: false, periodCertainty: "probable_period", alterations: { later_additions: ["marble top"], marriage: "not_seen" }, low: 1000, high: 2500 });
+  assert.ok(alt.factors.includes("additions_or_marriage_discount"), "structured alterations field triggers the discount");
+  const none = applyPhotoJudgement({ hasPhotos: true, userText: "", modelText: "", styleEvidence: false, periodCertainty: "probable_period", alterations: { later_additions: [], marriage: "not_seen", composed_of_parts: "cannot_tell" }, low: 1000, high: 2500 });
+  assert.ok(!none.factors.includes("additions_or_marriage_discount"));
   const text = applyPhotoJudgement({ hasPhotos: false, userText: "composed of period components", modelText: "", styleEvidence: false, periodCertainty: "ambiguous", low: 400, high: 1200 });
   assert.equal(text.factors.length, 0, "a text run the model already priced as ambiguous is left alone");
 });

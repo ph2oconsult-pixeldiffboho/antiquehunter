@@ -136,6 +136,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       hasPhotos, userText: `${query || ''} ${lotFacts?.ok ? `${lotFacts.title || ''} ${(lotFacts as any).description || ''}` : ''}`,
       periodCertainty: originalPeriodCertainty, modelMakerStatus: item.item_summary?.maker?.status, makerStatus: maker?.status || null,
       constructionEvidence: item.item_summary.construction_evidence, modelText: pjModelText, styleEvidence: pjStyleEvidence,
+      alterations: (item.item_summary as any)?.alterations || null,
     };
     const pjEarly = applyPhotoJudgement({ ...pjInput, low: Number(item.price_guidance?.estimated_market_range_low) || 0, high: Number(item.price_guidance?.estimated_market_range_high) || 0 });
     if (pjEarly.periodCertainty !== originalPeriodCertainty) item.item_summary.period_certainty = pjEarly.periodCertainty;

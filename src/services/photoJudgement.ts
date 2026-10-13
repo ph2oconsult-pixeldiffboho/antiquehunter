@@ -20,6 +20,8 @@ export interface PhotoJudgementInput {
   modelText: string;
   /** Is a later-style verdict backed by catalogue / user words or a modern construction cue? */
   styleEvidence: boolean;
+  /** Structured alterations check from the model (item_summary.alterations). */
+  alterations?: { later_additions?: string[]; marriage?: string; composed_of_parts?: string; reconstruction?: string } | null;
   low: number;
   high: number;
 }
@@ -80,7 +82,11 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
 
   // 2. Later additions / marriages / composed of parts, while the model still treated it as fully period
   const addText = `${i.modelText} ${i.constructionEvidence || ''} ${i.userText}`;
-  if (hasAdditionsCue(addText) && (pc === 'confirmed_period' || (i.hasPhotos && pc === 'probable_period'))) {
+  const alt = i.alterations || null;
+  const altFlag = !!alt && ((Array.isArray(alt.later_additions) && alt.later_additions.filter(x => String(x || '').trim()).length > 0)
+    || ['yes', 'possible'].includes(String(alt.marriage)) || ['yes', 'possible'].includes(String(alt.composed_of_parts))
+    || ['yes', 'possible'].includes(String(alt.reconstruction)));
+  if ((altFlag || hasAdditionsCue(addText)) && (pc === 'confirmed_period' || (i.hasPhotos && pc === 'probable_period'))) {
     low = low * 0.8; high = high * 0.75;
     if (pc === 'confirmed_period') pc = 'probable_period';
     confidenceCap = Math.min(confidenceCap, 55);
