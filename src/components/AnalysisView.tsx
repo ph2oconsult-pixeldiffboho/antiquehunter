@@ -1062,7 +1062,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
             <div className="space-y-1">
               <p className={`text-[9px] uppercase tracking-widest font-bold ${dealerScale ? 'text-ink' : 'text-muted'}`}>{dealerScale ? t('analysis.dealer_range') : t('analysis.retail_range', 'Retail Range')}</p>
-              {dealerEvidence === 'none' && !isAuctionItem ? (
+              {dealerEvidence === 'none' ? (
                 <p className="text-sm font-medium text-amber-800" data-testid="range-dealer-none">{t('analysis.no_dealer_evidence')}</p>
               ) : (
                 <p className={dealerScale ? 'text-xl font-medium text-ink' : 'text-lg font-medium text-muted'} data-testid="range-dealer">
