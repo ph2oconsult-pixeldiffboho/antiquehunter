@@ -535,7 +535,7 @@ check("price bands are contiguous; overpaying threshold = walk-away", () => {
   assert.equal(at(6001).basis, "walk_away");
   let prev = 100;
   for (let p = 500; p <= 8000; p += 50) { const s = at(p).score; assert.ok(s <= prev, `score rises at ${p}`); prev = s; }
-  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8") + readFileSync(new URL("../src/services/postProcess.ts", import.meta.url), "utf8");
   assert.match(gem, /pg\.overpaying_above = valuation\.overpayingAbove/);
   assert.match(gem, /buildValuation\(/);
   assert.match(gem, /assertValuationAgreement\(valuation\)/);
@@ -946,7 +946,7 @@ check("fix 5: a pasted lot link gives the real catalogue, estimate, fees and pho
   assert.equal(pickAuctionetItem(api, "5401614")?.estimate, 200);
   assert.equal(pickAuctionetItem(api, "1"), null);
   // the appraisal prompt no longer tells the model to fetch / anchor to an estimate it never saw
-  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8") + readFileSync(new URL("../src/services/postProcess.ts", import.meta.url), "utf8");
   assert.ok(!/prioritize fetching/i.test(gem));
   assert.ok(!/Anchored to auction house catalog estimate for this lot/i.test(gem));
   // a link alone can be submitted; decimal fees are accepted
@@ -975,7 +975,7 @@ check("fix 6: confidence inputs on fixed scales, calibrated with the app's own e
 });
 
 check("step 1 split: the original valuation path (fixed reference price ranges, no comparables, no band correction)", () => {
-  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8") + readFileSync(new URL("../src/services/postProcess.ts", import.meta.url), "utf8");
   assert.match(gem, /Provincial walnut commode, 18th c\.: €300/);
   assert.ok(!/comparablesPrompt|bandFactor/.test(gem));
 });
@@ -1064,7 +1064,7 @@ check("need more evidence: no Strong/Good Buy or Fair verdict, but Overpriced/Wa
 });
 
 check("need more evidence: post-processing marks the range provisional and the verdict; prompt asks for construction evidence; EN/FR text", () => {
-  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8") + readFileSync(new URL("../src/services/postProcess.ts", import.meta.url), "utf8");
   assert.match(gem, /hand-cut dovetails/);
   assert.match(gem, /pegged mortise-and-tenon/);
   assert.match(gem, /Phillips or cross-head screws, staples/);
@@ -1098,7 +1098,7 @@ check("need more evidence: post-processing marks the range provisional and the v
 });
 
 check("fix 9: appraisals are repeatable (temperature 0, fixed seed)", () => {
-  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8");
+  const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8") + readFileSync(new URL("../src/services/postProcess.ts", import.meta.url), "utf8");
   assert.match(gem, /temperature: 0,/);
   assert.match(gem, /seed: APPRAISAL_SEED/);
 });
