@@ -193,7 +193,7 @@ export const PIECES: PieceQuery[] = [
   { key: 'commode', en: 'commode', fr: 'commode', re: /\b(commodes?|chests?\s+of\s+drawers|byra)\b/ },
   { key: 'secretaire', en: 'secrétaire', fr: 'secrétaire', re: /\b(secretaires?|secretary|secretaries)\b/ },
   { key: 'desk', en: 'bureau plat desk', fr: 'bureau', re: /\b(bureau(x)?\s+plats?|desks?|bureaux?)\b/ },
-  { key: 'table', en: 'table', fr: 'table', re: /\b(tables?|gueridons?|consoles?)\b/ },
+  { key: 'table', en: 'table', fr: 'table', re: /\b(tables?|gueridons?|consoles?|coiffeuses?|poudreuses?|dressing[\s-]+tables?|bonheurs?[\s-]+du[\s-]+jour|travailleuses?)\b/ },
   { key: 'cabinet', en: 'cabinet', fr: 'meuble', re: /\b(cabinets?|armoires?|bibliotheques?|bookcases?|encoignures?|corner\s+cupboards?|chiffonniers?|semainiers?)\b/ },
   { key: 'mirror', en: 'mirror', fr: 'miroir', re: /\b(mirrors?|miroirs?|trumeaux?)\b/ },
   { key: 'screen', en: 'fire screen', fr: 'écran de cheminée', re: /\b(fire\s?screens?|firescreens?|ecrans?(\s+de\s+(cheminee|feu|foyer))?|pare-?feux?|paravents?|folding\s+screens?)\b/ },

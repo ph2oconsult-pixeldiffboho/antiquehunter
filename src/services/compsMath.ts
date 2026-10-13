@@ -293,7 +293,7 @@ export interface AnchorOptions {
   relevanceFactor?: number;
 }
 
-const kindOfComp = (c: Comparable): string | null => pieceOf(c.title)?.key || null;
+const kindOfComp = (c: Comparable): string | null => pieceOf(c.title)?.key || pieceOf(String(c.snippet || '').slice(0, 200))?.key || null;
 
 /**
  * Relevance gate shared by maker and generic comps: the same kind of piece (a mirror is never matched with a dressing

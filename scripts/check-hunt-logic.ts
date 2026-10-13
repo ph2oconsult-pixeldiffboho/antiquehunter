@@ -2188,6 +2188,7 @@ check("fix 3: relevance — a mirror is never matched with a dressing table, a f
   const r = filterRelevantComps(mirrorComps, { pieceKey: "mirror", isAuction: true });
   assert.deepEqual(r.kept.map(c => c.title), ["Miroir en bois doré, Hache", "Trumeau Louis XVI"]);
   assert.ok(r.notes.some(n => /other_piece_type_table/.test(n.reason)));
+  assert.equal(filterRelevantComps([mkComp("Coiffeuse d'époque Louis XVI, par Hache", 1476)], { pieceKey: "mirror", isAuction: true }).kept.length, 0, "a coiffeuse is a dressing table");
   const screen = filterRelevantComps([mkComp("Paire de fauteuils, Jacob", 300000), mkComp("Écran de cheminée Louis XVI", 900)], { pieceText: "Fire screen, Louis XVI, giltwood", isAuction: true });
   assert.deepEqual(screen.kept.map(c => c.title), ["Écran de cheminée Louis XVI"]);
 });
