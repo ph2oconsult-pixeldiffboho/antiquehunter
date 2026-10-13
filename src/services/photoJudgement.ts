@@ -62,7 +62,11 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
 
   // 1. Stamp / maker read from a photo only (the buyer's text did not state it)
   const photoStamp = i.hasPhotos && !STAMP_IN_TEXT_RE.test(i.userText)
-    && (i.modelMakerStatus === 'stamp_visible_in_photo' || i.makerStatus === 'stamp_in_photo');
+    && !['dealer_label', 'doubtful_stamp', 'mentioned'].includes(String(i.makerStatus || ''))
+    && !['dealer_label', 'doubtful_stamp'].includes(String(i.modelMakerStatus || ''))
+    && (['stamp_visible_in_photo', 'stamped_stated', 'stamped_confirmed'].includes(String(i.modelMakerStatus || ''))
+      || ['stamp_in_photo', 'stamped_stated', 'stamped_confirmed'].includes(String(i.makerStatus || ''))
+      || STAMP_IN_TEXT_RE.test(String(i.modelText || '').slice(0, 400)));
   if (photoStamp && !periodBuilt) {
     if (pc === 'confirmed_period') { pc = 'probable_period'; factors.push('photo_stamp_period_capped'); }
     confidenceCap = Math.min(confidenceCap, 60);

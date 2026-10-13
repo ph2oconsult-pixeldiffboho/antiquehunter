@@ -186,7 +186,10 @@ export const applyBaseBandPriors = (i: BandPriorInput): BandPriorResult => {
   }
 
   const text = `${i.query || ''} ${i.title || ''}`;
-  const style = styleDiscountOf(i.periodCertainty, i.styleNote, text, i.claims);
+  const styleRaw = styleDiscountOf(i.periodCertainty, i.styleNote, text, i.claims);
+  // Text-only: a soft style note is the model's own reading of the text it already priced; only an explicit
+  // "de style" / later-style verdict discounts.
+  const style = i.textOnly && styleRaw.note === 'style_soft' ? { factor: 1, note: null } : styleRaw;
   styleDiscount = style.factor;
   // Fix: a later-style / revival call from appearance alone is a hypothesis, not a fact. Keep the period-piece upper
   // bound (no discount on the high) and widen the range downward by the style factor instead.
@@ -198,9 +201,8 @@ export const applyBaseBandPriors = (i: BandPriorInput): BandPriorResult => {
     styleDiscount = 1;
   } else if (style.note) factors.push(style.note);
 
-  const cond = i.textOnly
-    ? conditionDiscountOf((i.defects || []).filter(d => ['major', 'structural'].includes(String(d.severity || ''))), '')
-    : conditionDiscountOf(i.defects, text);
+  // Text-only: the model priced the condition wording it was given; grading that same wording again double-counts.
+  const cond = i.textOnly ? conditionDiscountOf([], '') : conditionDiscountOf(i.defects, text);
   conditionDiscount = cond.factorHigh;
   if (cond.note) factors.push(cond.note);
 
