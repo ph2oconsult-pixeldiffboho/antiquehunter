@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 server-dist/
+
+# Firebase emulator logs
+*-debug.log

@@ -56,9 +56,13 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
+    // Admin = custom claim `admin: true` (preferred), or users/{uid}.role == 'admin'.
+    // LEGACY_ADMIN_EMAIL_FALLBACK: remove the email clause once the `admin` custom claim has been set
+    // on the admin account (see PR "Security E" for the one-off command). Admin account should have MFA enabled.
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (request.auth.token.get('admin', false) == true ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
           (request.auth.token.email == "ph2oconsult@gmail.com" && request.auth.token.email_verified == true));
     }
 
@@ -139,7 +143,11 @@ service cloud.firestore {
 
     match /analysis_feedback/{feedbackId} {
       allow read: if isAdmin();
+      // Anonymous creates are intentional. Spam/cost protection comes from Firebase App Check enforcement
+      // on Cloud Firestore (console setting; Firestore rules cannot read App Check tokens per collection).
+      // Feedback is write-once.
       allow create: if isValidFeedback(request.resource.data);
+      allow update, delete: if false;
     }
   }
 }
