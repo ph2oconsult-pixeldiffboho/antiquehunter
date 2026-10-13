@@ -1,0 +1,2125 @@
+{
+  "note": "Dev corpus for real-pipeline appraisal benchmark. n=76. Inputs: catalogue description, category, dimensions/defects in text, French/auction context, premium. NO estimate, NO ask, NO URL in the prompt. Realised hammer for scoring only. Sealed eval untouched.",
+  "n": 70,
+  "lots": [
+    {
+      "id": "drouot-35127785",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Conan Belleville Hôtel d'Ainay",
+      "city": "Lyon",
+      "sale_date": "2026-10-08",
+      "url": "https://drouot.com/fr/l/35127785-commode-dans-le-style-louis-xvi-en-noyer-et-placage-de-noyer",
+      "category": "furniture",
+      "type": "commode (style)",
+      "text": "Commode dans le style Louis XVI en noyer et placage de noyer marqueté de filets enrubannés, ouvre à trois rangs de tiroirs, plateau marqueté d'une urne fleurie. Poignés de tirage tombantes en laiton. Début du XIXème siècle. H. 97 cm - L. 134 cm - P. 63,5 cm. Accidents, restaurations.",
+      "currency": "EUR",
+      "est_low_eur": 200,
+      "est_high_eur": 300,
+      "hammer_eur": 320,
+      "premium_pct": 27.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/35127785-commode-dans-le-style-louis-xvi-en-noyer-et-placage-de-noyer",
+        "house": "Conan Belleville Hôtel d'Ainay",
+        "sale_date": "2026-10-08",
+        "city": "Lyon",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34965716",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "2026-10-04",
+      "url": "https://drouot.com/fr/l/34965716-commode-galbee-a-facade-cintree-en-placage-de-bois-de-rose",
+      "category": "furniture",
+      "type": "commode",
+      "text": "Commode galbée à façade cintrée en placage de bois de rose marqueté d'un vase fleuri dans des encadrements de palissandre, ouvrant par deux tiroirs sans traverse, reposant sur quatre pieds cambrés. Garniture de bronzes ciselés et dorés tels que tablier, chutes, sabots, anneaux de tirage et entrées de serrure. Plateau de marbre gris veiné blanc. Porte deux estampilles. En partie d'époque Louis XV. Haut. : 88 cm - Larg. : 112 cm - Prof. : 57 cm Expertise réalisée par Monsieur Cédric HENON - 06 95 34 93 78 - cedric.henon@authenticite.fr",
+      "currency": "EUR",
+      "est_low_eur": 1200,
+      "est_high_eur": 1500,
+      "hammer_eur": 1300,
+      "premium_pct": 28.8,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965716-commode-galbee-a-facade-cintree-en-placage-de-bois-de-rose",
+        "house": "Le Floc'h",
+        "sale_date": "2026-10-04",
+        "city": "Saint-Cloud",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34965739",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "2026-10-04",
+      "url": "https://drouot.com/fr/l/34965739-commode-rectangulaire-en-bois-laque-polychrome-a-decor-dune",
+      "category": "furniture",
+      "type": "commode",
+      "text": "Commode rectangulaire en bois laqué polychrome à décor d'une frise à l'antique avec Cérès sur un char tiré par des anges entourée de guirlandes de fleurs, les montants droits et cannelés (petits éclats et manques). Elle repose sur deux pieds toupie à l'avant. Plateau de marbre blanc veiné gris. Italie, XIXe siècle. Haut. : 85 cm - Larg. : 107 cm - Prof. : 50 cm",
+      "currency": "EUR",
+      "est_low_eur": 400,
+      "est_high_eur": 600,
+      "hammer_eur": 1900,
+      "premium_pct": 28.8,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965739-commode-rectangulaire-en-bois-laque-polychrome-a-decor-dune",
+        "house": "Le Floc'h",
+        "sale_date": "2026-10-04",
+        "city": "Saint-Cloud",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34965755",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "2026-10-04",
+      "url": "https://drouot.com/fr/l/34965755-commode-a-langlaise-en-acajou-et-placage-dacajou-moulure",
+      "category": "furniture",
+      "type": "commode",
+      "text": "Commode à l’anglaise en acajou et placage d’acajou mouluré ouvrant en ceinture par quatre tiroirs surmontant deux vantaux centraux et deux étagères d'encoignure à plateaux de marbre blanc veiné et fond de glace (chocs). Les montants en pilastre reposant sur des pieds fuselés. Importante garniture de bronzes ciselés et dorés tels que frises d’entrelacs, chutes feuillagées, rosaces, frises de perles et olives, asperges, entrées de serrure et sabots. Plateau de marbre blanc veiné gris (égrenures). Signée sur la platine Paul SORMANI, 10 rue Charlot, Paris. Seconde moitié du XIXe siècle. Haut. : 106 cm - Larg. : 215 cm - Prof. : 64,5 cm Note : Fondée par Paul Sormani en 1854, la maison Sormani devient rapidement fournisseur de la famille Impériale. Elle participe à l'Exposition des Produits de l'Industrie de 1849 puis aux Expositions Universelles de 1855 et 1867 lors desquelles elle reçoit plusieurs récompenses, et s’installe rue Charlot. Paul Sormani décède en 1877 et sa veuve et son fils poursuivent l'activité sous le nom de Veuve Paul Sormani et Fils A Paris. Expertise réalisée par Monsieur Cédric HENON - 06 95 34 93 78 - cedric.henon@authenticite.fr",
+      "currency": "EUR",
+      "est_low_eur": 2000,
+      "est_high_eur": 3000,
+      "hammer_eur": 2800,
+      "premium_pct": 28.8,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965755-commode-a-langlaise-en-acajou-et-placage-dacajou-moulure",
+        "house": "Le Floc'h",
+        "sale_date": "2026-10-04",
+        "city": "Saint-Cloud",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-35127801",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Conan Belleville Hôtel d'Ainay",
+      "city": "Lyon",
+      "sale_date": "2026-10-08",
+      "url": "https://drouot.com/fr/l/35127801-commode-dans-le-style-empire-en-noyer-ouvrant-a-trois",
+      "category": "furniture",
+      "type": "commode (style)",
+      "text": "Commode dans le style Empire en noyer ouvrant à trois tiroirs entre demi-colonne. Dessus bois. XIXème siècle. H. 88 cm - L. 124 cm - P. 60 cm. Accidents, restaurations.",
+      "currency": "EUR",
+      "est_low_eur": 50,
+      "est_high_eur": 100,
+      "hammer_eur": 90,
+      "premium_pct": 27.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/35127801-commode-dans-le-style-empire-en-noyer-ouvrant-a-trois",
+        "house": "Conan Belleville Hôtel d'Ainay",
+        "sale_date": "2026-10-08",
+        "city": "Lyon",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34965721",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "2026-10-04",
+      "url": "https://drouot.com/fr/l/34965721-secretaire-a-abattant-en-armoire-a-pans-coupes-en-placage-de",
+      "category": "furniture",
+      "type": "tall cabinet/secretaire",
+      "text": "Secrétaire à abattant en armoire à pans coupés en placage de bois de rose dans des encadrements d’amarante, marqueté d'un cavalier en médaillon, de pots à feu et de branchages feuillagés, ouvrant par un tiroir, un abattant découvrant un intérieur aménagé et deux vantaux (manques, soulèvements, accidents et fentes). Estampillé à deux reprises François-Gaspard TEUNÉ, reçu maître le 29 mars 1766 et poinçon de jurande. Plateau de marbre gris veiné blanc. Époque Louis XVI. Haut. : 145 cm - Larg. : 97 cm - Prof. : 41 cm Expertise réalisée par Monsieur Cédric HENON - 06 95 34 93 78 - cedric.henon@authenticite.fr",
+      "currency": "EUR",
+      "est_low_eur": 1200,
+      "est_high_eur": 1300,
+      "hammer_eur": 1200,
+      "premium_pct": 28.8,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965721-secretaire-a-abattant-en-armoire-a-pans-coupes-en-placage-de",
+        "house": "Le Floc'h",
+        "sale_date": "2026-10-04",
+        "city": "Saint-Cloud",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-35082101",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Vanderkindere",
+      "city": "Uccle (Bruxelles)",
+      "sale_date": "2026-10-07",
+      "url": "https://drouot.com/fr/l/35082101-secretaire-droit-louis-xvi-en-frisage-a-decor-dailes-de",
+      "category": "furniture",
+      "type": "tall cabinet/secretaire",
+      "text": "Secrétaire droit Louis XVI en frisage à décor d'\"Ailes de papillons\" et \"Frises en grecques\". Ouvrant à deux tiroirs supérieurs, un abattant en trompe-l'oeil qui révèle une série de compartiments, et trois tiroirs sous l'abattant. Entrées de serrures en bronze doré à décor de \"Noeuds en rubans\". Le tout surmonté d'une tablette en marbre rouge. Travail français. Epoque: XVIIIème. (Soulèvements et **). Dim.:+/-171x79x39,5 cm.",
+      "currency": "EUR",
+      "est_low_eur": 600,
+      "est_high_eur": 800,
+      "hammer_eur": 600,
+      "premium_pct": 26.5,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/35082101-secretaire-droit-louis-xvi-en-frisage-a-decor-dailes-de",
+        "house": "Vanderkindere",
+        "sale_date": "2026-10-07",
+        "city": "Uccle (Bruxelles)",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "500_1k"
+      }
+    },
+    {
+      "id": "drouot-35127792",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Conan Belleville Hôtel d'Ainay",
+      "city": "Lyon",
+      "sale_date": "2026-10-08",
+      "url": "https://drouot.com/fr/l/35127792-secretaire-droit-en-noyer-dans-le-style-louis-xvi-ouvre-en",
+      "category": "furniture",
+      "type": "tall cabinet/secretaire (style)",
+      "text": "Secrétaire droit en noyer, dans le style Louis XVI, ouvre en façade par un tiroir sur un abattant et trois tiroirs, montants ornés de cannelures, pieds fuseaux. Début du XIXème siècle. H. 145,5 cm - L. 100,5 cm - P. 42 cm Accidents.",
+      "currency": "EUR",
+      "est_low_eur": 150,
+      "est_high_eur": 300,
+      "hammer_eur": 150,
+      "premium_pct": 27.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/35127792-secretaire-droit-en-noyer-dans-le-style-louis-xvi-ouvre-en",
+        "house": "Conan Belleville Hôtel d'Ainay",
+        "sale_date": "2026-10-08",
+        "city": "Lyon",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-35105769",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Côte Basque Enchères Lelièvre - Cabarrouy",
+      "city": "Saint-Jean-De-Luz",
+      "sale_date": "2026-10-02",
+      "url": "https://drouot.com/fr/l/35105769-buffet-dencoignure-en-bois-naturel-moulure-la-partie-basse",
+      "category": "furniture",
+      "type": "buffet/encoignure",
+      "text": "BUFFET D'ENCOIGNURE, en bois naturel mouluré, la partie basse ouvrant à un petit tiroir en ceinture et deux portes bombées; la partie supérieure chantournée à cinq tablettes posant sur le plateau du buffet et probablement rapportée. Haut. totale : 204 cm ; 65 x 63 cm",
+      "currency": "EUR",
+      "est_low_eur": 100,
+      "est_high_eur": 150,
+      "hammer_eur": 100,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/35105769-buffet-dencoignure-en-bois-naturel-moulure-la-partie-basse",
+        "house": "Côte Basque Enchères Lelièvre - Cabarrouy",
+        "sale_date": "2026-10-02",
+        "city": "Saint-Jean-De-Luz",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-35141964",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Nice Enchères",
+      "city": "Nice",
+      "sale_date": "2026-10-06",
+      "url": "https://drouot.com/fr/l/35141964-grand-miroir-de-forme-rectangulaire-en-bois-et-stuc-dore-a",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Grand miroir de forme rectangulaire en bois et stuc doré à décor ajouré richement sculpté de coquilles et peignées. De style Louis XV. Travail de la fin du XIXe siècle. Dimensions : 142 x 91 cm (accidents et manques).",
+      "currency": "EUR",
+      "est_low_eur": 400,
+      "est_high_eur": 500,
+      "hammer_eur": 400,
+      "premium_pct": 27.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/35141964-grand-miroir-de-forme-rectangulaire-en-bois-et-stuc-dore-a",
+        "house": "Nice Enchères",
+        "sale_date": "2026-10-06",
+        "city": "Nice",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34965719",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "2026-10-04",
+      "url": "https://drouot.com/fr/l/34965719-miroir-a-parecloses-surmonte-dun-fronton-a-decor-ajoure-dun",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Miroir à parecloses surmonté d'un fronton à décor ajouré d'un panier fleuri et palmette, les encadrements en bois et composition laquée or sculptés de palmettes aux écoinçons, les glaces au mercure (manques). Composé d'éléments anciens, style Régence. Haut. : 144,5 cm - Larg : 71 cm",
+      "currency": "EUR",
+      "est_low_eur": 500,
+      "est_high_eur": 800,
+      "hammer_eur": 1100,
+      "premium_pct": 28.8,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965719-miroir-a-parecloses-surmonte-dun-fronton-a-decor-ajoure-dun",
+        "house": "Le Floc'h",
+        "sale_date": "2026-10-04",
+        "city": "Saint-Cloud",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-35105855",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Côte Basque Enchères Lelièvre - Cabarrouy",
+      "city": "Saint-Jean-De-Luz",
+      "sale_date": "2026-10-02",
+      "url": "https://drouot.com/fr/l/35105855-miroir-a-fronton-en-bois-et-stuc-dore-au-mercure-le-fronton",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "MIROIR à fronton en bois et stuc doré au mercure, le fronton à décor de fleurs. XVIIIe siècle Haut. 60 cm (accident)",
+      "currency": "EUR",
+      "est_low_eur": 80,
+      "est_high_eur": 120,
+      "hammer_eur": 100,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/35105855-miroir-a-fronton-en-bois-et-stuc-dore-au-mercure-le-fronton",
+        "house": "Côte Basque Enchères Lelièvre - Cabarrouy",
+        "sale_date": "2026-10-02",
+        "city": "Saint-Jean-De-Luz",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-5353205",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Auktionsverket Engelholm",
+      "city": "Sweden",
+      "sale_date": "2026-09-09",
+      "url": "https://auctionet.com/en/5353205-chest-of-drawers-gustavian-southern-sweden-late-18th-century",
+      "category": "furniture",
+      "type": "Swedish commode",
+      "text": "BYRÅ, Gustaviansk, Sydsverige, 1700-talets slut.. Stor byrå, Gustaviansk. Alrotsfanér, almfanér på furu. Äldre lås och nyckel. Höjd 88 cm Bredd 112 cm Djup 56 cm. Condition: Välhållen relaterat till sin ålder. Antikt föremål. Till viss del renoverad och kompletterad över tid. Beslag tillkommit. Lås sitter löst. Trä med ytlitage och märken. Doft av parfym Key/keys included.",
+      "currency": "SEK",
+      "est_low_eur": 715,
+      "est_high_eur": 715,
+      "hammer_eur": 536,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/5353205-chest-of-drawers-gustavian-southern-sweden-late-18th-century",
+        "house": "Auktionsverket Engelholm",
+        "sale_date": "2026-09-09",
+        "city": "Sweden",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "500_1k"
+      }
+    },
+    {
+      "id": "auctionet-5396478",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Kalmar Auktionsverk",
+      "city": "Sweden",
+      "sale_date": "2026-10-06",
+      "url": "https://auctionet.com/en/5396478-chest-of-drawers-gustavian-style",
+      "category": "furniture",
+      "type": "Swedish commode (style)",
+      "text": "BYRÅ, gustaviansk stil.. höjd 77 cm, längd 100 cm, bredd 54 cm. Condition: färgbortfall och slitage.",
+      "currency": "SEK",
+      "est_low_eur": 107,
+      "est_high_eur": 107,
+      "hammer_eur": 31,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/5396478-chest-of-drawers-gustavian-style",
+        "house": "Kalmar Auktionsverk",
+        "sale_date": "2026-10-06",
+        "city": "Sweden",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-4703827",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Stockholms Auktionsverk Helsingborg",
+      "city": "Sweden",
+      "sale_date": "2025-11-25",
+      "url": "https://auctionet.com/en/4703827-a-gustavian-mirror-18th-century",
+      "category": "mirrors",
+      "type": "Swedish mirror",
+      "text": "SPEGEL, Gustaviansk, 1700-tal.. Spegel med en oval form med en ram i förgyllt trä prydd med bandrosett på toppen. Originalglas. H ca 83 cm. B ca 55 cm. Condition: Slitage, skador, lagningar och retuscher.",
+      "currency": "SEK",
+      "est_low_eur": 268,
+      "est_high_eur": 268,
+      "hammer_eur": 232,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/4703827-a-gustavian-mirror-18th-century",
+        "house": "Stockholms Auktionsverk Helsingborg",
+        "sale_date": "2025-11-25",
+        "city": "Sweden",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-4601099",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Lawrences Auctioneers",
+      "city": "United Kingdom",
+      "sale_date": "2026-02-11",
+      "url": "https://auctionet.com/en/events/965-winter-fine-art-sale/455-george-iii-mahogany-serpentine-chest-of-drawers",
+      "category": "furniture",
+      "type": "UK chest of drawers",
+      "text": "GEORGE III MAHOGANY SERPENTINE CHEST OF DRAWERS.. the shaped top with moulded edge over a brushing slide and four long drawers, the canted corners with fluted detail, raised upon bracket feet, height 83cm, width 93cm, depth 53cm. Condition: Fine split to top, loss of colour/fading to top, surface marks and general wear, wear to RH canted corner, replacement handles.",
+      "currency": "GBP",
+      "est_low_eur": 885,
+      "est_high_eur": 1181,
+      "hammer_eur": 2597,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/events/965-winter-fine-art-sale/455-george-iii-mahogany-serpentine-chest-of-drawers",
+        "house": "Lawrences Auctioneers",
+        "sale_date": "2026-02-11",
+        "city": "United Kingdom",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "auctionet-5439249",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Lawrences Auctioneers",
+      "city": "United Kingdom",
+      "sale_date": "2026-10-05",
+      "url": "https://auctionet.com/en/5439249-a-george-iii-style-walnut-chest-of-drawers",
+      "category": "furniture",
+      "type": "UK chest of drawers (style)",
+      "text": "A GEORGE III STYLE WALNUT CHEST OF DRAWERS.. A George III style walnut chest of drawers, comprising of four graduated drawers with drop down handles, and raised on bracket supports. 67.5cm (h) x 52cm (w) x 35.5cm (d). Condition: General knocks, marks and scratches. Scratches to the top. Large split to the side. Other imperfections.",
+      "currency": "GBP",
+      "est_low_eur": 47,
+      "est_high_eur": 47,
+      "hammer_eur": 41,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/5439249-a-george-iii-style-walnut-chest-of-drawers",
+        "house": "Lawrences Auctioneers",
+        "sale_date": "2026-10-05",
+        "city": "United Kingdom",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-4827010",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Lawrences Auctioneers",
+      "city": "United Kingdom",
+      "sale_date": "2026-01-20",
+      "url": "https://auctionet.com/en/4827010-an-18th-century-walnut-chest-of-drawers-formerly-top-half-of-a-tallboy",
+      "category": "furniture",
+      "type": "commode",
+      "text": "AN 18TH CENTURY WALNUT CHEST OF DRAWERS (FORMERLY TOP HALF OF A TALLBOY).. the concave top over three short and three long drawers, raised on bracket feet, 102cm high x 103cm wide x 54cm deep. Condition: General wear and marks commensurate with age and use, replaced handles, fill-in repairs to shrinkage splits on sides, some bowing to drawer fronts. Key/keys included.",
+      "currency": "GBP",
+      "est_low_eur": 118,
+      "est_high_eur": 118,
+      "hammer_eur": 475,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/4827010-an-18th-century-walnut-chest-of-drawers-formerly-top-half-of-a-tallboy",
+        "house": "Lawrences Auctioneers",
+        "sale_date": "2026-01-20",
+        "city": "United Kingdom",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-4245030",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Göteborgs Auktionsverk",
+      "city": "Sweden",
+      "sale_date": "2025-08-08",
+      "url": "https://auctionet.com/en/4245030-mirror-rococo-rococo-style",
+      "category": "furniture",
+      "type": "mirror",
+      "text": "SPEGEL, rokoko/rokokostil.. Bronserad träram. Dekor av snäckor och blad. Höjd 76 cm. Condition: Senare bronsering, kompletterad samt renoverad.",
+      "currency": "SEK",
+      "est_low_eur": 134,
+      "est_high_eur": 134,
+      "hammer_eur": 107,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/4245030-mirror-rococo-rococo-style",
+        "house": "Göteborgs Auktionsverk",
+        "sale_date": "2025-08-08",
+        "city": "Sweden",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-4862879",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Lots Road Auctions",
+      "city": "United Kingdom",
+      "sale_date": "2026-03-08",
+      "url": "https://auctionet.com/en/events/1030-modern-traditional-home/12-large-gilt-wall-mirror",
+      "category": "furniture",
+      "type": "mirror",
+      "text": "LARGE GILT WALL MIRROR.. swept frame and bevelled plate, 184cm x 153cm. Condition: No remarks.",
+      "currency": "GBP",
+      "est_low_eur": 177,
+      "est_high_eur": 236,
+      "hammer_eur": 307,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/events/1030-modern-traditional-home/12-large-gilt-wall-mirror",
+        "house": "Lots Road Auctions",
+        "sale_date": "2026-03-08",
+        "city": "United Kingdom",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-4814151",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Bishop & Miller",
+      "city": "United Kingdom",
+      "sale_date": "2026-01-24",
+      "url": "https://auctionet.com/en/4814151-a-george-iii-mahogany-chest-of-drawers-circa-1820",
+      "category": "furniture",
+      "type": "commode",
+      "text": "A GEORGE III MAHOGANY CHEST OF DRAWERS, CIRCA 1820.. The rectangular top above two short over two long drawers each with brass handles, raised on bracket feet, 90.5cm wide 89cm high 48cm deep. Condition: Some dents to the handles, surface scratches and marks, replaced piece to the top corner, couple of cracks to the veneer, piece of missing moulding to one drawer, but a good size chest which with some care and attention could become a nice piece!",
+      "currency": "GBP",
+      "est_low_eur": 94,
+      "est_high_eur": 94,
+      "hammer_eur": 94,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/4814151-a-george-iii-mahogany-chest-of-drawers-circa-1820",
+        "house": "Bishop & Miller",
+        "sale_date": "2026-01-24",
+        "city": "United Kingdom",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-5261736",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Stockholms Auktionsverk Sickla",
+      "city": "Sweden",
+      "sale_date": "2026-07-30",
+      "url": "https://auctionet.com/en/5261736-cupboard-18th-century-painted",
+      "category": "furniture",
+      "type": "cabinet",
+      "text": "SKÅP. 1700-tal, bemålat.. Höjd ca 162, bredd ca 121, djup ca 46 cm. Condition: Bruks- och åldersrelaterat slitage, dörrar låsta och saknar nyckel.",
+      "currency": "SEK",
+      "est_low_eur": 179,
+      "est_high_eur": 179,
+      "hammer_eur": 296,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/5261736-cupboard-18th-century-painted",
+        "house": "Stockholms Auktionsverk Sickla",
+        "sale_date": "2026-07-30",
+        "city": "Sweden",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-5090050",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Lawrences Auctioneers",
+      "city": "United Kingdom",
+      "sale_date": "2026-05-05",
+      "url": "https://auctionet.com/en/5090050-a-painted-pine-shop-counter-cupboard",
+      "category": "furniture",
+      "type": "cabinet",
+      "text": "A PAINTED PINE SHOP COUNTER/ CUPBOARD.. with green painted finish, the shaped rectangular top above a single frieze drawer with cupboard below, 132cm x 70cm x 75cm high. Condition: In rustic condition. Some shrinkage splits and losses. Some signs of old worm. Flaking to painted surface. Other imperfections. See online images.",
+      "currency": "GBP",
+      "est_low_eur": 94,
+      "est_high_eur": 94,
+      "hammer_eur": 965,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/5090050-a-painted-pine-shop-counter-cupboard",
+        "house": "Lawrences Auctioneers",
+        "sale_date": "2026-05-05",
+        "city": "United Kingdom",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "500_1k"
+      }
+    },
+    {
+      "id": "drouot-34952708",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Beaussant Lefèvre & Associés",
+      "city": "Paris",
+      "sale_date": "2026-09-23",
+      "url": "https://drouot.com/fr/l/34952708-commode-a-facade-legerement-galbee-en-placage-de-palissandre",
+      "category": "furniture",
+      "type": "commode",
+      "text": "Commode à façade légèrement galbée en placage de palissandre ouvrant à cinq tiroirs sur quatre rangs.\nMontants arrondis à cannelures de cuivre. Poignées tombantes en bronze. Dessus de marbre rouge de Belgique. \nÉpoque Régence. \n(Accidents).\n\nHauteur : 86 cm - Longueur : 131 cm\n-Profondeur : 67 cm\n\n\nExpert : IEP CONSEIL",
+      "currency": "EUR",
+      "est_low_eur": 1500,
+      "est_high_eur": 2000,
+      "hammer_eur": 1959,
+      "premium_pct": 28.8,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34952708-commode-a-facade-legerement-galbee-en-placage-de-palissandre",
+        "house": "Beaussant Lefèvre & Associés",
+        "sale_date": "2026-09-23",
+        "city": "Paris",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "auctionet-4604073",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Lawrences Auctioneers",
+      "city": "United Kingdom",
+      "sale_date": "2025-10-28",
+      "url": "https://auctionet.com/en/4604073-a-wooden-gilt-wall-mirror",
+      "category": "furniture",
+      "type": "mirror",
+      "text": "A WOODEN GILT WALL MIRROR.. A wall mirror with a wooden frame, decorated with floral and gilded designs. 52cm x 34cm. Condition: Some wear to the paint. Previous signs of wood worm. Some silvering to the mirror, and losses to the lower section of the mirror. Other imperfections. See online images.",
+      "currency": "GBP",
+      "est_low_eur": 59,
+      "est_high_eur": 59,
+      "hammer_eur": 130,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/4604073-a-wooden-gilt-wall-mirror",
+        "house": "Lawrences Auctioneers",
+        "sale_date": "2025-10-28",
+        "city": "United Kingdom",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34943207",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Osenat",
+      "city": "Versailles",
+      "sale_date": "2026-09-20",
+      "url": "https://drouot.com/fr/l/34943207-commode-de-la-fin-de-lepoque-louis-xvi-en-acajou-placage",
+      "category": "furniture",
+      "type": "commode",
+      "text": "COMMODE DE LA FIN DE L’EPOQUE LOUIS XVI en acajou, placage d’acajou et filets de laiton. Elle ouvre à cinq tiroirs sur trois rangs, montant arrondi, la partie supérieure ornée d’étoiles, la partie inférieure cannelée, reposant sur des pieds fuselés. Marbre brèche rouge et gris, retaillé.\nH.86 x l.127 x P.59,5 cm\n(Accidents, fentes et soulèvements de placage, garniture de laiton à refixer, restaurations dans les fonds, deux poignées de tirage à refixer).",
+      "currency": "EUR",
+      "est_low_eur": 400,
+      "est_high_eur": 600,
+      "hammer_eur": 525,
+      "premium_pct": 28.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34943207-commode-de-la-fin-de-lepoque-louis-xvi-en-acajou-placage",
+        "house": "Osenat",
+        "sale_date": "2026-09-20",
+        "city": "Versailles",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "500_1k"
+      }
+    },
+    {
+      "id": "auctionet-4322497",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Crafoord Auktioner Stockholm",
+      "city": "Sweden",
+      "sale_date": "2025-07-31",
+      "url": "https://auctionet.com/en/4322497-chest-of-drawers-rococo-rococo-style-19th-century-asymmetrical-veneer-italy",
+      "category": "furniture",
+      "type": "commode",
+      "text": "BYRÅ, rokoko/rokokostil, 1800-tal, asymmetrisk fanér, Italien.. Fyra lådor, varav två mindre lådor upptill över två byrålådor. Beslag av mässing, delvis skuren dekor. Höjd 81 cm, bredd ca 115 cm, djup ca 50 cm. Etikett baktill, enligt etikett sannolikt beställd -55. Condition: Slitage. Märken, avslag, torrsprickor, slagen fanér.",
+      "currency": "SEK",
+      "est_low_eur": 268,
+      "est_high_eur": 268,
+      "hammer_eur": 429,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/4322497-chest-of-drawers-rococo-rococo-style-19th-century-asymmetrical-veneer-italy",
+        "house": "Crafoord Auktioner Stockholm",
+        "sale_date": "2025-07-31",
+        "city": "Sweden",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "auctionet-5171119",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Växjö Auktionskammare",
+      "city": "Sweden",
+      "sale_date": "2026-06-19",
+      "url": "https://auctionet.com/en/5171119-cupboard-folk-art-18th-19th-century",
+      "category": "furniture",
+      "type": "cabinet",
+      "text": "SKÅP, allmoge, 1700/1800-tal.. Delbart. Monogram. Höjd 204 cm. Bredd 106 cm. Djup 44 cm. Condition: Slitage. Skador. Delar saknas. Sprickor. Maskstunget. Ställvis nött. Krackelyr. Lutar bakåt. Toppdel något kapad.",
+      "currency": "SEK",
+      "est_low_eur": 268,
+      "est_high_eur": 268,
+      "hammer_eur": 581,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/5171119-cupboard-folk-art-18th-19th-century",
+        "house": "Växjö Auktionskammare",
+        "sale_date": "2026-06-19",
+        "city": "Sweden",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "500_1k"
+      }
+    },
+    {
+      "id": "auctionet-4637911",
+      "split": "dev",
+      "source": "auctionet",
+      "house": "Södermanlands Auktionsverk",
+      "city": "Sweden",
+      "sale_date": "2025-11-22",
+      "url": "https://auctionet.com/en/4637911-a-rococo-mirror-18th-century",
+      "category": "furniture",
+      "type": "mirror",
+      "text": "SPEGEL, rokoko, 1700-tal.. Spegelns mått 87x44 cm Ramens mått ca 63 x 146 cm. Condition: Bruksslitage. Senare renoverad samt kompleterad, Senare förgyllning.",
+      "currency": "SEK",
+      "est_low_eur": 2680,
+      "est_high_eur": 2680,
+      "hammer_eur": 1608,
+      "premium_pct": 25,
+      "provenance": {
+        "url": "https://auctionet.com/en/4637911-a-rococo-mirror-18th-century",
+        "house": "Södermanlands Auktionsverk",
+        "sale_date": "2025-11-22",
+        "city": "Sweden",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-35051106",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Mirabaud - Mercier",
+      "city": "Paris",
+      "sale_date": "2026-09-28",
+      "url": "https://drouot.com/fr/l/35051106-commode-a-ressaut-entierement-recouverte-de-miroirs-84-x-120",
+      "category": "furniture",
+      "type": "commode",
+      "text": "Commode à ressaut entièrement recouverte de miroirs\n84 x 120 x 55 cm environ \n\nLot à retirer chez Socquet Vidal, 1 avenue de l'Ormeteau, Gennevilliers\nFrais de stockage à compter du 6e jour après la vente",
+      "currency": "EUR",
+      "est_low_eur": 80,
+      "est_high_eur": 100,
+      "hammer_eur": 160,
+      "premium_pct": 29.4,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/35051106-commode-a-ressaut-entierement-recouverte-de-miroirs-84-x-120",
+        "house": "Mirabaud - Mercier",
+        "sale_date": "2026-09-28",
+        "city": "Paris",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34841295",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Millon",
+      "city": "Neuilly sur Marne",
+      "sale_date": "2026-09-11",
+      "url": "https://drouot.com/fr/l/34841295-miroir-en-bois-et-stuc-dore-et-laque-de-style-louis-xvi-a",
+      "category": "furniture",
+      "type": "mirror",
+      "text": "Miroir\nen bois et stuc doré et laqué de style Louis XVI à décor d'un trophée avec instruments de musique, frises de perles et frise d'oves\nEn partie du XVIIIème siècle \nH : 98, L : 58 cm \nPetits accidents et manques",
+      "currency": "EUR",
+      "est_low_eur": 100,
+      "est_high_eur": 200,
+      "hammer_eur": 120,
+      "premium_pct": 29.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34841295-miroir-en-bois-et-stuc-dore-et-laque-de-style-louis-xvi-a",
+        "house": "Millon",
+        "sale_date": "2026-09-11",
+        "city": "Neuilly sur Marne",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34791514",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Alexandre Landre Beaune",
+      "city": "Beaune",
+      "sale_date": "2026-09-12",
+      "url": "https://drouot.com/fr/l/34791514-buffet-de-chasse-sur-plinthe-en-chene-a-patine-blonde",
+      "category": "furniture",
+      "type": "dresser",
+      "text": "Buffet de chasse sur plinthe en chêne à patine blonde sculpté de motifs feuillagés et stylisés. Il ouvre par 2 portes à double évolution encadrées de montants arrondis. Joli dessus de marbre à la forme.\nEpoque Louis XV\nH_88 cm L_128 cm P_66 cm",
+      "currency": "EUR",
+      "est_low_eur": 2000,
+      "est_high_eur": 3000,
+      "hammer_eur": 3770,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34791514-buffet-de-chasse-sur-plinthe-en-chene-a-patine-blonde",
+        "house": "Alexandre Landre Beaune",
+        "sale_date": "2026-09-12",
+        "city": "Beaune",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34845277",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Daguerre Val de Loire",
+      "city": "Amboise",
+      "sale_date": "2026-09-17",
+      "url": "https://drouot.com/fr/l/34845277-commode-depoque-louis-xv-en-bois-acajou-ouvrant-par-trois",
+      "category": "furniture",
+      "type": "commode",
+      "text": "COMMODE d'époque Louis XV en bois acajou ouvrant par trois tiroirs sur trois rangs. Elle repose sur quatre petits pieds cambrés.\nOrnementations de bronzes ciselés et dorés aux poignées et entrées de serrures à décor de médaillons enrubannés.\n95 x 132 x 68 cm.\n\nA récupérer à l'entrepôt, au 12 rue Jules Hiron 37530 Nazelles-Negron.",
+      "currency": "EUR",
+      "est_low_eur": 800,
+      "est_high_eur": 1200,
+      "hammer_eur": 1024,
+      "premium_pct": 28.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34845277-commode-depoque-louis-xv-en-bois-acajou-ouvrant-par-trois",
+        "house": "Daguerre Val de Loire",
+        "sale_date": "2026-09-17",
+        "city": "Amboise",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34994475",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Alexandre Landre Semur",
+      "city": "Paris",
+      "sale_date": "2026-10-04",
+      "url": "https://drouot.com/fr/l/34994475-rare-miroir-rectangulaire-a-lencadrement-compose-de-motifs",
+      "category": "furniture",
+      "type": "mirror",
+      "text": "Rare miroir rectangulaire à l'encadrement composé de motifs géométriques alternés de verre clair et bleu cobalt. Bordure de jonc torsadé.\nComposé de miroirs anciens.\nProbablement Italie du Nord - Murano. \nH_107 cm L_80 cm.\n(Petits manques)",
+      "currency": "EUR",
+      "est_low_eur": 4000,
+      "est_high_eur": 6000,
+      "hammer_eur": 8840,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34994475-rare-miroir-rectangulaire-a-lencadrement-compose-de-motifs",
+        "house": "Alexandre Landre Semur",
+        "sale_date": "2026-10-04",
+        "city": "Paris",
+        "corpus": "testset60/lots_split66.json"
+      },
+      "has_images": true,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "gt5k"
+      }
+    },
+    {
+      "id": "g49",
+      "split": "dev",
+      "source": "giraudeau_pdf",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": null,
+      "category": "furniture",
+      "type": "lot",
+      "text": "Commode en bois naturel à décor de filets noircis, ouvrant par trois tiroirs. XIXe. 78 x 120 x 50 cm. (fentes). Catalogue Giraudeau, vente mobilier, sans estimation affichée pour l'acheteur.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 500,
+      "premium_pct": 25,
+      "provenance": {
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03",
+        "lot": 49,
+        "corpus": "baseline/cases/giraudeau_5.json"
+      },
+      "has_images": false,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "500_1k"
+      }
+    },
+    {
+      "id": "g92",
+      "split": "dev",
+      "source": "giraudeau_pdf",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": null,
+      "category": "furniture",
+      "type": "lot",
+      "text": "Commode en bois et placage ouvrant par deux tiroirs à décor marqueté de filets de cubes. Début XIXe. 82 x 109 x 54,5 cm. (accidents et manques). Catalogue Giraudeau.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 250,
+      "premium_pct": 25,
+      "provenance": {
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03",
+        "lot": 92,
+        "corpus": "baseline/cases/giraudeau_5.json"
+      },
+      "has_images": false,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "g189",
+      "split": "dev",
+      "source": "giraudeau_pdf",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": null,
+      "category": "chandelier_lighting",
+      "type": "lot",
+      "text": "Lustre en bronze ou laiton à pampilles de cristal à huit bras de lumière. H. 70 cm, D. 55 cm. Catalogue Giraudeau.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 140,
+      "premium_pct": 25,
+      "provenance": {
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03",
+        "lot": 189,
+        "corpus": "baseline/cases/giraudeau_5.json"
+      },
+      "has_images": false,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "g237",
+      "split": "dev",
+      "source": "giraudeau_pdf",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": null,
+      "category": "furniture",
+      "type": "lot",
+      "text": "Miroir rectangulaire en bois et stuc doré à décor de fleurs. Fin XIXe. 117 x 92 cm. (accidents et manques). Catalogue Giraudeau.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 80,
+      "premium_pct": 25,
+      "provenance": {
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03",
+        "lot": 237,
+        "corpus": "baseline/cases/giraudeau_5.json"
+      },
+      "has_images": false,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "g245",
+      "split": "dev",
+      "source": "giraudeau_pdf",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": null,
+      "category": "furniture",
+      "type": "lot",
+      "text": "Commode rectangulaire en placage d'érable moucheté et marqueterie de palissandre à décor de rinceaux feuillagés et rosace, ouvrant par cinq tiroirs dont un dissimulé en partie basse et un à doucine en partie supérieure, surmontée d'un plateau de marbre blanc veiné gris. Les montants arrondis. L'ensemble reposant sur deux pieds en boule aplatie à l'avant et deux pieds droits à l'arrière. De style Charles X. 97 x 125 x 60 cm. (marbre fendu restauré, petits soulèvements de marqueterie et fentes). Catalogue Giraudeau.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 130,
+      "premium_pct": 25,
+      "provenance": {
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03",
+        "lot": 245,
+        "corpus": "baseline/cases/giraudeau_5.json"
+      },
+      "has_images": false,
+      "leak_controls": {
+        "realised_not_in_prompt": true
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34804010",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Daguerre",
+      "city": "Meillant",
+      "sale_date": "2026-09-20",
+      "url": "https://drouot.com/fr/l/34804010-trumeau-en-bois-moulure-et-sculpte-depoque-louis-xvi-a-decor",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Trumeau en bois mouluré et sculpté, d'époque Louis XVI À décor d'un trophée retenu par un nœud. Frises de perles H. 168 L. 124 cm Usures à la dorure.",
+      "currency": "EUR",
+      "est_low_eur": 200.0,
+      "est_high_eur": 300.0,
+      "hammer_eur": 2080.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34804010-trumeau-en-bois-moulure-et-sculpte-depoque-louis-xvi-a-decor",
+        "house": "Daguerre",
+        "sale_date": "2026-09-20"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34987484",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Daguerre",
+      "city": "Paris",
+      "sale_date": "2026-09-29",
+      "url": "https://drouot.com/fr/l/34987484-grande-glace-en-bois-moulure-sculpte-et-dore-depoque-louis",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Grande glace en bois mouluré, sculpté et doré d'époque Louis XV À décor fleuri d'entrelacs. Glace rapportée. 242 x 130 cm",
+      "currency": "EUR",
+      "est_low_eur": 3000.0,
+      "est_high_eur": 5000.0,
+      "hammer_eur": 3900.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34987484-grande-glace-en-bois-moulure-sculpte-et-dore-depoque-louis",
+        "house": "Daguerre",
+        "sale_date": "2026-09-29"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34987498",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Daguerre",
+      "city": "Paris",
+      "sale_date": "2026-09-29",
+      "url": "https://drouot.com/fr/l/34987498-grand-miroir-en-bois-sculpte-et-dore-depoque-louis-xv-miroir",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Grand miroir en bois sculpté et doré, d'époque Louis XV Miroir rapporté. Manques. 220 x 134 cm",
+      "currency": "EUR",
+      "est_low_eur": 1000.0,
+      "est_high_eur": 2000.0,
+      "hammer_eur": 1430.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34987498-grand-miroir-en-bois-sculpte-et-dore-depoque-louis-xv-miroir",
+        "house": "Daguerre",
+        "sale_date": "2026-09-29"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34803895",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Daguerre",
+      "city": "Meillant",
+      "sale_date": "2026-09-20",
+      "url": "https://drouot.com/fr/l/34803895-grand-miroir-a-entourage-en-chene-sculpte-fin-du-xixe-siecle",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Grand miroir à entourage en chêne sculpté, fin du XIXe siècle Le fronton à volutes feuillagées entourant un blason, les montants à personnages en therme et chutes de fruits. La vue cintrée dans la partie supérieure. H. 160 L. 148 cm",
+      "currency": "EUR",
+      "est_low_eur": 400.0,
+      "est_high_eur": 500.0,
+      "hammer_eur": 1040.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34803895-grand-miroir-a-entourage-en-chene-sculpte-fin-du-xixe-siecle",
+        "house": "Daguerre",
+        "sale_date": "2026-09-20"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34804037",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Daguerre",
+      "city": "Meillant",
+      "sale_date": "2026-09-20",
+      "url": "https://drouot.com/fr/l/34804037-trumeau-en-bois-sculpte-neo-renaissance-xixe-siecle-orne-de",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Trumeau en bois sculpté néo-renaissance, XIXe siècle Orné de thermes, de chutes de feuilles et de fruits, le miroir cintré. 168 x 169 cm",
+      "currency": "EUR",
+      "est_low_eur": 150.0,
+      "est_high_eur": 200.0,
+      "hammer_eur": 2080.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34804037-trumeau-en-bois-sculpte-neo-renaissance-xixe-siecle-orne-de",
+        "house": "Daguerre",
+        "sale_date": "2026-09-20"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34934144",
+      "split": "dev",
+      "source": "drouot",
+      "house": "De Baecque et Associés",
+      "city": "Lyon",
+      "sale_date": "2026-09-26",
+      "url": "https://drouot.com/fr/l/34934144-grand-miroir-rectangulaire-a-decor-marquete-de-bois",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Grand miroir rectangulaire à décor marqueté de bois indigènes à motif de volutes feuillagées, fleurettes et frise stylisée Travail du début du XVIIIe siècle, à rapprocher de la production de Thomas HACHE (1664-1747) H. 100,5 cm - L. 92 cm Piqûres, manques et restaurations au cadre et la marqueterie, usures au tain",
+      "currency": "EUR",
+      "est_low_eur": 1200.0,
+      "est_high_eur": 1500.0,
+      "hammer_eur": 3000.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34934144-grand-miroir-rectangulaire-a-decor-marquete-de-bois",
+        "house": "De Baecque et Associés",
+        "sale_date": "2026-09-26"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34934178",
+      "split": "dev",
+      "source": "drouot",
+      "house": "De Baecque et Associés",
+      "city": "Lyon",
+      "sale_date": "2026-09-26",
+      "url": "https://drouot.com/fr/l/34934178-miroir-en-bois-sculpte-dore-maque-vert-et-rouge-le-fronton",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Miroir en bois sculpté, doré, maqué vert et rouge, le fronton ajouré à décor de fleurettes, guirlandes feuillagées et feuilles d'acanthes Travail Italien du XVIIIe siècle H. 137 cm - L. 72 cm Accidents, manques, restaurations et redorure par endroits, usures au tain Provenance : Succession de M. X, Rome, Italie",
+      "currency": "EUR",
+      "est_low_eur": 500.0,
+      "est_high_eur": 800.0,
+      "hammer_eur": 1800.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34934178-miroir-en-bois-sculpte-dore-maque-vert-et-rouge-le-fronton",
+        "house": "De Baecque et Associés",
+        "sale_date": "2026-09-26"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34943203",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Osenat",
+      "city": "Versailles",
+      "sale_date": "2026-09-20",
+      "url": "https://drouot.com/fr/l/34943203-grand-miroir-a-parcloses-louis-xvi-en-bois-dore-moulure-et",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "GRAND MIROIR A PARCLOSES LOUIS XVI, en bois doré mouluré et sculpté de paniers fleuris de guirlandes de fleurs et feuillages et feuillages, rosaces et motifs architecturaux. H. 178 x L. 109 cm. (Accidents et manques de sculptures, lacunes et manques à la dorure.",
+      "currency": "EUR",
+      "est_low_eur": 800.0,
+      "est_high_eur": 1500.0,
+      "hammer_eur": 1088.0,
+      "premium_pct": 28.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34943203-grand-miroir-a-parcloses-louis-xvi-en-bois-dore-moulure-et",
+        "house": "Osenat",
+        "sale_date": "2026-09-20"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34841282",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Millon",
+      "city": "Neuilly sur Marne",
+      "sale_date": "2026-09-11",
+      "url": "https://drouot.com/fr/l/34841282-important-miroir-de-forme-rectangulaire-en-bois-et-stuc-dore",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Important miroir de forme rectangulaire en bois et stuc doré à décor de style Louis XVI d'enroulements feuillagés et frises de perles H : 97, L : 71 cm",
+      "currency": "EUR",
+      "est_low_eur": 100.0,
+      "est_high_eur": 200.0,
+      "hammer_eur": 80.0,
+      "premium_pct": 29.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34841282-important-miroir-de-forme-rectangulaire-en-bois-et-stuc-dore",
+        "house": "Millon",
+        "sale_date": "2026-09-11"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34845149",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Daguerre Val de Loire",
+      "city": "Amboise",
+      "sale_date": "2026-09-17",
+      "url": "https://drouot.com/fr/l/34845149-miroir-de-style-louis-xvi-en-bois-stuque-et-dore-a-decor",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "MIROIR de style Louis XVI en bois stuqué et doré à décor d'une frise à motif géométrique et d'une frise de perle. 135 x 95 cm. Manques et usure. A récupérer à l'entrepôt, au 12 rue Jules Hiron 37530 Nazelles-Negron.",
+      "currency": "EUR",
+      "est_low_eur": 80.0,
+      "est_high_eur": 120.0,
+      "hammer_eur": 102.0,
+      "premium_pct": 28.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34845149-miroir-de-style-louis-xvi-en-bois-stuque-et-dore-a-decor",
+        "house": "Daguerre Val de Loire",
+        "sale_date": "2026-09-17"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34845278",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Daguerre Val de Loire",
+      "city": "Amboise",
+      "sale_date": "2026-09-17",
+      "url": "https://drouot.com/fr/l/34845278-miroir-de-style-louis-xvi-en-bois-stuque-decore-de-frises-de",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "MIROIR de style Louis XVI en bois stuqué décoré de frises de laurier, fleurettes et branchages fleuris , le fronton orné d'un cartouche encadré de rubans. 123 x 81.5 cm. Manques. A récupérer à l'entrepôt, au 12 rue Jules Hiron 37530 Nazelles-Negron.",
+      "currency": "EUR",
+      "est_low_eur": 80.0,
+      "est_high_eur": 120.0,
+      "hammer_eur": 77.0,
+      "premium_pct": 28.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34845278-miroir-de-style-louis-xvi-en-bois-stuque-decore-de-frises-de",
+        "house": "Daguerre Val de Loire",
+        "sale_date": "2026-09-17"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34872957",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Alexandre Landre Paris",
+      "city": "Paris",
+      "sale_date": "2026-09-16",
+      "url": "https://drouot.com/fr/l/34872957-trumeau-en-bois-moulure-laque-dans-des-tons-gris-vert-et",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Trumeau en bois mouluré laqué dans des tons gris-vert et rechampi de filets et d'ornements dorés. Le fronton est centré d'un médaillon ovale peint figurant un paysage animé dans un encadrement à décor de rubans et de guirlandes. Les montants sont ornés de chutes de fleurs. De style Louis XVI. Époque du XIXe siècle. H_160 cm L_107 cm",
+      "currency": "EUR",
+      "est_low_eur": 150.0,
+      "est_high_eur": 200.0,
+      "hammer_eur": 155.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34872957-trumeau-en-bois-moulure-laque-dans-des-tons-gris-vert-et",
+        "house": "Alexandre Landre Paris",
+        "sale_date": "2026-09-16"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34934122",
+      "split": "dev",
+      "source": "drouot",
+      "house": "De Baecque et Associés",
+      "city": "Lyon",
+      "sale_date": "2026-09-26",
+      "url": "https://drouot.com/fr/l/34934122-petit-miroir-rectangulaire-dans-un-encadrement-en-bois-dore",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Petit miroir rectangulaire dans un encadrement en bois doré mouluré et sculpté de volutes, le fronton à décor d'un bouquet fleuri ajouré et orné d'un semi de fleurettes Époque Régence H. 70 cm - L. 39 cm Accidents, manques et redoré par endroits",
+      "currency": "EUR",
+      "est_low_eur": 150.0,
+      "est_high_eur": 200.0,
+      "hammer_eur": 280.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34934122-petit-miroir-rectangulaire-dans-un-encadrement-en-bois-dore",
+        "house": "De Baecque et Associés",
+        "sale_date": "2026-09-26"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34934136",
+      "split": "dev",
+      "source": "drouot",
+      "house": "De Baecque et Associés",
+      "city": "Lyon",
+      "sale_date": "2026-09-26",
+      "url": "https://drouot.com/fr/l/34934136-miroir-rectangulaire-dans-un-encadrement-en-bois-dore",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Miroir rectangulaire dans un encadrement en bois doré mouluré et sculpté, le fronton à décor d'un bouquet fleuri ajouré Époque Régence H. 77 cm - L. 43 cm Petits accidents et manques, usures au tain",
+      "currency": "EUR",
+      "est_low_eur": 100.0,
+      "est_high_eur": 200.0,
+      "hammer_eur": 80.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34934136-miroir-rectangulaire-dans-un-encadrement-en-bois-dore",
+        "house": "De Baecque et Associés",
+        "sale_date": "2026-09-26"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34934246",
+      "split": "dev",
+      "source": "drouot",
+      "house": "De Baecque et Associés",
+      "city": "Lyon",
+      "sale_date": "2026-09-26",
+      "url": "https://drouot.com/fr/l/34934246-petite-glace-rectangulaire-dans-un-encadrement-a-fronton",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Petite glace rectangulaire dans un encadrement à fronton ajouré en bois doré mouluré et sculpté de frise de perles et de canaux, le fronton orné d'une couronne de laurier ajourée surmontant un cœur enflammé polychrome dans un entourage de cornes d'abondance, nœud de ruban et draperies Époque Louis XVI H. 66 cm - L. 39 cm Usures au tain, accidents et manques",
+      "currency": "EUR",
+      "est_low_eur": 80.0,
+      "est_high_eur": 100.0,
+      "hammer_eur": 90.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34934246-petite-glace-rectangulaire-dans-un-encadrement-a-fronton",
+        "house": "De Baecque et Associés",
+        "sale_date": "2026-09-26"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34943192",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Osenat",
+      "city": "Versailles",
+      "sale_date": "2026-09-20",
+      "url": "https://drouot.com/fr/l/34943192-miroir-a-fronton-et-parcloses-de-style-louis-xv-en-bois-dore",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "MIROIR À FRONTON ET PARCLOSES DE STYLE LOUIS XV en bois doré, mouluré et sculpté d’un panier fleuri, d’enroulements, feuilles d’acanthe et pampres de vignes. Miroir central biseauté et parcloses simulées. H. 105 x L. 54 cm. (Petits accidents et manques de sculptures et de dorures, restaurations)",
+      "currency": "EUR",
+      "est_low_eur": 200.0,
+      "est_high_eur": 400.0,
+      "hammer_eur": 320.0,
+      "premium_pct": 28.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34943192-miroir-a-fronton-et-parcloses-de-style-louis-xv-en-bois-dore",
+        "house": "Osenat",
+        "sale_date": "2026-09-20"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34955803",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Hôtel des ventes Élysée",
+      "city": "Liège",
+      "sale_date": "2026-09-22",
+      "url": "https://drouot.com/fr/l/34955803-miroir-de-style-louis-xiv-en-bois-dore-et-biseaute-hauteur",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Miroir de style Louis XIV en bois doré et biseauté - Hauteur : 116 cm",
+      "currency": "EUR",
+      "est_low_eur": 90.0,
+      "est_high_eur": 120.0,
+      "hammer_eur": 90.0,
+      "premium_pct": 30.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34955803-miroir-de-style-louis-xiv-en-bois-dore-et-biseaute-hauteur",
+        "house": "Hôtel des ventes Élysée",
+        "sale_date": "2026-09-22"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34984103",
+      "split": "dev",
+      "source": "drouot",
+      "house": "Pousse-Cornet",
+      "city": "Orléans",
+      "sale_date": "2026-09-24",
+      "url": "https://drouot.com/fr/l/34984103-miroir-en-bois-et-stuc-dore-agremente-dun-fronton-de-style",
+      "category": "mirrors",
+      "type": "mirror",
+      "text": "Miroir en bois et stuc doré agrémenté d'un fronton de style rocaille, décor frise perlée. Epoque Napoléon III 130 x 87 cm Accidents",
+      "currency": "EUR",
+      "est_low_eur": 80.0,
+      "est_high_eur": 120.0,
+      "hammer_eur": 40.0,
+      "premium_pct": 21.8,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34984103-miroir-en-bois-et-stuc-dore-agremente-dun-fronton-de-style",
+        "house": "Pousse-Cornet",
+        "sale_date": "2026-09-24"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34803942",
+      "split": "dev",
+      "source": "drouot_harvest_signoff",
+      "house": "Daguerre",
+      "city": "Meillant",
+      "sale_date": "1970-01-21",
+      "url": "https://drouot.com/fr/l/34803942-important-lustre-en-bronze-de-style-neogothique-xixe-siecle",
+      "category": "chandelier_lighting",
+      "type": "Important lustre en bronze de style néogothique, XIXe siècle",
+      "text": "Important lustre en bronze de style néogothique, XIXe siècle Bouquet de six lumières et deux lanternes à décor ajouré de fenestrages et pinacles. Les deux cloches facettées en opaline, couronnées. Une opaline d'un abat jour fendue H. 321 L. 198 P. 46 cm",
+      "currency": "EUR",
+      "est_low_eur": 800.0,
+      "est_high_eur": 1200.0,
+      "hammer_eur": 5720.0,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34803942-important-lustre-en-bronze-de-style-neogothique-xixe-siecle",
+        "house": "Daguerre",
+        "sale_date": "1970-01-21"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "gt5k"
+      }
+    },
+    {
+      "id": "drouot-34965715",
+      "split": "dev",
+      "source": "drouot_harvest_signoff",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "1970-01-21",
+      "url": "https://drouot.com/fr/l/34965715-miroir-dapplique-a-fronton-en-bois-moulure-sculpte-stuque-et",
+      "category": "mirrors",
+      "type": "Miroir d’applique à fronton en bois mouluré, sculpté, stuqué et doré (usures), à",
+      "text": "Miroir d’applique à fronton en bois mouluré, sculpté, stuqué et doré (usures), à décor de palmes, fleurs, panier fleuri, volatiles, acanthes et rinceaux. Style Régence. Haut. : 179 cm - Larg. : 95 cm Expertise réalisée par Monsieur Cédric HENON - 06 95 34 93 78 - cedric.henon@authenticite.fr",
+      "currency": "EUR",
+      "est_low_eur": 1000.0,
+      "est_high_eur": 2000.0,
+      "hammer_eur": 1300.0,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965715-miroir-dapplique-a-fronton-en-bois-moulure-sculpte-stuque-et",
+        "house": "Le Floc'h",
+        "sale_date": "1970-01-21"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "g190",
+      "split": "dev",
+      "source": "giraudeau_2025-02-03",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": "",
+      "category": "chandelier_lighting",
+      "type": "lighting",
+      "text": "Lustre en métal et pampilles de cristal à six bras de lumière. H. 55 cm, D. 40 cm. Catalogue Giraudeau Tours, 3 février 2025.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 40,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "",
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "g191",
+      "split": "dev",
+      "source": "giraudeau_2025-02-03",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": "",
+      "category": "chandelier_lighting",
+      "type": "lighting",
+      "text": "Lustre en bronze ou laiton à pampilles de cristal et verre à six bras de lumière. H. 60 cm, D. 40 cm. Catalogue Giraudeau Tours, 3 février 2025.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 90,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "",
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "g192",
+      "split": "dev",
+      "source": "giraudeau_2025-02-03",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": "",
+      "category": "chandelier_lighting",
+      "type": "lighting",
+      "text": "Lustre en métal et pampilles de cristal à six bras de lumière. On y joint deux appliques au modèle (manques). H. 55 cm, D. 45 cm. Catalogue Giraudeau Tours, 3 février 2025.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 40,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "",
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "g303",
+      "split": "dev",
+      "source": "giraudeau_2025-02-03",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": "",
+      "category": "chandelier_lighting",
+      "type": "lighting",
+      "text": "Paire d'appliques en bronze doré et ciselé à deux bras de lumière à décor de drapés et pot à feu. Style Louis XVI. 42 x 28 x 16 cm. Catalogue Giraudeau Tours, 3 février 2025.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 60,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "",
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    },
+    {
+      "id": "drouot-34803922",
+      "split": "dev",
+      "source": "drouot_harvest_signoff",
+      "house": "Daguerre",
+      "city": "Meillant",
+      "sale_date": "1970-01-21",
+      "url": "https://drouot.com/fr/l/34803922-suite-de-onze-fauteuils-en-bois-dore-moulure-et-sculpte",
+      "category": "furniture",
+      "type": "Suite de onze fauteuils en bois doré, mouluré et sculpté d'époque Louis XIV",
+      "text": "Suite de onze fauteuils en bois doré, mouluré et sculpté d'époque Louis XIV À décor de feuilles d'acanthe, à hauts dossiers plats. Les accotoirs mouvementés sur des montants en console. Les quatre pieds cambrés à volutes réunis par une entretoise en X. Garnis de tapisseries à fleurs d'époque Louis XIV. Importantes restaurations, redorés, un non garni, sans garantie sous la dorure. H. 119 L. 67 P. 60 cm",
+      "currency": "EUR",
+      "est_low_eur": 15000.0,
+      "est_high_eur": 20000.0,
+      "hammer_eur": 65000.0,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34803922-suite-de-onze-fauteuils-en-bois-dore-moulure-et-sculpte",
+        "house": "Daguerre",
+        "sale_date": "1970-01-21"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "gt5k"
+      }
+    },
+    {
+      "id": "drouot-34785465",
+      "split": "dev",
+      "source": "drouot_harvest_signoff",
+      "house": "Astrid Guillon Maison de ventes aux enchères",
+      "city": "Besançon",
+      "sale_date": "1970-01-21",
+      "url": "https://drouot.com/fr/l/34785465-bureau-plat-depoque-louis-xv-marquete-toutes-faces-en",
+      "category": "furniture",
+      "type": "Bureau plat d'époque Louis XV, marqueté toutes faces en placage à décor de crois",
+      "text": "Bureau plat d'époque Louis XV, marqueté toutes faces en placage à décor de croisillons et losanges, le plateau chantourné et bordé d’une lingotière, ouvrant à trois tiroirs en ceinture, dessus de cuir fauve refait, ornementation de bronze doré. Estampille P. MIGEON (pour Pierre MIGEON) et poinçon de jurande (JME). 77,5 x 147 x 76 cm MIGEON : célèbre famille d’ébénistes parisiens dont le père, le fils et le petit-fils ont porté le même prénom. L’atelier de la famille a connu une grande prospérité sous le règne de Louis XV. Provenance : Collection particulière, Besançon Expert : François Lachaud",
+      "currency": "EUR",
+      "est_low_eur": 6000.0,
+      "est_high_eur": 9000.0,
+      "hammer_eur": 5800.0,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34785465-bureau-plat-depoque-louis-xv-marquete-toutes-faces-en",
+        "house": "Astrid Guillon Maison de ventes aux enchères",
+        "sale_date": "1970-01-21"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "gt5k"
+      }
+    },
+    {
+      "id": "drouot-34803919",
+      "split": "dev",
+      "source": "drouot_harvest_signoff",
+      "house": "Daguerre",
+      "city": "Meillant",
+      "sale_date": "1970-01-21",
+      "url": "https://drouot.com/fr/l/34803919-armoire-en-chene-sculpte-de-style-gothique-du-val-de-loire-a",
+      "category": "furniture",
+      "type": "Armoire en chêne sculpté de style gothique du Val-de-Loire",
+      "text": "Armoire en chêne sculpté de style gothique du Val-de-Loire À décor d'arcatures et de frises stylisées, les panneaux des côtés en plis de serviette. Ouvre à deux portes, quelques panneaux probablement plus anciens. Transformations. H. 222 L. 147 P. 41 cm",
+      "currency": "EUR",
+      "est_low_eur": 600.0,
+      "est_high_eur": 800.0,
+      "hammer_eur": 3900.0,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34803919-armoire-en-chene-sculpte-de-style-gothique-du-val-de-loire-a",
+        "house": "Daguerre",
+        "sale_date": "1970-01-21"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34965727",
+      "split": "dev",
+      "source": "drouot_harvest_signoff",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "1970-01-21",
+      "url": "https://drouot.com/fr/l/34965727-ecran-de-cheminee-en-bois-moulure-sculpte-et-dore-les",
+      "category": "furniture",
+      "type": "Écran de cheminée en bois mouluré, sculpté et doré, les montants en colonnes dét",
+      "text": "Écran de cheminée en bois mouluré, sculpté et doré, les montants en colonnes détachées à décor de feuilles d'eau, treillage fleuronné, cannelures et feuilles de refend, les traverses à décor à branches de myrte nouées. La feuille mobile en soie brodée figurant un vase fleuri est coiffée d'une couronne de laurier accostée d'enroulements (usures, manque les quatre patins en galette). Attribué à Georges JACOB ou JACOB Frères. Le châssis d'époque Louis XVI. La feuille, son cadre et son couronnement d'époque Restauration. Haut. : 120 cm - Larg. : 41 cm - Prof. : 73 cm Note : Notre écran de cheminée est comparable, à l’exception du couronnement de la feuille, à l'écran de cheminée réalisé par Jaco",
+      "currency": "EUR",
+      "est_low_eur": 400.0,
+      "est_high_eur": 600.0,
+      "hammer_eur": 2100.0,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965727-ecran-de-cheminee-en-bois-moulure-sculpte-et-dore-les",
+        "house": "Le Floc'h",
+        "sale_date": "1970-01-21"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34965723",
+      "split": "dev",
+      "source": "drouot_harvest_signoff",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "1970-01-21",
+      "url": "https://drouot.com/fr/l/34965723-secretaire-de-dame-a-cylindre-toutes-faces-en-acajou-et",
+      "category": "furniture",
+      "type": "Secrétaire de dame à cylindre toutes faces en acajou et placage d’acajou mouchet",
+      "text": "Secrétaire de dame à cylindre toutes faces en acajou et placage d’acajou moucheté ouvrant par trois tiroirs en ceinture, le cylindre découvre trois tiroirs et deux casiers (fentes et restaurations). Baguettes, lingotière à jour (déformations) et poignées de tirage en laiton (sabots rapportés). Estampillé Fidelys SCHEY, reçu maître le 5 février 1777. Époque Louis XVI. Haut. : 102 cm - Larg. : 76 cm - Prof. : 48 cm Expertise réalisée par Monsieur Cédric HENON - 06 95 34 93 78 - cedric.henon@authenticite.fr",
+      "currency": "EUR",
+      "est_low_eur": 400.0,
+      "est_high_eur": 600.0,
+      "hammer_eur": 3300.0,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965723-secretaire-de-dame-a-cylindre-toutes-faces-en-acajou-et",
+        "house": "Le Floc'h",
+        "sale_date": "1970-01-21"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "drouot-34965738",
+      "split": "dev",
+      "source": "drouot_harvest_signoff",
+      "house": "Le Floc'h",
+      "city": "Saint-Cloud",
+      "sale_date": "1970-01-21",
+      "url": "https://drouot.com/fr/l/34965738-pendule-a-letude-de-lastronomie-en-bronze-cisele-et-dore-mat",
+      "category": "furniture",
+      "type": "Pendule à l’étude de l’astronomie en bronze ciselé et doré mat et bruni (usures)",
+      "text": "Pendule à l’étude de l’astronomie en bronze ciselé et doré mat et bruni (usures), figurant Uranie, un compas à la main, étudiant un globe émaillé bleu et étoilé, le cadran circulaire émaillé blanc à chiffres romains en noir (égrenures), la base ornée d'un bas-relief au putto et télescope. Contre-socle quadrangulaire en marbre vert de mer (égrenures) à quatre petits pieds. D’après un dessin de Jean-André Reiche (1752-1817). Époque Empire. Haut. : 37 cm - Larg. : 30 cm - Prof. : 10 cm Note : L’aquarelle du dessin de Jean-André Reiche a été déposée en 1806 à la Bibliothèque impériale, aujourd’hui Cabinet des Estampes de la Bibliothèque nationale. Bibliographie : -Pierre Kjellberg, Encyclopédie ",
+      "currency": "EUR",
+      "est_low_eur": 2000.0,
+      "est_high_eur": 3000.0,
+      "hammer_eur": 2000.0,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "https://drouot.com/fr/l/34965738-pendule-a-letude-de-lastronomie-en-bronze-cisele-et-dore-mat",
+        "house": "Le Floc'h",
+        "sale_date": "1970-01-21"
+      },
+      "tags": {
+        "style_not_period": false,
+        "period_claim": true,
+        "band": "1k_5k"
+      }
+    },
+    {
+      "id": "g304",
+      "split": "dev",
+      "source": "giraudeau_2025-02-03",
+      "house": "Giraudeau Tours",
+      "city": "Tours",
+      "sale_date": "2025-02-03",
+      "url": "",
+      "category": "chandelier_lighting",
+      "type": "appliques",
+      "text": "Trois appliques en bronze doré et ciselé à deux bras de lumière à décor de drapés et pot à feu. Catalogue Giraudeau Tours, 3 février 2025.",
+      "currency": "EUR",
+      "est_low_eur": null,
+      "est_high_eur": null,
+      "hammer_eur": 150,
+      "premium_pct": 25.0,
+      "provenance": {
+        "url": "",
+        "house": "Giraudeau Tours",
+        "sale_date": "2025-02-03"
+      },
+      "tags": {
+        "style_not_period": true,
+        "period_claim": false,
+        "band": "lt500"
+      }
+    }
+  ]
+}
