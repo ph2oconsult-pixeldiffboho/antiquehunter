@@ -41,6 +41,13 @@ const NEGATED_PERIOD_RE = /\b(no|without|not|lacks?|absence\s+of)\s+(\w+\s+){0,3
 const ADDITIONS_RE = /\b(later\s+(marble|top|mounts?|bronzes?|ormolu|gilt[\s-]?bronzes?|additions?|added|elements?)|(marble|top|mounts?|bronzes?|ornamentation|ormolu)\s+(added|replaced|of\s+a\s+later\s+date)\s*(later)?|added\s+later|ajout\w*\s+(post[ée]rieur\w*|plus\s+tard)|rapport[ée]e?s?\s+post[ée]rieur\w*|post[ée]rieur\w*|marriage|married|mari[ée]|composed\s+of\s+(period\s+)?(components|elements|parts)|made\s+up\s+(of|from)|assembled\s+from|compos[ée]e?\s+d'[ée]l[ée]ments|constitu[ée]e?\s+d'[ée]l[ée]ments|period\s+(components|elements|parts)|r[ée]assembl\w*|re-?assembled)\b/i;
 const NEGATED_ADD_RE = /\b(no|not|without|aucun\w*|sans)\s+(\w+\s+){0,3}(marriage|later\s+additions?|added|replaced|assembled)/i;
 
+/** Top-tier names whose stamp can justify a large multiple (kept short and general). */
+const TOP_MAKER_RE = /\b(riesener|oeben|bvrb|van\s+risen\s?burgh|weisweiler|carlin|cressent|roentgen|leleu|dubois|jacob|desmalter|bellang[ée]|hache|delanois|tilliard|foliot|s[ée]n[ée]|gourdin|boulle\s+(andr[ée]|charles)|andr[ée][\s-]+charles\s+boulle|majorelle|gall[ée]|ruhlmann|linke|sormani|zwiener|beurdeley)(?![a-z])/i;
+/** Upper level for stamped pieces by recorded, non-top maîtres at regional auction (EUR hammer). */
+export const STAMPED_MINOR_HIGH_CAP = 3000;
+const CHEAP_MATERIAL_RE = /\b(resin|r[ée]sine|plaster|pl[âa]tre|cast\s+(composition|resin|plaster)|polyurethane|plastic|mdf|plywood|reproduction|repro\b|replica|copie|machine[\s-]+(woven|made|carved)|20th[\s-]+century|xxe|modern)\b/i;
+const STYLE_LATE_RE = /\b(louis\s+(xiii|xiv|xv|xvi)|r[ée]gence|empire|rococo|neoclassical)[\s-]+style\b.*\b(late\s+19th|19th[\s-]century|20th)|\b(late\s+19th|19th[\s-]century|20th)\b.*\b(louis\s+(xiii|xiv|xv|xvi)|r[ée]gence|empire|rococo)[\s-]+style\b|\bde\s+style\b|\bstyle\s+(louis|r[ée]gence|empire)/i;
+
 const r = (x: number) => x >= 10000 ? Math.round(x / 500) * 500 : x >= 1000 ? Math.round(x / 50) * 50 : Math.round(x / 10) * 10;
 
 export const hasPeriodConstruction = (ce?: string): boolean => {
@@ -69,9 +76,11 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
     && (['stamp_visible_in_photo', 'stamped_stated', 'stamped_confirmed'].includes(String(i.modelMakerStatus || ''))
       || ['stamp_in_photo', 'stamped_stated', 'stamped_confirmed'].includes(String(i.makerStatus || ''))
       || STAMP_IN_TEXT_RE.test(String(i.modelText || '').slice(0, 400)));
-  if (photoStamp && !periodBuilt) {
-    if (pc === 'confirmed_period') { pc = 'probable_period'; factors.push('photo_stamp_period_capped'); }
-    confidenceCap = Math.min(confidenceCap, 60);
+  if (photoStamp) {
+    // The period label may stand on construction evidence, but the price premium never rests on a photo-read
+    // stamp alone (the model now asserts construction more readily, which used to bypass this cap).
+    if (!periodBuilt && pc === 'confirmed_period') { pc = 'probable_period'; factors.push('photo_stamp_period_capped'); }
+    if (!periodBuilt) confidenceCap = Math.min(confidenceCap, 60);
     if (pc === 'confirmed_period' || pc === 'probable_period') {
       // The stamped premium is unproven: widen downward to the unstamped level, trim the top.
       low = low * 0.6; high = high * 0.9;
@@ -102,6 +111,27 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
     notes.push(periodBuilt
       ? 'The "later copy" reading comes from photos only, yet period construction or veneer signs were seen: kept as a hypothesis, with the upper figure covering a period piece.'
       : 'The "later copy" reading comes from photos only: kept as a hypothesis, so the upper figure also covers the case that it is period.');
+  }
+
+  // 4. Stamped level: a stamp (read or stated) by a recorded but not top-tier maître does not take a provincial-auction
+  //    piece into high four figures. Cap the top at STAMPED_MINOR_HIGH_CAP unless a top maker is named.
+  const anyStamp = photoStamp || (STAMP_IN_TEXT_RE.test(i.userText) && /\b(stamp|estampill|jme)/i.test(i.userText));
+  const topMaker = TOP_MAKER_RE.test(`${i.userText} ${String(i.modelText || '').slice(0, 600)}`);
+  if (anyStamp && !topMaker && high > STAMPED_MINOR_HIGH_CAP) {
+    high = STAMPED_MINOR_HIGH_CAP;
+    low = Math.min(low, high / 3);
+    factors.push('stamped_minor_maker_cap');
+    notes.push('A stamp by a recorded maker who is not a top name adds a premium, not a multiple: the top of the range is capped at the level such stamped pieces typically make at regional auction.');
+  }
+
+  // 5. Cheap signals: modern or cheap materials / reproduction / explicit "style" with a later date → tight and low.
+  const cheapText = `${i.userText} ${String(i.modelText || '').slice(0, 800)} ${i.constructionEvidence || ''}`;
+  const cheap = CHEAP_MATERIAL_RE.test(cheapText) || (STYLE_LATE_RE.test(cheapText) && !anyStamp);
+  if (cheap) {
+    // undo any hypothesis widening and keep the range tight
+    if (factors.some(f => f.startsWith('revival_hypothesis'))) { high = high / (periodBuilt ? 2.0 : 1.5); }
+    if (low > 0 && high > low * 2.5) high = low * 2.5;
+    factors.push('cheap_signal_tight');
   }
 
   if (low > 0 && high / low > 6) low = high / 6;

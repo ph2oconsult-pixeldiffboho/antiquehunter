@@ -2222,7 +2222,7 @@ check("photo judgement: stamp read from a photo alone cannot mean confirmed peri
   assert.equal(r.periodCertainty, "probable_period"); assert.ok(r.confidenceCap <= 60);
   assert.ok(r.low < 1500 && r.high < 3500, `${r.low}-${r.high}`);
   const withJoints = applyPhotoJudgement({ ...base, periodCertainty: "confirmed_period", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "hand-cut dovetails, oak secondary" });
-  assert.equal(withJoints.periodCertainty, "confirmed_period"); assert.equal(withJoints.low, 1500);
+  assert.equal(withJoints.periodCertainty, "confirmed_period"); assert.ok(withJoints.low < 1500, "construction keeps the label; the stamped premium is still capped");
   const stated = applyPhotoJudgement({ ...base, userText: "commode stamped Flechy", periodCertainty: "confirmed_period", modelMakerStatus: "stamp_visible_in_photo" });
   assert.equal(stated.periodCertainty, "confirmed_period", "a stamp the buyer stated is not a photo-only read");
 });
@@ -2245,12 +2245,26 @@ check("photo judgement: later-copy verdict from photos alone widens up (more wit
   const a = applyPhotoJudgement({ hasPhotos: true, userText: "table", modelText: "", styleEvidence: false, periodCertainty: "later_style_or_revival", constructionEvidence: "softwood frame, mortise and tenon", low: 150, high: 450 });
   assert.equal(a.high, 900); assert.equal(a.low, 150);
   const b = applyPhotoJudgement({ hasPhotos: true, userText: "table de style Louis XV", modelText: "", styleEvidence: true, periodCertainty: "later_style_or_revival", low: 150, high: 450 });
-  assert.equal(b.high, 450, "catalogue says de style: no widening");
+  assert.ok(b.high <= 450 && b.high >= 350, "catalogue says de style: no widening, cheap cap may trim");
 });
 check("text runs: technique word next to a period claim is not a style discount; condition wording not double-counted", () => {
   assert.equal(styleDiscountOf("ambiguous", null, "Boulle-style marquetry. Napoleon III period.").factor, 1);
   const t = applyBaseBandPriors({ marketLow: 200, marketHigh: 700, periodCertainty: "ambiguous", query: "Boulle-style marquetry. Napoleon III period. Dents, lifting of the veneer, scratches", textOnly: true });
   assert.ok(t.high >= 700, JSON.stringify(t));
+});
+
+check("photo judgement: stamped minor-maker cap (read or stated), top makers exempt; cheap signals keep the range tight", () => {
+  const read = applyPhotoJudgement({ hasPhotos: true, userText: "chest of drawers", modelText: "Louis XV stamped commode", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "hand-cut dovetails", styleEvidence: false, periodCertainty: "confirmed_period", low: 3000, high: 7000 });
+  assert.ok(read.high <= 3000 && read.low <= 1000, `${read.low}-${read.high}`);
+  assert.equal(read.periodCertainty, "confirmed_period", "construction evidence keeps the label, not the premium");
+  const stated = applyPhotoJudgement({ hasPhotos: true, userText: "commode, stamped P. Durand JME", modelText: "", styleEvidence: false, periodCertainty: "confirmed_period", low: 3500, high: 7000 });
+  assert.ok(stated.high <= 3000);
+  const top = applyPhotoJudgement({ hasPhotos: true, userText: "commode stamped Riesener JME", modelText: "", styleEvidence: false, periodCertainty: "confirmed_period", low: 30000, high: 60000 });
+  assert.equal(top.high, 60000);
+  const resin = applyPhotoJudgement({ hasPhotos: true, userText: "wall console", modelText: "gilt resin wall console", styleEvidence: false, periodCertainty: "later_style_or_revival", low: 40, high: 200 });
+  assert.ok(resin.high <= 100, `${resin.low}-${resin.high}`);
+  const styleLate = applyPhotoJudgement({ hasPhotos: false, userText: "Large mirror. Louis XV style. Late 19th century.", modelText: "", styleEvidence: true, periodCertainty: "later_style_or_revival", low: 200, high: 700 });
+  assert.ok(styleLate.high <= 500);
 });
 
 console.log(`
