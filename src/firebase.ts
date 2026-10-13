@@ -1,5 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
+import { installApiAuthFetch } from './apiAuth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 
 // @ts-ignore
@@ -8,6 +10,26 @@ import firebaseConfig from '../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 export const auth = getAuth();
+
+// Firebase App Check: only initialised when a site key is configured at build time
+// (VITE_APPCHECK_SITE_KEY, plus VITE_APPCHECK_PROVIDER=enterprise for reCAPTCHA Enterprise; default reCAPTCHA v3).
+let appCheck: AppCheck | null = null;
+const appCheckKey = (import.meta as any).env?.VITE_APPCHECK_SITE_KEY as string | undefined;
+if (appCheckKey && typeof window !== 'undefined') {
+  try {
+    const enterprise = String((import.meta as any).env?.VITE_APPCHECK_PROVIDER || '').toLowerCase() === 'enterprise';
+    appCheck = initializeAppCheck(app, {
+      provider: enterprise ? new ReCaptchaEnterpriseProvider(appCheckKey) : new ReCaptchaV3Provider(appCheckKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (e) {
+    console.warn('App Check init failed', e);
+  }
+}
+export const getAppCheckInstance = () => appCheck;
+
+// Attach the sign-in token and App Check token to our own /api/* calls.
+installApiAuthFetch(auth, getAppCheckInstance);
 
 // Validate connection
 async function testConnection() {

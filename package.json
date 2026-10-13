@@ -9,7 +9,8 @@
     "start": "node server-dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "check": "tsx scripts/check-hunt-logic.ts"
+    "check": "tsx scripts/check-hunt-logic.ts",
+    "test:api-guard": "tsx tests/apiGuard.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -22,6 +23,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^12.11.0",
+    "firebase-admin": "^14.5.0",
     "i18next": "^25.8.20",
     "i18next-browser-languagedetector": "^8.2.1",
     "lucide-react": "^0.546.0",
