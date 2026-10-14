@@ -3,7 +3,7 @@
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
-import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS } from "../src/services/appraiseHandler.ts";
+import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS } from "../src/services/appraiseHandler.ts";
 import { appraisalErrorCode } from "../src/services/gemini.ts";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -1751,11 +1751,36 @@ await acheck("appraise handler retries 503 then succeeds; gives up with model_bu
   const ok = await handleAppraiseRequest(body, { sleep, generate: async () => { if (++n < 3) throw Object.assign(new Error("overloaded"), { status: 503 }); return { text: "{}" }; } });
   assert.equal(ok.status, 200); assert.equal(n, 3); assert.deepEqual(waits, RETRY_DELAYS_MS);
   n = 0; const busy = await handleAppraiseRequest(body, { sleep, generate: async () => { n++; throw Object.assign(new Error("x"), { status: 503 }); } });
-  assert.equal(busy.status, 503); assert.equal(busy.body.code, "model_busy"); assert.equal(n, 3);
+  assert.equal(busy.status, 503); assert.equal(busy.body.code, "model_busy"); assert.equal(n, 3 + FALLBACK_MODELS.length, "primary x3 then each fallback once");
   n = 0; const bad = await handleAppraiseRequest(body, { sleep, generate: async () => { n++; throw Object.assign(new Error("Unable to process input image"), { status: 400 }); } });
   assert.equal(bad.status, 400); assert.equal(bad.body.code, "bad_input"); assert.equal(n, 1);
   assert.ok(RETRY_DELAYS_MS.reduce((a, b) => a + b, 0) < 10_000);
 });
 
+await acheck("appraise handler falls back to lighter models after primary 503/404, within the time budget", async () => {
+  const body = { contents: { parts: [{ text: "x" }] }, config: { thinkingConfig: { thinkingLevel: "LOW" }, temperature: 0 } };
+  const sleep = async () => {};
+  const seen: string[] = [];
+  const r = await handleAppraiseRequest(body, { sleep, generate: async ({ model, config }: any) => {
+    seen.push(model);
+    if (model === APPRAISAL_MODEL) throw Object.assign(new Error("overloaded"), { status: 503 });
+    assert.ok(config.thinkingConfig, "Gemini 3 fallback keeps thinkingLevel");
+    return { text: "{}" };
+  } });
+  assert.equal(r.status, 200); assert.equal(r.body.model, FALLBACK_MODELS[0]);
+  assert.deepEqual(seen, [APPRAISAL_MODEL, APPRAISAL_MODEL, APPRAISAL_MODEL, FALLBACK_MODELS[0]]);
+  seen.length = 0;
+  const gone = await handleAppraiseRequest(body, { sleep, generate: async ({ model }: any) => { seen.push(model); if (model !== FALLBACK_MODELS[1]) throw Object.assign(new Error("not found"), { status: 404 }); return { text: "{}" }; } });
+  assert.equal(gone.body.model, FALLBACK_MODELS[1]); assert.deepEqual(seen, [APPRAISAL_MODEL, ...FALLBACK_MODELS], "404 is not retried, goes straight to the next model");
+  seen.length = 0;
+  const bad = await handleAppraiseRequest(body, { sleep, generate: async ({ model }: any) => { seen.push(model); throw Object.assign(new Error("bad image"), { status: 400 }); } });
+  assert.equal(bad.status, 400); assert.deepEqual(seen, [APPRAISAL_MODEL], "400 never falls back");
+  let t = 0; seen.length = 0;
+  const slow = await handleAppraiseRequest(body, { sleep, now: () => t, generate: async ({ model }: any) => { seen.push(model); t += 25_000; throw Object.assign(new Error("busy"), { status: 503 }); } });
+  assert.equal(slow.body.code, "model_busy"); assert.equal(seen.length, 2, "stops starting calls after the deadline");
+  assert.ok(ATTEMPT_DEADLINE_MS < 60_000);
+  assert.equal(configFor("gemini-2.5-flash", body.config).thinkingConfig, undefined, "non-Gemini-3 drops thinkingLevel");
+  assert.equal(configFor("gemini-2.5-flash", body.config).temperature, 0);
+});
 console.log(`
 ${passed} checks passed`);

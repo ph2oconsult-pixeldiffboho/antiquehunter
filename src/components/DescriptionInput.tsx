@@ -447,7 +447,6 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
               className={`w-full h-36 p-4 bg-paper border rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all resize-none text-sm leading-relaxed text-ink placeholder:text-muted/40 ${
                 isListening ? 'border-gold ring-2 ring-gold/10' : 'border-border-custom'
               }`}
-              required={!lotUrl.trim()}
             />
             {isListening && (
               <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] rounded-2xl flex items-center justify-center pointer-events-none">
