@@ -319,7 +319,14 @@
     "simple_start_hint": "“Start with something simple — even a glass or small item”",
     "lot_url_label": "Paste Auction or Listing Link (Lot Link)",
     "price_invalid": "Enter numbers only, e.g. 1500, 1 500 or 1,500.50",
-    "seller_market": "Market / Fair"
+    "seller_market": "Market / Fair",
+    "motivation": "How much do you want it? (optional)",
+    "motivation_none": "Not specified",
+    "motivation_browsing": "Just browsing",
+    "motivation_would_like": "I'd like it",
+    "motivation_fills_gap": "Fills a gap in my collection",
+    "budget": "Your budget (optional)",
+    "budget_placeholder": "e.g. 1 500"
   },
   "categories": {
     "furniture": "Furniture",
@@ -657,5 +664,31 @@
     "retry": "Try again",
     "back": "Edit details",
     "rerun_kept": "Re-run failed, your previous appraisal is kept. {{reason}}"
+  },
+  "motivation": {
+    "verdict_walk_away": "Walk Away",
+    "verdict_negotiate": "Over fair value — negotiate",
+    "verdict_premium": "Paying a premium",
+    "verdict_over_budget": "Over your budget",
+    "reason_walk_away": "{{price}} is {{gap}} above the walk-away ({{walkAway}}). You're just browsing: let this one go.",
+    "reason_negotiate": "{{price}} is {{gap}} above the walk-away ({{walkAway}}). Worth having, but only if the price comes down: negotiate (see the offer plan).",
+    "reason_premium": "{{price}} is {{gap}} over fair value (walk-away {{walkAway}}), within your budget of {{budget}}. It fills a gap in your collection, so paying a premium can make sense: know that you are paying {{gap}} more than it's worth.",
+    "reason_over_budget": "{{outlay}} is {{budgetGap}} over your budget of {{budget}}.",
+    "within_budget": "Within your budget of {{budget}}."
+  },
+  "offer": {
+    "title": "Offer plan",
+    "opening": "Opening offer: {{amount}}.",
+    "cash_dealer": "Cash price: {{amount}} (cash to a dealer is allowed up to €1,000 in France).",
+    "cash_private": "Cash price: {{amount}} (no cash cap between private individuals; ask for a written receipt).",
+    "cash_market": "Cash price: {{amount}} (cash is normal at a brocante or market).",
+    "cash_capped": "No cash offer: in France a dealer can't take more than €1,000 in cash, so pay by transfer or card.",
+    "best_final": "Best and final: {{amount}}.",
+    "max_bid": "Maximum bid: {{hammer}} hammer ({{allIn}} all-in with the {{pct}}% premium). Bid, don't make offers.",
+    "never_above": "Don't go above the walk-away ({{walkAway}}).",
+    "never_above_auction": "Don't bid above the walk-away ({{walkAway}} hammer).",
+    "stretch": "Because it fills a gap and your budget allows, this goes {{amount}} above the walk-away ({{walkAway}}): a premium of at most {{pct}}%, never over your budget ({{budget}}).",
+    "budget_ok": "Within your budget of {{budget}}.",
+    "budget_over": "The asking price is {{gap}} over your budget of {{budget}}: the offers stay within it."
   }
 }

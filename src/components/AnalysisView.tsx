@@ -1,6 +1,8 @@
 import { sanitizeWalkAwayIf } from '../services/gemini';
 import React, { useState, useEffect, useMemo } from 'react';
 import { applyVenueGuidance, needEvidenceWalkAway } from '../services/venueGuidance';
+import { motivationDecision } from '../services/motivation';
+import { OfferPlan } from './OfferPlan';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen, Sparkles } from 'lucide-react';
@@ -376,8 +378,24 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const nmeLine = nw ? ' ' + t(`analysis.nme_range_${nw.rangeKind}`) + ' ' + (nw.isAuction && nw.allIn
       ? t('analysis.nme_walk_away_auction', { walkAway: formatMoney(nw.walkAway, pg.currency), walkAwayAllIn: formatMoney(nw.allIn, pg.currency), premiumPct: nw.premiumPct })
       : t(`analysis.nme_walk_away_${nw.venue}`, { walkAway: formatMoney(nw.walkAway, pg.currency) })) : '';
-    const reasonOut = (dealerReason ? `${reason} ${t('analysis.venue_note_dealer')}` : reason) + nmeLine;
-    return { ...rawItem, buy_decision: { ...originalDecision, score, label, price_basis: basis, reason: reasonOut } };
+    let reasonOut = (dealerReason ? `${reason} ${t('analysis.venue_note_dealer')}` : reason) + nmeLine;
+    // Buyer motivation + budget: above the walk-away the verdict depends on them (all figures from motivation.ts)
+    const md = motivationDecision(rawItem);
+    if (md && !['high_risk', 'no_price'].includes(basis)) {
+      const cur = pg.currency;
+      const a = { gap: formatMoney(md.gap, cur), walkAway: formatMoney(md.walkAway, cur), price: formatMoney(md.price, cur), budget: formatMoney(md.budget || 0, cur), budgetGap: formatMoney(md.budgetGap, cur), outlay: formatMoney(md.outlay, cur) };
+      if (md.verdict !== 'unchanged') {
+        // Need More Evidence keeps its label (no buy verdict until the period is known); the motivation line is added
+        if (basis !== 'need_evidence') label = t(`motivation.verdict_${md.verdict}`);
+        // negotiate / premium replace the price sentence (it says "walk away", which contradicts them); the venue note stays
+        const replace = basis !== 'need_evidence' && (md.verdict === 'negotiate' || md.verdict === 'premium');
+        const venueNote = rawItem.venue === 'dealer' ? t('analysis.venue_note_dealer') : rawItem.venue === 'market' ? t(rawItem.venue_note_key || 'analysis.venue_note_market') : '';
+        reasonOut = replace ? `${t(`motivation.reason_${md.verdict}`, a)} ${venueNote}`.trim() : `${t(`motivation.reason_${md.verdict}`, a)} ${reasonOut}`;
+      } else if (md.budget) {
+        reasonOut = `${reasonOut} ${t('motivation.within_budget', a)}`;
+      }
+    }
+    return { ...rawItem, motivation_decision: md, buy_decision: { ...originalDecision, score, label, price_basis: basis, reason: reasonOut } };
   }, [rawItem, buyingGoal, t]);
 
   // Keep the floating action bar from covering the end of the page (bar height + safe area).
@@ -939,6 +957,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <Negotiate embedded plan={currentItem.negotiation_plan} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
         </EvidenceStep>
       )}
+
+      <OfferPlan md={currentItem.motivation_decision} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
 
       {/* 3c. Maker attribution + verified auction comparables (public results; the anchored range itself is in the price card) */}
       <MakerAndComparables item={currentItem} />

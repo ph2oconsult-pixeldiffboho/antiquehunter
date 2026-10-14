@@ -1,3 +1,4 @@
+import { parseMotivation, parseBudget } from './motivation';
 import { Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
@@ -19,6 +20,9 @@ export const APPRAISAL_SEED = 20261009;
 export interface ChecklistBase { low: number; high: number; fair_low: number; fair_high: number; maker_status: string | null }
 
 export interface AppraisalExtra {
+  /** Optional buyer inputs (never sent to the model; used by motivation.ts on the result) */
+  motivation?: string;
+  budget?: number;
   /** What was read from the pasted lot link (server-side, /api/lot); null = a link was given but could not be read */
   lotFacts?: LotFacts | null;
   /** Comparables already fetched (the accuracy harness re-applies captured ones); undefined = fetch when a maker is named */
@@ -476,13 +480,13 @@ ${getGlossaryPrompt(language)}`;
   const comps = compsP ? await compsP : undefined;
   return postProcessAppraisal(result, {
     query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
-    lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers: extra.checkAnswers, previousBase: extra.previousBase,
+    lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers: extra.checkAnswers, previousBase: extra.previousBase, motivation: extra.motivation, budget: extra.budget,
   });
 };
 
 export interface PostProcessContext {
   query: string; hasPhotos: boolean; askingPrice?: number; isAuction: boolean; premiumPct: number; targetCurrency: string;
-  currencySymbol: string; language: string; sellerType?: string; lotUrl?: string;
+  currencySymbol: string; language: string; sellerType?: string; lotUrl?: string; motivation?: string; budget?: number;
   lotFacts?: LotFacts | null; fetchedEstimate: boolean; eurTo: (eur: number) => number;
   category?: string;
   /** Verified auction comparables (null = lookup failed; undefined = not looked up) */
@@ -833,7 +837,10 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         isAuction,
         lotUrl: lotUrl || null,
         buyerPremiumRate: premiumPct,
-        allInPrice: allIn || null
+        allInPrice: allIn || null,
+        askingPrice: Number(askingPrice) || null,
+        motivation: parseMotivation(ctx.motivation) || null,
+        budget: parseBudget(ctx.budget) || null,
       },
       item_summary: {
         ...item.item_summary,

@@ -184,7 +184,7 @@ export default function Main() {
         details.location || (lotFacts?.ok ? [lotFacts.city].filter(Boolean).join(', ') : undefined),
         details.lotUrl,
         premium,
-        { lotFacts, checkAnswers, previousBase }
+        { lotFacts, checkAnswers, previousBase, motivation: details.motivation, budget: details.budget }
       );
       
       if (result) {
