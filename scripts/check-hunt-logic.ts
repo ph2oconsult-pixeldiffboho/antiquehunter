@@ -1299,30 +1299,7 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 1400, category: "mirrors" }))[0].buy_decision.label, "Overpriced");
   assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 2000, category: "mirrors" }))[0].buy_decision.label, "Walk Away");
   // private seller: same dealer range scale
-  // venue split (PR #28): Market/Fair and private sellers use the market bands; every figure on the page agrees
-  for (const st of ["Market/Fair", "Private Seller"]) {
-    const v: any = postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 450, category: "mirrors", sellerType: st }))[0];
-    assert.equal(v.buy_decision.price_scale, "market", st);
-    assert.equal(v.negotiation_strategy.walk_away_price, 700, st + ": walk-away = auction high");
-    assert.equal(v.price_guidance.overpaying_above, 700); assert.equal(v.negotiation_plan.walk_away, 700, st + ": Negotiate box uses the venue walk-away");
-    assert.equal(v.price_guidance.good_buy_below, 500); assert.equal(v.price_guidance.market_bargain_low, 300);
-    assert.ok(v.negotiation_strategy.target_price_high <= 700 && v.negotiation_plan.happy_at <= 700 && v.negotiation_plan.opening_offer <= v.negotiation_plan.happy_at);
-    assert.equal(v.buy_decision.label, "Good Buy", st + ": €450 inside the bargain band €300–500");
-    assert.equal(v.buy_decision.dealer_bands, null);
-    assert.deepEqual([v.negotiation_strategy.opening_offer, v.negotiation_strategy.target_price_high], [v.negotiation_plan.opening_offer, v.negotiation_plan.happy_at], st + ": how-to-buy box = Negotiate box");
-    const cv: any = applyVenueGuidance(v);
-    assert.deepEqual([cv.negotiation_strategy, cv.price_guidance.good_buy_below, cv.buy_decision.price_basis], [v.negotiation_strategy, v.price_guidance.good_buy_below, v.buy_decision.price_basis], "client keeps the server's venue figures");
-    assert.equal(v.negotiation_plan.payment.mode, st === "Market/Fair" ? "cash_market" : "cash_private_receipt");
-    assert.ok(v.walk_away_if.some((x: string) => /walk-away of €700/.test(x)) && !v.walk_away_if.some((x: string) => /450/.test(x)), JSON.stringify(v.walk_away_if));
-  }
-  const dl: any = postProcessAppraisal((() => { const r = lpRaw(); r.items[0].walk_away_if = ["The price exceeds 450 EUR.", "Glass replaced."]; return r; })(), dealerCtx(q, { askingPrice: 450, category: "mirrors", sellerType: "Antique Shop" }))[0];
-  assert.equal(dl.negotiation_plan.walk_away, 1100); assert.equal(dl.negotiation_strategy.opening_offer, dl.negotiation_plan.opening_offer); assert.ok(dl.negotiation_strategy.opening_offer < 450); assert.equal(dl.negotiation_strategy.walk_away_price, 1100); assert.equal(dl.negotiation_plan.payment.mode, "cash");
-  const auV: any = postProcessAppraisal((() => { const r = lpRaw(); r.items[0].walk_away_if = ["The total cost (hammer + 25% premium) exceeds 800 EUR.", "Glass replaced."]; return r; })(), dealerCtx(q, { askingPrice: 450, category: "mirrors", sellerType: "Auction", isAuction: true, premiumPct: 25 }))[0];
-  assert.equal(auV.buy_decision.price_scale, "auction"); assert.equal(auV.negotiation_plan.walk_away, auV.negotiation_strategy.walk_away_price);
-  const wV = auV.negotiation_strategy.walk_away_price;
-  assert.equal(auV.walk_away_if[1], `The hammer goes above €${wV.toLocaleString("en")} (about €${Math.round(wV * 1.25).toLocaleString("en")} all-in with the 25% buyer's premium).`, JSON.stringify(auV.walk_away_if));
-  assert.equal(auV.negotiation_plan.bidding.max_all_in, Math.round(wV * 1.25));
-  assert.deepEqual(dl.walk_away_if, ["Glass replaced.", "The final price goes above your walk-away of €1,100."]);
+  assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 950, category: "mirrors", sellerType: "Market/Fair" }))[0].buy_decision.price_scale, "dealer");
   // the model's dealer range out of line: clamped (low >= auction mid, high >= auction high)
   const bad = lpRaw(); Object.assign(bad.items[0].price_guidance, { fair_price_low: 320, fair_price_high: 650 });
   const c: any = postProcessAppraisal(bad, dealerCtx(q, { askingPrice: 950, category: "mirrors" }))[0];
@@ -1711,6 +1688,28 @@ check("venue split review fixes: missing auction low never shows 0; private sell
   assert.equal(pv.venue_note_key, "analysis.venue_note_private"); assert.equal(pv.negotiation_strategy.walk_away_price, 600, "same market bands");
   const mk: any = applyVenueGuidance({ seller_context: { sellerType: "Market/Fair" }, price_guidance: { estimated_market_range_low: 200, estimated_market_range_high: 600 }, buy_decision: {} });
   assert.equal(mk.venue_note_key, "analysis.venue_note_market");
+});
+
+check("venue split (display-side): Negotiate plan, how-to-buy box and payment tip follow the venue figures", () => {
+  const plan0 = { kind: "private", opening_offer: 400, happy_at: 420, walk_away: 700, levers: [{ id: "bundle" }], invoice: { terms: ["epoque"] }, payment: { mode: "cash_private_receipt" } };
+  const mk = (st: string) => ({ seller_context: { sellerType: st, isAuction: false }, negotiation_plan: plan0,
+    price_guidance: { currency: "EUR", estimated_market_range_low: 200, estimated_market_range_high: 600, fair_price_low: 600, fair_price_high: 1200 },
+    negotiation_strategy: { opening_offer: 600, target_price_low: 600, target_price_high: 900, walk_away_price: 1200 },
+    buy_decision: { effective_price: 450, compare_price: 450, price_basis: "strong_buy", price_scale: "dealer" } });
+  for (const st of ["Market/Fair", "Private Seller"]) {
+    const v: any = applyVenueGuidance(mk(st));
+    assert.equal(v.negotiation_plan.walk_away, 600, st + ": Negotiate walk-away = auction high");
+    assert.equal(v.negotiation_strategy.walk_away_price, 600); assert.equal(v.price_guidance.overpaying_above, 600);
+    assert.ok(v.negotiation_plan.opening_offer <= v.negotiation_plan.happy_at && v.negotiation_plan.happy_at <= 600 && v.negotiation_plan.happy_at < 450, JSON.stringify(v.negotiation_plan));
+    assert.deepEqual([v.negotiation_strategy.opening_offer, v.negotiation_strategy.target_price_high], [v.negotiation_plan.opening_offer, v.negotiation_plan.happy_at], "how-to-buy box = Negotiate box");
+    assert.equal(v.negotiation_plan.payment.mode, st === "Market/Fair" ? "cash_market" : "cash_private_receipt");
+    assert.deepEqual(v.negotiation_plan.levers, plan0.levers, "levers kept");
+  }
+  const d: any = applyVenueGuidance(mk("Antique Shop"));
+  assert.equal(d.negotiation_plan.walk_away, 1200); assert.equal(d.negotiation_plan.payment.mode, "cash");
+  assert.ok(d.negotiation_strategy.opening_offer < 450 && d.negotiation_strategy.opening_offer === d.negotiation_plan.opening_offer);
+  const auc: any = { ...mk("Auction"), seller_context: { sellerType: "Auction", isAuction: true } };
+  assert.equal(applyVenueGuidance(auc), auc, "auction untouched");
 });
 
 console.log(`

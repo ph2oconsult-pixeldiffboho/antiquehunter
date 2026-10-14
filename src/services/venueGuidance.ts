@@ -5,7 +5,7 @@
 // - Market/Fair (brocante, flea market): its own bargain band at or below auction level; the walk-away is the auction
 //   high; the verdict notes that bargains are possible but quality is not guaranteed.
 import { bandScore, type VerdictBands } from './appraisalMath';
-import { sellerKindOf } from './negotiation';
+import { sellerKindOf, buildNegotiationPlan } from './negotiation';
 
 export type Venue = 'auction' | 'market' | 'dealer';
 /** Above the walk-away (auction high), a market price is "Overpriced" up to this multiple, then "Walk Away". */
@@ -45,21 +45,30 @@ export const marketFigures = (auctionLow: number, auctionHigh: number) => {
 };
 
 /** Returns the item as the given venue should show it. Auction items are returned unchanged (same object). */
+/** Rebuilds the Negotiate plan's figures and payment tip from the venue figures (levers / invoice wording are kept). */
+const rebuildPlan = (item: any, venue: 'market' | 'private' | 'dealer', walk: number, dealerLow?: number, openingOffer?: number, targetHigh?: number) => {
+  const old = item.negotiation_plan;
+  if (!old || !(walk > 0)) return old;
+  const ask = Number(item.buy_decision?.compare_price || item.buy_decision?.effective_price || item.seller_context?.allInPrice) || undefined;
+  const p = buildNegotiationPlan({ sellerType: item.seller_context?.sellerType, isAuction: false, venue, askingPrice: ask, currency: item.price_guidance?.currency || 'EUR',
+    walkAway: walk, dealerLow, openingOffer, targetHigh });
+  return { ...old, kind: p.kind, opening_offer: p.opening_offer, happy_at: p.happy_at, walk_away: p.walk_away, asking: p.asking, asking_over_walk_pct: p.asking_over_walk_pct, payment: p.payment };
+};
+
+/** The "how to buy" box shows the same offers as the Negotiate box: opening offer, and the range up to "happy at". */
+const withPlanOffers = (ns: any, plan: any) => plan && Number(plan.happy_at) > 0
+  ? { ...ns, opening_offer: plan.opening_offer, target_price_low: plan.opening_offer, target_price_high: plan.happy_at, walk_away_price: plan.walk_away }
+  : ns;
+
 export const applyVenueGuidance = <T extends Record<string, any>>(item: T): T => {
   if (!item) return item;
   const venue = venueOf(item.seller_context);
   if (venue === 'auction') return item;
   const noteKey = isPrivateSeller(item.seller_context) ? 'analysis.venue_note_private' : 'analysis.venue_note_market';
-  if (venue === 'dealer') return { ...item, venue, venue_note_key: 'analysis.venue_note_dealer' };
-  // Already computed on the server (gemini.ts, same figures): only the note is added, nothing is recomputed
-  if (item.buy_decision?.price_scale === 'market') {
-    const bd0 = item.buy_decision;
-    const pg0 = item.price_guidance || {};
-    const lo0 = Number(pg0.estimated_market_range_low) || 0, hi0 = Number(pg0.estimated_market_range_high) || 0;
-    const f0 = marketFigures(lo0, hi0);
-    return { ...item, venue, venue_note_key: noteKey,
-      buy_decision: { ...bd0, market_bands: bd0.market_bands || { bargain_low: f0.bargain_low, bargain_high: f0.bargain_high, walk_away: f0.walk_away_price, overpriced_to: r(hi0 * MARKET_OVER_FACTOR) } },
-      price_guidance: { ...pg0, market_bargain_low: pg0.market_bargain_low || f0.bargain_low, market_bargain_high: pg0.market_bargain_high || f0.bargain_high } };
+  if (venue === 'dealer') {
+    const ns0 = item.negotiation_strategy || {};
+    const plan = rebuildPlan(item, 'dealer', Number(ns0.walk_away_price) || Number(item.price_guidance?.fair_price_high) || 0, Number(item.price_guidance?.fair_price_low) || undefined, Number(ns0.opening_offer) || undefined, Number(ns0.target_price_high) || undefined);
+    return { ...item, venue, venue_note_key: 'analysis.venue_note_dealer', negotiation_plan: plan, negotiation_strategy: withPlanOffers(ns0, plan) };
   }
   const pg = item.price_guidance || {};
   const lo = Number(pg.estimated_market_range_low) || 0, hi = Number(pg.estimated_market_range_high) || 0;
@@ -74,25 +83,12 @@ export const applyVenueGuidance = <T extends Record<string, any>>(item: T): T =>
   }
   bd.price_scale = 'market';
   bd.market_bands = { bargain_low: f.bargain_low, bargain_high: f.bargain_high, walk_away: f.walk_away_price, overpriced_to: r(hi * MARKET_OVER_FACTOR) };
+  const ns1 = { ...(item.negotiation_strategy || {}), opening_offer: f.opening_offer, target_price_low: f.target_price_low, target_price_high: f.target_price_high, walk_away_price: f.walk_away_price };
+  const plan = rebuildPlan({ ...item, buy_decision: bd }, isPrivateSeller(item.seller_context) ? 'private' : 'market', f.walk_away_price, undefined, f.opening_offer, f.target_price_high);
   return {
-    ...item, venue, venue_note_key: noteKey, buy_decision: bd,
+    ...item, venue, venue_note_key: noteKey, buy_decision: bd, negotiation_plan: plan,
     price_guidance: { ...pg, good_buy_below: f.good_buy_below, overpaying_above: f.walk_away_price, market_bargain_low: f.bargain_low, market_bargain_high: f.bargain_high },
-    negotiation_strategy: { ...(item.negotiation_strategy || {}), opening_offer: f.opening_offer, target_price_low: f.target_price_low, target_price_high: f.target_price_high, walk_away_price: f.walk_away_price },
+    negotiation_strategy: withPlanOffers(ns1, plan),
   };
 };
 
-const MONEY_RE = /(\d[\d\s.,\u00a0\u202f]*\s?(€|£|\$|kr|eur|gbp|usd|sek)\b)|((€|£|\$)\s?\d)/i;
-
-/** "When to walk away" conditions: any condition quoting a money figure is replaced by one line built from the app's own
- *  walk-away (auction: max hammer bid and its all-in cost), so the list can never contradict the walk-away card. */
-export const walkAwayConditions = (list: unknown, o: { venue: Venue; walkAway: number; allIn?: number; premiumPct?: number; money: (n: number) => string; fr?: boolean }): string[] => {
-  const items = (Array.isArray(list) ? list : []).map(x => String(x || '').trim()).filter(Boolean);
-  const kept = items.filter(x => !MONEY_RE.test(x));
-  if (!(o.walkAway > 0)) return kept;
-  const w = o.money(o.walkAway);
-  const line = o.venue === 'auction'
-    ? (o.fr ? `L'enchère dépasse ${w} au marteau (environ ${o.money(o.allIn || o.walkAway)} frais compris, avec ${o.premiumPct || 0} % de frais acheteur).`
-            : `The hammer goes above ${w} (about ${o.money(o.allIn || o.walkAway)} all-in with the ${o.premiumPct || 0}% buyer's premium).`)
-    : (o.fr ? `Le prix final dépasse votre prix plafond de ${w}.` : `The final price goes above your walk-away of ${w}.`);
-  return [...kept.slice(0, 2), line];
-};
