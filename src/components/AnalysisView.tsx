@@ -1,7 +1,7 @@
 import { sanitizeWalkAwayIf } from '../services/gemini';
 import React, { useState, useEffect, useMemo } from 'react';
 import { applyVenueGuidance, needEvidenceWalkAway } from '../services/venueGuidance';
-import { motivationDecision } from '../services/motivation';
+import { motivationDecision, overridesNeedEvidence } from '../services/motivation';
 import { OfferPlan } from './OfferPlan';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
@@ -11,7 +11,6 @@ import { useTranslation } from 'react-i18next';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis } from '../services/appraisalMath';
-import { EvidenceStep } from './EvidenceStep';
 import { BeforeYouBuy } from './BeforeYouBuy';
 import { Negotiate } from './Negotiate';
 import { FieldNotesForPiece } from './fieldNotes/FieldNotesForPiece';
@@ -386,15 +385,21 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       const a = { gap: formatMoney(md.gap, cur), walkAway: formatMoney(md.walkAway, cur), price: formatMoney(md.price, cur), budget: formatMoney(md.budget || 0, cur), budgetGap: formatMoney(md.budgetGap, cur), outlay: formatMoney(md.outlay, cur) };
       if (md.verdict !== 'unchanged') {
         // Need More Evidence keeps its label (no buy verdict until the period is known); the motivation line is added
-        if (basis !== 'need_evidence') label = t(`motivation.verdict_${md.verdict}`);
+        // Above the walk-away (or over budget) with a motivation given, the motivation verdict wins over Need More
+        // Evidence; a short note keeps the uncertainty. Without a motivation, Need More Evidence keeps its label.
+        const overNme = overridesNeedEvidence(md, basis);
+        if (basis !== 'need_evidence' || overNme) label = t(`motivation.verdict_${md.verdict}`);
         // negotiate / premium replace the price sentence (it says "walk away", which contradicts them); the venue note stays
-        const replace = basis !== 'need_evidence' && (md.verdict === 'negotiate' || md.verdict === 'premium');
+        const replace = (basis !== 'need_evidence' || overNme) && (md.verdict === 'negotiate' || md.verdict === 'premium' || overNme);
         const venueNote = rawItem.venue === 'dealer' ? t('analysis.venue_note_dealer') : rawItem.venue === 'market' ? t(rawItem.venue_note_key || 'analysis.venue_note_market') : '';
-        reasonOut = replace ? `${t(`motivation.reason_${md.verdict}`, a)} ${venueNote}`.trim() : `${t(`motivation.reason_${md.verdict}`, a)} ${reasonOut}`;
+        const thin = '';
+        reasonOut = replace ? `${t(`motivation.reason_${md.verdict}`, a)}${thin} ${venueNote}`.trim() : `${t(`motivation.reason_${md.verdict}`, a)} ${reasonOut}`;
       } else if (md.budget) {
         reasonOut = `${reasonOut} ${t('motivation.within_budget', a)}`;
       }
     }
+    // Thin evidence (period not established): a confidence note only, never a blocking verdict
+    if (rawItem.evidence_check?.required) reasonOut = `${reasonOut} ${t('motivation.evidence_thin')}`;
     return { ...rawItem, motivation_decision: md, buy_decision: { ...originalDecision, score, label, price_basis: basis, reason: reasonOut } };
   }, [rawItem, buyingGoal, t]);
 
@@ -948,14 +953,16 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </section>
 
-      {/* 3b. Need more evidence (period not established): shown on every plan, before any verdict */}
-      {currentItem.evidence_check?.required && (
-        <EvidenceStep check={currentItem.evidence_check} constructionSeen={currentItem.item_summary?.construction_evidence} onAddEvidence={onAddEvidence || onAddMoreDetails}>
-          {currentItem.checklist?.items?.length > 0 && (
-            <BeforeYouBuy embedded items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />
-          )}
-          <Negotiate embedded plan={currentItem.negotiation_plan} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
-        </EvidenceStep>
+      {/* 3b. Thin evidence: at most two optional "check before you pay" tips (no blocking, no re-asking) */}
+      {currentItem.evidence_check?.required && (currentItem.evidence_check.asks || []).length > 0 && (
+        <section data-testid="check-before-pay" className="p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-1">
+          <p className="text-[10px] uppercase tracking-widest font-bold text-amber-900/70">{t('evidence.tips_title')}</p>
+          <ul className="space-y-1">
+            {(currentItem.evidence_check.asks as string[]).filter((a) => a !== 'photos' && a !== 'catalogue_or_link').slice(0, 2).map((a) => (
+              <li key={a} className="text-sm text-ink">• {t(`evidence.tips.${a}`)}</li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <OfferPlan md={currentItem.motivation_decision} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
@@ -964,12 +971,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       <MakerAndComparables item={currentItem} />
 
       {/* 3d. Before you buy: what to check and confirm for this piece (answers re-run the appraisal) */}
-      {!currentItem.evidence_check?.required && currentItem.checklist?.items?.length > 0 && (
+      {currentItem.checklist?.items?.length > 0 && (
         <BeforeYouBuy items={currentItem.checklist.items} answers={currentItem.checklist.answers} onRerun={onRerunWithChecks} />
       )}
 
       {/* 3e. Negotiate (dealer / private) or bidding tips (auction), part of "Before you buy" */}
-      {!currentItem.evidence_check?.required && (
+      {(
         <Negotiate plan={currentItem.negotiation_plan} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
       )}
 

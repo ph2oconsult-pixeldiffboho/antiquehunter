@@ -40,9 +40,14 @@ export interface MotivationDecision {
   plan: OfferPlan | null;
 }
 
+/** Need More Evidence is overridden by the motivation verdict when a motivation was given and the price is above the
+ *  walk-away (at auction the hammer vs the hammer walk-away, i.e. the all-in vs the all-in walk-away), or over budget. */
+export const overridesNeedEvidence = (md: MotivationDecision | null | undefined, basis: string): boolean =>
+  !!md && basis === 'need_evidence' && md.verdict !== 'unchanged' && (md.over || md.overBudget);
+
 /**
  * Run on an item that went through applyVenueGuidance. Returns null when there is no price or no walk-away.
- * No motivation and no budget -> verdict 'unchanged' (the current behaviour); the plan is still built when the
+ * No motivation -> the "I'd like it" behaviour; below the walk-away and within budget -> 'unchanged'; the plan is still built when the
  * price is above fair value (the smart buy) or the walk-away.
  */
 export const motivationDecision = (item: Record<string, any> | null | undefined): MotivationDecision | null => {
@@ -58,6 +63,8 @@ export const motivationDecision = (item: Record<string, any> | null | undefined)
   if (!(price > 0) || !(walkAway > 0)) return null;
   const outlay = isAuction ? Math.round(price * (1 + premiumPct / 100)) : price;
   const motivation = parseMotivation(sc.motivation);
+  // no motivation given: the "I'd like it" behaviour (always a decisive verdict)
+  const effMotivation: Motivation = motivation || 'would_like';
   const budget = parseBudget(sc.budget);
   const budgetEur = budget; // the budget is typed in the appraisal's currency
   const over = price > walkAway;
@@ -66,9 +73,9 @@ export const motivationDecision = (item: Record<string, any> | null | undefined)
   const budgetGap = overBudget ? outlay - budgetEur! : 0;
   let verdict: MotivationVerdict = 'unchanged';
   if (overBudget) verdict = 'over_budget';
-  else if (over && motivation === 'browsing') verdict = 'walk_away';
-  else if (over && motivation === 'would_like') verdict = 'negotiate';
-  else if (over && motivation === 'fills_gap') verdict = budgetEur ? 'premium' : 'negotiate';
+  else if (over && effMotivation === 'browsing') verdict = 'walk_away';
+  else if (over && effMotivation === 'would_like') verdict = 'negotiate';
+  else if (over && effMotivation === 'fills_gap') verdict = budgetEur ? 'premium' : 'negotiate';
 
   const fairValue = Math.min(walkAway, Number(pg.good_buy_below) || walkAway);
   const needPlan = price > fairValue || over;
@@ -76,7 +83,7 @@ export const motivationDecision = (item: Record<string, any> | null | undefined)
   if (needPlan) {
     // premium allowed only for "fills a gap" with a budget that covers it
     const premiumCap = niceDown(walkAway * (1 + GAP_PREMIUM_PCT / 100));
-    const stretch = motivation === 'fills_gap' && !!budgetEur;
+    const stretch = effMotivation === 'fills_gap' && !!budgetEur;
     if (isAuction) {
       const budgetHammer = budgetEur ? niceDown(budgetEur / (1 + premiumPct / 100)) : Infinity;
       let maxHammer = stretch ? Math.max(walkAway, Math.min(premiumCap, budgetHammer)) : Math.min(walkAway, budgetHammer);

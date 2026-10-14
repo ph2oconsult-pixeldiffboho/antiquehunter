@@ -495,7 +495,15 @@
     "provisional_range": "Fourchette de marché provisoire",
     "provisional_note": "Provisoire tant que l'époque n'est pas confirmée.",
     "describe_banner": "Ajoutez les éléments demandés : les nouvelles photos s'ajoutent à celles déjà fournies.",
-    "construction_seen": "Construction observée"
+    "construction_seen": "Construction observée",
+    "tips_title": "À vérifier avant de payer",
+    "tips": {
+      "underside_back": "Regardez dessous et au dos : bois ancien scié main et surfaces oxydées, pas de contreplaqué ni de traces de scie fraîches.",
+      "drawer_joints": "Ouvrez un tiroir : des queues d'aronde taillées main (irrégulières) indiquent l'époque ; régulières à la machine, une pièce plus tardive.",
+      "hardware_mounts": "Vérifiez la quincaillerie : vis et bronzes faits main avec une usure ancienne, pas de vis cruciformes ni de métal neuf.",
+      "seat_frame_webbing": "Passez la main sous l'assise : assemblages chevillés, sangles ou clous anciens, pas d'agrafes ni de mousse moderne.",
+      "stamp_label": "Cherchez une estampille, une marque ou une étiquette (haut du bâti, intérieur des tiroirs, ceinture)."
+    }
   },
   "checklist": {
     "title": "Avant d'acheter",
@@ -674,7 +682,8 @@
     "reason_negotiate": "{{price}} dépasse de {{gap}} votre prix plafond ({{walkAway}}). La pièce vous plaît, mais seulement si le prix baisse : négociez (voir le plan d'offre).",
     "reason_premium": "{{price}} dépasse de {{gap}} sa juste valeur (plafond {{walkAway}}), dans votre budget de {{budget}}. Elle complète votre collection, une prime peut se justifier : sachez que vous payez {{gap}} de plus que sa valeur.",
     "reason_over_budget": "{{outlay}} dépasse de {{budgetGap}} votre budget de {{budget}}.",
-    "within_budget": "Dans votre budget de {{budget}}."
+    "within_budget": "Dans votre budget de {{budget}}.",
+    "evidence_thin": "Confiance plus faible : l'époque n'est pas confirmée, vérifiez les points ci-dessous avant de payer."
   },
   "offer": {
     "title": "Plan d'offre",
