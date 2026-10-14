@@ -69,6 +69,10 @@ export default function Main() {
   // "Need more evidence" re-run: the text typed last time (not the default photo prompt) and the evidence asked for
   const [lastTyped, setLastTyped] = useState('');
   const [evidenceRequest, setEvidenceRequest] = useState<any>(null);
+  // "Add more details" from a result: the form reopens with the previous description and details (price, venue...)
+  const [prefillFromLast, setPrefillFromLast] = useState(false);
+  // A new item (home / scan) starts from a blank form
+  useEffect(() => { if (currentScreen === 'home' || currentScreen === 'scan') setPrefillFromLast(false); }, [currentScreen]);
   const [isFromCollection, setIsFromCollection] = useState(false);
   const [autoStartListening, setAutoStartListening] = useState(false);
   const [showResetPrompt, setShowResetPrompt] = useState(false);
@@ -136,6 +140,7 @@ export default function Main() {
     setLastDetails(details);
     setLastTyped(inputIsImage || input === t('upload_choice.default_prompt', "Analyze this antique from the images provided.") ? '' : String(input || ''));
     setEvidenceRequest(null);
+    setPrefillFromLast(false);
     setIsFromCollection(false);
     setIterationCount(prev => prev + 1);
     
@@ -459,8 +464,8 @@ export default function Main() {
             onAnalyze={(desc, details) => handleAnalyze(desc || t('upload_choice.default_prompt', "Analyze this antique from the images provided."), details)}
             isAnalyzing={isAnalyzing}
             images={capturedImages}
-            initialDescription={evidenceRequest ? lastTyped : undefined}
-            initialDetails={evidenceRequest ? lastDetails : undefined}
+            initialDescription={evidenceRequest || prefillFromLast ? lastTyped : undefined}
+            initialDetails={evidenceRequest || prefillFromLast ? lastDetails : undefined}
             evidenceRequest={evidenceRequest}
             isDetailedScan={isDetailedScan}
             onAddImage={() => fileInputRef.current?.click()}
@@ -543,7 +548,7 @@ export default function Main() {
                 onUpgrade={handleCheckout}
                 plan={plan}
                 currency={currency}
-                onAddMoreDetails={() => setCurrentScreen('upload-choice')}
+                onAddMoreDetails={() => { setPrefillFromLast(true); setCurrentScreen('upload-choice'); }}
                 onOpenFieldNotes={(opts) => { setFieldNotesInitial(opts as any); setCurrentScreen('field-notes'); }}
                 onRerunWithChecks={(answers) => handleAnalyze(lastTyped || t('upload_choice.default_prompt', "Analyze this antique from the images provided."), lastDetails || {}, false, [], answers,
                   analysisItems(analysisResult)[0]?.checklist?.base || null)}

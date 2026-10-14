@@ -20,9 +20,21 @@ export const APPRAISAL_MODEL = "gemini-3.1-flash-lite";
  */
 export const FALLBACK_MODELS = ["gemini-3.5-flash-lite"];
 /** Upstream statuses after which the next model is tried (404 = model id retired). */
-export const FALLBACK_STATUSES = [404, 429, 500, 503];
-/** Don't start a new model call after this much time; leaves room for one call inside maxDuration 60 s. */
+export const FALLBACK_STATUSES = [404, 429, 500, 503, 504];
+/** Don't start a new model call after this much time. */
 export const ATTEMPT_DEADLINE_MS = 40_000;
+/** Per-call cap for every model except the last one in the chain, so a hung call fails over in time. */
+export const CALL_TIMEOUT_MS = 18_000;
+/** Whole-request budget for model calls, under Vercel's maxDuration 60 s (leaves ~5 s for cold start + response). */
+export const TOTAL_BUDGET_MS = 55_000;
+/** Pseudo upstream status used for a call we aborted on timeout (treated like a 504: fall over, no same-model retry). */
+export const TIMEOUT_STATUS = 504;
+
+/** Timeout for the next call: 18 s while another model can still follow, otherwise whatever budget remains. */
+export const callTimeoutFor = (elapsedMs: number, isLastModel: boolean): number => {
+  const remaining = Math.max(0, TOTAL_BUDGET_MS - elapsedMs);
+  return isLastModel ? remaining : Math.min(CALL_TIMEOUT_MS, remaining);
+};
 
 /** Config for a given model: thinkingLevel is a Gemini 3 feature, so drop it for any non-Gemini-3 model. */
 export const configFor = (model: string, config: any): any => {
@@ -61,7 +73,7 @@ export const failureFor = (status: number | null): AppraiseHttpResult => {
   return { status: 502, body: { error: "Model request failed", code: "model_error" } };
 };
 
-type Generate = (args: { contents: unknown; config: unknown; model: string }) => Promise<{ text?: string }>;
+type Generate = (args: { contents: unknown; config: unknown; model: string; signal?: AbortSignal }) => Promise<{ text?: string }>;
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export const handleAppraiseRequest = async (
@@ -99,7 +111,7 @@ export const handleAppraiseRequest = async (
       contents: args.contents as any,
       // responseMimeType/responseSchema/thinkingConfig/temperature/seed are built by the
       // caller and passed through unchanged, preserving the existing appraisal behaviour.
-      config: args.config as any,
+      config: { ...((args.config as any) || {}), ...(args.signal ? { abortSignal: args.signal } : {}) } as any,
     });
   }
   const sleep = deps.sleep || defaultSleep;
@@ -118,19 +130,31 @@ export const handleAppraiseRequest = async (
         console.error(`Appraisal model time budget spent before trying ${model}; giving up (last upstream ${lastStatus ?? "unknown"}).`);
         return failureFor(lastStatus);
       }
+      const timeoutMs = callTimeoutFor(now() - started, m === models.length - 1);
+      const ctrl = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        const response = await generate({ contents, config: configFor(model, cfg), model });
+        // Race the call against the timer too, in case the SDK ignores the abort signal
+        const response = await Promise.race([
+          generate({ contents, config: configFor(model, cfg), model, signal: ctrl.signal }),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => { ctrl.abort(); reject(Object.assign(new Error(`timed out after ${timeoutMs} ms`), { status: TIMEOUT_STATUS, timedOut: true })); }, timeoutMs);
+          }),
+        ]);
         console.log(`Appraisal served by ${model}${m > 0 ? " (fallback)" : ""}, attempt ${attempt + 1}.`);
         return { status: 200, body: { text: response.text ?? "", model } };
       } catch (error: any) {
-        const status = upstreamStatus(error);
+        const status = error?.timedOut ? TIMEOUT_STATUS : upstreamStatus(error);
         lastStatus = status;
-        const retry = status !== null && RETRYABLE_STATUSES.includes(status) && attempt < retries;
+        // A timed-out model is not retried (it would eat the budget); the next model is tried instead
+        const retry = status !== null && status !== TIMEOUT_STATUS && RETRYABLE_STATUSES.includes(status) && attempt < retries;
         const next = !retry && status !== null && FALLBACK_STATUSES.includes(status) && m < models.length - 1;
         console.error(`Error running appraisal model ${model} (upstream ${status ?? "unknown"}, attempt ${attempt + 1}${retry ? ", retrying" : next ? ", trying fallback" : ""}):`, error?.message || error);
         if (retry) { await sleep(RETRY_DELAYS_MS[attempt]); continue; }
         if (next) break;
         return failureFor(status);
+      } finally {
+        if (timer) clearTimeout(timer);
       }
     }
   }
