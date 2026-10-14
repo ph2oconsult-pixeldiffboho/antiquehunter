@@ -382,7 +382,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
       if (md.verdict !== 'unchanged') {
         // Need More Evidence keeps its label (no buy verdict until the period is known); the motivation line is added
         if (basis !== 'need_evidence') label = t(`motivation.verdict_${md.verdict}`);
-        reasonOut = `${t(`motivation.reason_${md.verdict}`, a)} ${reasonOut}`;
+        // negotiate / premium replace the price sentence (it says "walk away", which contradicts them); the venue note stays
+        const replace = basis !== 'need_evidence' && (md.verdict === 'negotiate' || md.verdict === 'premium');
+        const venueNote = rawItem.venue === 'dealer' ? t('analysis.venue_note_dealer') : rawItem.venue === 'market' ? t(rawItem.venue_note_key || 'analysis.venue_note_market') : '';
+        reasonOut = replace ? `${t(`motivation.reason_${md.verdict}`, a)} ${venueNote}`.trim() : `${t(`motivation.reason_${md.verdict}`, a)} ${reasonOut}`;
       } else if (md.budget) {
         reasonOut = `${reasonOut} ${t('motivation.within_budget', a)}`;
       }
