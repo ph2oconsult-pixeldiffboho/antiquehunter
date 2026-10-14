@@ -55,6 +55,17 @@ export const compsRequestFor = (m: MakerMatch, text: string, category: string | 
 // shipped to the browser. The client only builds the prompt + schema and parses the result.
 const APPRAISE_CLIENT_TIMEOUT_MS = 60_000;
 
+const PRICE_CURRENCY = /[€£$¥]|\b(EUR|USD|GBP|CHF|euros?|dollars?|pounds?|livres?)\b/i;
+const PRICE_GROUPED = /\b\d{1,3}(?:[ ,.\u00a0\u202f]\d{3})+\b/;
+const PRICE_K = /\b\d+(?:[.,]\d+)?\s?k\b/i;
+const PRICE_AFTER_WORD = /\b(?:above|over|beyond|exceed(?:s|ing)?|more than|higher than|under|below|at|for|bid|pay(?:ing)?|plus de|au-delà de|dépasse|au-dessus de|moins de|pour)\s+(\d{2,})(?![\d.,]*\s*(?:th|st|nd|rd|s\b|cm|mm|m\b|kg|%|years?|ans|century|centuries|siècles?|e\b|ème))/i;
+/** True when a walk-away condition carries a monetary figure (symbol, currency word, or a number used as a price). */
+export const mentionsPrice = (s: string): boolean =>
+  PRICE_CURRENCY.test(s) || PRICE_GROUPED.test(s) || PRICE_K.test(s) || PRICE_AFTER_WORD.test(s);
+/** Keep only qualitative walk-away conditions; the figure lives in walk_away_threshold. */
+export const sanitizeWalkAwayIf = (list: unknown): string[] =>
+  Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string' && x.trim() !== '' && !mentionsPrice(x)) : [];
+
 /** Stable failure codes for an appraisal request; the UI maps them to translated messages (analysis_error.*). */
 export type AppraisalErrorCode = 'too_large' | 'rate_limited' | 'model_busy' | 'bad_input' | 'timeout' | 'network' | 'failed';
 export class AppraisalError extends Error {
@@ -774,6 +785,15 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       : v;
     const cleaned: any = align(sanitizeDeep(item));
     item = cleaned;
+    // One authoritative walk-away figure (the reconciled one); the free-text walk_away_if keeps only qualitative
+    // reasons, so the model's own figures can never contradict it.
+    item.walk_away_threshold = {
+      hammer: nf.walk_away_price,
+      all_in: isAuction ? Math.round(nf.walk_away_price * (1 + premiumPct / 100)) : null,
+      is_auction: isAuction,
+      premium_pct: premiumPct,
+    };
+    item.walk_away_if = sanitizeWalkAwayIf(item.walk_away_if);
     if (evidence.required) item.price_guidance = { ...item.price_guidance, provisional: true };
     if (anchor.applied) {
       const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };

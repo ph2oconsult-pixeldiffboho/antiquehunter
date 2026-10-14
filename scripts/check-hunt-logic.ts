@@ -4,7 +4,7 @@ import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller } from "../
 import assert from "node:assert/strict";
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
 import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS } from "../src/services/appraiseHandler.ts";
-import { appraisalErrorCode } from "../src/services/gemini.ts";
+import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
 import {
@@ -1757,5 +1757,43 @@ await acheck("appraise handler retries 503 then succeeds; gives up with model_bu
   assert.ok(RETRY_DELAYS_MS.reduce((a, b) => a + b, 0) < 10_000);
 });
 
+check("walk-away: qualitative walk_away_if only, one authoritative threshold (dealer, private, auction)", () => {
+  assert.ok(mentionsPrice("Walk away if the hammer exceeds €1,800"));
+  assert.ok(mentionsPrice("Do not pay more than 450 EUR"));
+  assert.ok(mentionsPrice("Above 2,500 all-in it is not worth it"));
+  assert.ok(mentionsPrice("Bid above 1500 and you overpay"));
+  assert.ok(mentionsPrice("Stop at 2k"));
+  assert.ok(!mentionsPrice("Walk away if the drawers show machine-cut dovetails"));
+  assert.ok(!mentionsPrice("Walk away if the stamp looks added after 1900s restoration"));
+  assert.ok(!mentionsPrice("Walk away if it is a 20th century reproduction"));
+  assert.ok(!mentionsPrice("Walk away if more than 2 legs are replaced"));
+  assert.ok(!mentionsPrice("Veneer lifting over 30 cm"));
+  assert.deepEqual(sanitizeWalkAwayIf(["Hammer above €900", "Marble top replaced", 42, "", "Over 1 200 euros"]), ["Marble top replaced"]);
+  const answer = () => ({ items: [{
+    item_summary: { title: "Louis XV Walnut Commode", likely_period: "18th c.", likely_style: "Louis XV", value_tier: "B", snap_judgement: "", confidence: "medium",
+      confidence_breakdown: { evidence_quality: 60, identification_certainty: 60, risk_factors: 20 }, confidence_reason: "", period_certainty: "probable_period", reproduction_risk: false, construction_evidence: "hand-cut dovetails" },
+    buy_decision: { decision_summary: [] },
+    price_guidance: { estimated_market_range_low: 1000, estimated_market_range_high: 2000, fair_price_low: 2500, fair_price_high: 4000, good_buy_below: 1200, pricing_reasoning: "" },
+    negotiation_strategy: { opening_offer: 900, target_price_low: 1000, target_price_high: 1300, walk_away_price: 3000 },
+    walk_away_if: ["Walk away if the hammer goes past €2,100", "Walk away if the marble top is a later replacement", "Don't pay more than 1800 EUR", "Walk away if the drawers have machine-cut dovetails"],
+    scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
+  const base = { query: "Louis XV walnut commode", hasPhotos: true, askingPrice: 1500, targetCurrency: "EUR", currencySymbol: "€", language: "en", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture" };
+  const fixtures: [string, any][] = [
+    ["Auction", { ...base, isAuction: true, premiumPct: 28, sellerType: "Auction" }],
+    ["Antique Shop", { ...base, isAuction: false, premiumPct: 0, sellerType: "Antique Shop" }],
+    ["Private Seller", { ...base, isAuction: false, premiumPct: 0, sellerType: "Private Seller" }],
+  ];
+  for (const [name, ctx] of fixtures) {
+    const it: any = postProcessAppraisal(answer(), ctx)[0];
+    assert.ok(it.walk_away_if.length >= 1 && it.walk_away_if.every((x: string) => !mentionsPrice(x)), `${name}: no figures left in walk_away_if`);
+    assert.deepEqual(it.walk_away_if, ["Walk away if the marble top is a later replacement", "Walk away if the drawers have machine-cut dovetails"], name);
+    assert.equal(it.walk_away_threshold.hammer, it.negotiation_strategy.walk_away_price, `${name}: threshold = reconciled walk-away`);
+    assert.ok(it.walk_away_threshold.hammer > 0, name);
+    assert.equal(it.walk_away_threshold.is_auction, ctx.isAuction, name);
+    assert.equal(it.walk_away_threshold.premium_pct, ctx.premiumPct, name);
+    if (ctx.isAuction) assert.equal(it.walk_away_threshold.all_in, Math.round(it.walk_away_threshold.hammer * 1.28), `${name}: all-in = hammer x (1 + premium)`);
+    else assert.equal(it.walk_away_threshold.all_in, null, name);
+  }
+});
 console.log(`
 ${passed} checks passed`);
