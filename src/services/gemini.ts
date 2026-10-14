@@ -1,3 +1,5 @@
+import { pieceKey, stableRange, browserStore, type RangeStore } from './priceCache';
+const APPRAISAL_MODEL_ID = 'gemini-3.1-flash-lite';
 import { parseMotivation, parseBudget } from './motivation';
 import { Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
@@ -20,6 +22,8 @@ export const APPRAISAL_SEED = 20261009;
 export interface ChecklistBase { low: number; high: number; fair_low: number; fair_high: number; maker_status: string | null }
 
 export interface AppraisalExtra {
+  /** Where stable ranges are kept (default: localStorage in the browser); null = no caching */
+  rangeStore?: RangeStore | null;
   /** Optional buyer inputs (never sent to the model; used by motivation.ts on the result) */
   motivation?: string;
   budget?: number;
@@ -79,7 +83,7 @@ export const appraisalErrorCode = (status: number): AppraisalErrorCode =>
   status === 413 ? 'too_large' : status === 429 ? 'rate_limited' : status === 503 || status === 504 ? 'model_busy' : status === 400 ? 'bad_input' : 'failed';
 
 /** Send the built request to the server, which holds the key and calls Gemini. Returns { text } like the SDK. */
-const generateAppraisalContent = async (req: { contents: unknown; config: unknown }): Promise<{ text: string }> => {
+const generateAppraisalContent = async (req: { contents: unknown; config: unknown }): Promise<{ text: string; model?: string }> => {
   const c = new AbortController();
   const timer = setTimeout(() => c.abort(), APPRAISE_CLIENT_TIMEOUT_MS);
   try {
@@ -97,7 +101,7 @@ const generateAppraisalContent = async (req: { contents: unknown; config: unknow
     if (!res.ok) throw new AppraisalError(appraisalErrorCode(res.status), res.status);
     const j = await res.json().catch(() => null);
     if (!j || typeof j.text !== 'string') throw new Error('Malformed appraisal response');
-    return { text: j.text };
+    return { text: j.text, model: typeof j.model === 'string' ? j.model : undefined };
   } finally {
     clearTimeout(timer);
   }
@@ -472,6 +476,21 @@ ${getGlossaryPrompt(language)}`;
   });
 
   const result = JSON.parse(response.text);
+  // Stable range for the same piece (priceCache.ts): repeat runs, other venues, prices or motivations reuse the
+  // primary model's first range instead of a fallback model's or a re-prompted one. Not on lot pages or re-runs.
+  const pg0 = result?.items?.[0]?.price_guidance;
+  if (pg0 && !lotFacts?.ok && !extra.checkAnswers && extra.rangeStore !== null) {
+    const key = pieceKey({ text: query, images: imagesBase64, category, currency: targetCurrency, location, lotUrl });
+    const st = stableRange(extra.rangeStore === undefined ? browserStore() : extra.rangeStore, key, {
+      low: Number(pg0.estimated_market_range_low) || 0, high: Number(pg0.estimated_market_range_high) || 0,
+      fair_low: Number(pg0.fair_price_low) || 0, fair_high: Number(pg0.fair_price_high) || 0,
+      model: response.model || '', primary: !response.model || response.model === APPRAISAL_MODEL_ID });
+    if (st.reused) {
+      pg0.estimated_market_range_low = st.range.low; pg0.estimated_market_range_high = st.range.high;
+      pg0.fair_price_low = st.range.fair_low; pg0.fair_price_high = st.range.fair_high;
+    }
+    result.items[0].range_source = { key, model: st.range.model, reused: st.reused };
+  }
   // A maker only the model found (a stamp read in a photo): look the comparables up now
   if (!compsP) {
     const m = combineMakerStatus(null, result?.items?.[0]?.item_summary?.maker);
