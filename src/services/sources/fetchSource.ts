@@ -7,6 +7,8 @@
 //   The relay must answer with the target's status code and body, and should only allow the auction hosts.
 // No relay is configured by default; without it those hosts are fetched directly (and usually blocked).
 
+import { assertPublicUrl } from './ssrfGuard.js';
+
 export const DIRECT_USER_AGENT = 'AntiqueHunter/1.0 (+https://antiquehunter.vercel.app; personal antique-search tool, low volume)';
 
 const DEFAULT_HEADERS: Record<string, string> = {
@@ -66,12 +68,17 @@ export const fetchSource = async (target: string, opts: { timeoutMs: number; ttl
   const timer = setTimeout(() => controller.abort(), Math.max(1, opts.timeoutMs));
   let value: SourceResponse;
   try {
+    // SSRF: for direct fetches, refuse targets that resolve to private/internal addresses.
+    // The relay path is operator-configured (FETCH_RELAY_URL) and allowlisted, so it is exempt.
+    if (!req.viaRelay) await assertPublicUrl(req.url);
     const res = await fetch(req.url, {
       method: 'GET',
       redirect: 'follow',
       headers: { ...DEFAULT_HEADERS, ...(opts.accept ? { Accept: opts.accept } : {}), ...req.headers },
       signal: controller.signal,
     });
+    // SSRF: re-check where redirects actually landed before reading/returning the body.
+    if (!req.viaRelay && res.url) await assertPublicUrl(res.url);
     const body = res.ok ? (await res.text()).slice(0, MAX_BODY_CHARS) : undefined;
     value = { status: res.status, body, ms: Date.now() - started, viaRelay: req.viaRelay, cached: false };
   } catch (err: any) {

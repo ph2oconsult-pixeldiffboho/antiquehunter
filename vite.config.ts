@@ -37,7 +37,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [tailwindcss(), react()],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+      // GEMINI_API_KEY is intentionally NOT defined here. Injecting it inlined the secret into
+      // the public client bundle; the key now lives only on the server (see api/appraise.ts).
       __APP_VERSION__: JSON.stringify(meta.version),
       __APP_BUILD_SHA__: JSON.stringify(meta.sha),
       __APP_DEPLOYED_AT__: JSON.stringify(meta.deployedAt),

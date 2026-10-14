@@ -1,4 +1,4 @@
-import type { LotFacts } from "./services/lotFetch";
+import type { LotFacts } from "./services/lotFacts";
 import type { CheckAnswers } from './services/checklist';
 import type { ChecklistBase } from './services/gemini';
 import { useState, useEffect, useRef } from 'react';
