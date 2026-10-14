@@ -978,9 +978,11 @@ check("fix 6: confidence inputs on fixed scales, calibrated with the app's own e
   assert.equal(confidenceLabel(80), "high"); assert.equal(confidenceLabel(60), "medium"); assert.equal(confidenceLabel(40), "low"); assert.equal(confidenceLabel(10), "very_low");
 });
 
-check("step 1 split: the original valuation path (fixed reference price ranges, no comparables, no band correction)", () => {
+check("prompt: no fixed reference price list (anchoring removed, approved 13 Oct 2026); no comparables prompt or band correction", () => {
   const gem = readFileSync(new URL("../src/services/gemini.ts", import.meta.url), "utf8") + readFileSync(new URL("../src/services/postProcess.ts", import.meta.url), "utf8");
-  assert.match(gem, /Provincial walnut commode, 18th c\.: €300/);
+  assert.ok(!/Provincial walnut commode, 18th c\.: €300/.test(gem));
+  assert.match(gem, /Do NOT anchor on a fixed price list/);
+  assert.match(gem, /ALTERATIONS CHECK/);
   assert.ok(!/comparablesPrompt|bandFactor/.test(gem));
 });
 
@@ -2220,7 +2222,7 @@ check("photo judgement: stamp read from a photo alone cannot mean confirmed peri
   assert.equal(r.periodCertainty, "probable_period"); assert.ok(r.confidenceCap <= 60);
   assert.ok(r.low < 1500 && r.high < 3500, `${r.low}-${r.high}`);
   const withJoints = applyPhotoJudgement({ ...base, periodCertainty: "confirmed_period", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "hand-cut dovetails, oak secondary" });
-  assert.equal(withJoints.periodCertainty, "confirmed_period"); assert.equal(withJoints.low, 1500);
+  assert.equal(withJoints.periodCertainty, "confirmed_period"); assert.ok(withJoints.low < 1500, "construction keeps the label; the stamped premium is still capped");
   const stated = applyPhotoJudgement({ ...base, userText: "commode stamped Flechy", periodCertainty: "confirmed_period", modelMakerStatus: "stamp_visible_in_photo" });
   assert.equal(stated.periodCertainty, "confirmed_period", "a stamp the buyer stated is not a photo-only read");
 });
@@ -2230,6 +2232,10 @@ check("photo judgement: later additions / composed of parts are discounted when 
   assert.ok(!hasAdditionsCue("no sign of a marriage"));
   const r = applyPhotoJudgement({ hasPhotos: true, userText: "", modelText: "the marble top is a later replacement; later bronzes", styleEvidence: false, periodCertainty: "confirmed_period", low: 1000, high: 2500 });
   assert.ok(r.factors.includes("additions_or_marriage_discount")); assert.ok(r.high < 2500);
+  const alt = applyPhotoJudgement({ hasPhotos: true, userText: "", modelText: "", styleEvidence: false, periodCertainty: "probable_period", alterations: { later_additions: ["marble top"], marriage: "not_seen" }, low: 1000, high: 2500 });
+  assert.ok(alt.factors.includes("additions_or_marriage_discount"), "structured alterations field triggers the discount");
+  const none = applyPhotoJudgement({ hasPhotos: true, userText: "", modelText: "", styleEvidence: false, periodCertainty: "probable_period", alterations: { later_additions: [], marriage: "not_seen", composed_of_parts: "cannot_tell" }, low: 1000, high: 2500 });
+  assert.ok(!none.factors.includes("additions_or_marriage_discount"));
   const text = applyPhotoJudgement({ hasPhotos: false, userText: "composed of period components", modelText: "", styleEvidence: false, periodCertainty: "ambiguous", low: 400, high: 1200 });
   assert.equal(text.factors.length, 0, "a text run the model already priced as ambiguous is left alone");
 });
@@ -2245,6 +2251,28 @@ check("text runs: technique word next to a period claim is not a style discount;
   assert.equal(styleDiscountOf("ambiguous", null, "Boulle-style marquetry. Napoleon III period.").factor, 1);
   const t = applyBaseBandPriors({ marketLow: 200, marketHigh: 700, periodCertainty: "ambiguous", query: "Boulle-style marquetry. Napoleon III period. Dents, lifting of the veneer, scratches", textOnly: true });
   assert.ok(t.high >= 700, JSON.stringify(t));
+});
+
+check("photo judgement: stamped minor-maker cap (read or stated), top makers exempt, furniture only; model-signal floor for thin photo runs", () => {
+  const read = applyPhotoJudgement({ hasPhotos: true, userText: "chest of drawers", modelText: "Louis XV stamped commode", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "hand-cut dovetails", styleEvidence: false, periodCertainty: "confirmed_period", low: 3000, high: 7000 });
+  assert.ok(read.high <= 3000 && read.low <= 1000, `${read.low}-${read.high}`);
+  assert.equal(read.periodCertainty, "confirmed_period", "construction evidence keeps the label, not the premium");
+  const stated = applyPhotoJudgement({ hasPhotos: true, userText: "commode, stamped P. Durand JME", modelText: "", styleEvidence: false, periodCertainty: "confirmed_period", low: 3500, high: 7000 });
+  assert.ok(stated.high <= 3000);
+  const top = applyPhotoJudgement({ hasPhotos: true, userText: "commode stamped Riesener JME", modelText: "", styleEvidence: false, periodCertainty: "confirmed_period", low: 30000, high: 60000 });
+  assert.equal(top.high, 60000);
+  const tapestry = applyPhotoJudgement({ hasPhotos: true, userText: "tapestry", category: "rug_textile", modelText: "Flemish verdure tapestry, signed in the border", modelMakerStatus: "stamp_visible_in_photo", constructionEvidence: "hand-woven wool", styleEvidence: false, periodCertainty: "confirmed_period", low: 3000, high: 8000 });
+  assert.ok(!tapestry.factors.includes("stamped_minor_maker_cap") && tapestry.high > 3000, "stamp cap is furniture-only");
+  const painting = applyPhotoJudgement({ hasPhotos: true, userText: "oil on canvas, signed", modelText: "", styleEvidence: false, periodCertainty: "confirmed_period", low: 3000, high: 9000 });
+  assert.ok(!painting.factors.includes("stamped_minor_maker_cap"), "no category: non-furniture words keep the cap off");
+  const carpet = applyPhotoJudgement({ hasPhotos: true, userText: "", category: "furniture", modelText: "Large Spanish Carpet, Real Fábrica de Tapices", modelMakerStatus: "stamp_visible_in_photo", styleEvidence: false, periodCertainty: "confirmed_period", low: 2000, high: 6000 });
+  assert.ok(!carpet.factors.includes("stamped_minor_maker_cap"), "a carpet filed under furniture is not capped");
+  const thin = applyPhotoJudgement({ hasPhotos: true, userText: "mirror", category: "mirrors", modelText: "", confidence: "medium", styleEvidence: false, periodCertainty: "ambiguous", low: 300, high: 800 });
+  assert.ok(thin.factors.includes("model_signal_cheap_floor") && thin.low <= 140 && thin.high === 800, `${thin.low}-${thin.high}`);
+  const firm = applyPhotoJudgement({ hasPhotos: true, userText: "commode", category: "furniture", modelText: "", confidence: "high", constructionEvidence: "hand-cut dovetails", styleEvidence: false, periodCertainty: "probable_period", low: 800, high: 1800 });
+  assert.ok(!firm.factors.includes("model_signal_cheap_floor"), "period construction or a high estimate: no floor");
+  const textRun = applyPhotoJudgement({ hasPhotos: false, userText: "mirror", modelText: "", confidence: "medium", styleEvidence: false, periodCertainty: "ambiguous", low: 300, high: 800 });
+  assert.ok(!textRun.factors.includes("model_signal_cheap_floor"), "photo runs only");
 });
 
 console.log(`

@@ -135,20 +135,18 @@ You must speak with the authority of an expert who has seen thousands of pieces.
 
 ### VALUATION RULES & PRICING CALIBRATION (CRITICAL)
 - Value items at what they realistically sell for at regional European auction (hammer price), not at retail dealer prices. Retail is typically 2–4x auction hammer; show retail separately and label it clearly in fair_price.
-- Typical European/French auction hammer ranges for reference (period, decent condition):
-  * Provincial walnut commode, 18th c.: €300–€1,200 (or equivalent in ${targetCurrency})
-  * Paris veneered commode, Louis XV/XVI, stamped by a minor maître with JME: €700–€2,500 (or equivalent in ${targetCurrency})
-  * Important stamped Paris pieces with original marble and bronzes in good condition: €3,000+ (or equivalent in ${targetCurrency})
-  * Transition chiffonnier: €800–€2,000 (or equivalent in ${targetCurrency})
-  * 18th c. provincial armoire: €100–€600 (or equivalent in ${targetCurrency})
-  * Vaisselier/buffet deux-corps 18th–19th c.: €150–€900 (or equivalent in ${targetCurrency})
-  * 20th c. reproductions: €50–€300 (or equivalent in ${targetCurrency})
+- Do NOT anchor on a fixed price list or a habitual "safe" low range. Price the specific piece from what it is (type, period evidence, maker, quality of veneer/carving/mounts, size, condition, completeness) and current regional auction behaviour.
+- Observed in the app's own dev set of French/Swedish regional auction results (source: engine_rework/dev/corpus.json, 2026-10-13; dev split only): genuine period case furniture (veneered or carved commodes, secrétaires, consoles, game tables) and period giltwood mirrors in reasonable condition very often reach four-figure hammer prices, and unstamped period pieces are routinely undervalued by estimates. Do not cap a period piece at a few hundred unless you can name the specific reason (heavy damage, missing parts, later/provincial copy shown by evidence, small or minor form).
+- Reserve low (two- to low three-figure) ranges for pieces with concrete evidence of being later, reproduced, damaged or minor; say which evidence.
+- When unsure whether a piece is period or later, give a wide range that covers both readings rather than the cheaper reading alone.
 - MAKER'S STAMPS AND ATTRIBUTIONS (fill item_summary.maker):
-  * A stamp the buyer says they have CONFIRMED ("stamped X, stamp confirmed"), a legible stamp in a photo, or a catalogue entry stating "estampillé X" / "stamped X" = a STAMPED piece by that maker: value it as stamped work by that maker, never call it "attributed" (the app anchors the range on verified auction results for that maker and piece).
+  * A stamp the buyer says they have CONFIRMED ("stamped X, stamp confirmed"), a legible stamp in a photo, or a catalogue entry stating "estampillé X" / "stamped X" = a STAMPED piece by that maker: record it as stamped, never call it "attributed" (the app anchors the range on verified auction results for that maker and piece).
+  * A stamp seen in a photo does NOT by itself prove the piece is period or untouched: stamps were reused on later or assembled pieces and struck on period carcasses that were later altered. Set period_certainty to "confirmed_period" only when construction evidence (joints, secondary woods, backs, saw marks, oxidation) also supports it; otherwise use "probable_period" and say what would confirm it.
   * "Attribué à" / "attributed to" / "atelier de" = attributed: between unattributed and stamped values.
   * A dealer's label, ticket or the dealer's word alone is NOT a stamp and NOT an attribution: value the piece as an unattributed piece of its period and say the label proves nothing.
   * Otherwise NEVER multiply value because the text claims a maker or "18th century" without saying the stamp was seen or confirmed.
 - Reduce value for replaced marble, replaced/later bronzes, veneer losses, woodworm, restorations, and "partly period" or marriage pieces.
+- ALTERATIONS CHECK (always, especially with photos; fill item_summary.alterations): look for and report later additions (marble top, gilt bronzes/mounts, handles/escutcheons/hardware with extra holes or mismatched patina), marriages (top and base or two parts from different pieces), pieces composed of period parts/elements, and reconstruction (rebuilt carcass, new drawers, re-veneering). Report only what you see or what the text states; use "not_seen" when you looked and found nothing, "cannot_tell" when the photos do not show the relevant area.
 - If a listing or auction estimate is given (typed by the user, or read from the lot page below), treat it as a strong anchor: your market range should normally sit within 0.7x–2.0x of that estimate unless you give a specific, documented reason.
 
 ### PERIOD vs STYLE, AND CONSTRUCTION EVIDENCE
@@ -161,6 +159,7 @@ You must speak with the authority of an expert who has seen thousands of pieces.
   "probable_period" = form, materials and wear fit the period and nothing points to a later piece, but construction is not shown;
   "ambiguous" = from the evidence available you cannot tell a period piece from a later style / revival piece (for example Empire vs Restauration vs a late 19th-century revival) and the value would differ materially;
   "later_style_or_revival" = clear evidence the piece is later (catalogue says "style", later construction, modern materials).
+  From photos alone, do NOT call an unstamped piece a later copy unless you can name concrete modern evidence (machine-cut dovetails, plywood/MDF, Phillips screws, staples, cast resin/plaster, modern finish). Overall look, "too uniform" veneer or crisp carving are not evidence: use "ambiguous" and state the uncertainty.
 - item_summary.reproduction_risk = true only when something specific suggests a later copy that could be passed off as period.
 
 ### EVIDENCE LEDGER (CRITICAL — fill evidence_ledger)
@@ -325,6 +324,17 @@ ${getGlossaryPrompt(language)}`;
                     period_certainty: { type: Type.STRING, enum: ["confirmed_period", "probable_period", "ambiguous", "later_style_or_revival"] },
                     reproduction_risk: { type: Type.BOOLEAN },
                     construction_evidence: { type: Type.STRING, description: "Construction details actually seen (joints, saw marks, nails/screws, oxidation), or 'none shown'." },
+                    alterations: {
+                      type: Type.OBJECT,
+                      description: "Later additions, marriages, composed-of-parts and reconstruction, as seen or stated.",
+                      properties: {
+                        later_additions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "e.g. 'marble top', 'gilt bronzes', 'handles'; empty if none seen." },
+                        marriage: { type: Type.STRING, enum: ["yes", "possible", "not_seen", "cannot_tell"] },
+                        composed_of_parts: { type: Type.STRING, enum: ["yes", "possible", "not_seen", "cannot_tell"] },
+                        reconstruction: { type: Type.STRING, enum: ["yes", "possible", "not_seen", "cannot_tell"] },
+                        evidence: { type: Type.STRING, description: "What was seen or stated." },
+                      },
+                    },
                     maker: {
                       type: Type.OBJECT,
                       description: "The maker (ébéniste / menuisier) if one is named or a stamp / label is visible; name '' and status 'none' otherwise.",

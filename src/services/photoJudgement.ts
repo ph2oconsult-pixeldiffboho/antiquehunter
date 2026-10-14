@@ -20,8 +20,18 @@ export interface PhotoJudgementInput {
   modelText: string;
   /** Is a later-style verdict backed by catalogue / user words or a modern construction cue? */
   styleEvidence: boolean;
+  /** Structured alterations check from the model (item_summary.alterations). */
+  alterations?: { later_additions?: string[]; marriage?: string; composed_of_parts?: string; reconstruction?: string } | null;
   low: number;
   high: number;
+  /** App/model category (furniture, mirrors, rug_textile, painting_art, chandelier_lighting…) */
+  category?: string;
+  /** Model's own confidence label (high / medium / low / very_low) */
+  confidence?: string;
+  /** Model's reproduction_risk flag */
+  reproductionRisk?: boolean;
+  /** Number of defects the model listed */
+  defectCount?: number;
 }
 
 export interface PhotoJudgementResult {
@@ -38,6 +48,15 @@ const PERIOD_CONSTRUCTION_RE = /\b(hand[\s-]?cut|hand[\s-]?sawn|hand[\s-]?planed
 const NEGATED_PERIOD_RE = /\b(no|without|not|lacks?|absence\s+of)\s+(\w+\s+){0,3}(hand[\s-]?cut|pegged|period|oxidi[sz]ed|gesso|thick\s+veneer)/i;
 const ADDITIONS_RE = /\b(later\s+(marble|top|mounts?|bronzes?|ormolu|gilt[\s-]?bronzes?|additions?|added|elements?)|(marble|top|mounts?|bronzes?|ornamentation|ormolu)\s+(added|replaced|of\s+a\s+later\s+date)\s*(later)?|added\s+later|ajout\w*\s+(post[ée]rieur\w*|plus\s+tard)|rapport[ée]e?s?\s+post[ée]rieur\w*|post[ée]rieur\w*|marriage|married|mari[ée]|composed\s+of\s+(period\s+)?(components|elements|parts)|made\s+up\s+(of|from)|assembled\s+from|compos[ée]e?\s+d'[ée]l[ée]ments|constitu[ée]e?\s+d'[ée]l[ée]ments|period\s+(components|elements|parts)|r[ée]assembl\w*|re-?assembled)\b/i;
 const NEGATED_ADD_RE = /\b(no|not|without|aucun\w*|sans)\s+(\w+\s+){0,3}(marriage|later\s+additions?|added|replaced|assembled)/i;
+
+/** Top-tier names whose stamp can justify a large multiple (kept short and general). */
+const TOP_MAKER_RE = /\b(riesener|oeben|bvrb|van\s+risen\s?burgh|weisweiler|carlin|cressent|roentgen|leleu|dubois|jacob|desmalter|bellang[ée]|hache|delanois|tilliard|foliot|s[ée]n[ée]|gourdin|boulle\s+(andr[ée]|charles)|andr[ée][\s-]+charles\s+boulle|majorelle|gall[ée]|ruhlmann|linke|sormani|zwiener|beurdeley)(?![a-z])/i;
+/** Upper level for stamped pieces by recorded, non-top maîtres at regional auction (EUR hammer). */
+export const STAMPED_MINOR_HIGH_CAP = 3000;
+const FURNITURE_CATS = new Set(['furniture', 'bedroom_furniture', 'chairs', 'mirrors']);
+const NON_FURNITURE_RE = /\b(rug|carpet|tapis|tapestry|tapisserie|textile|portiere|porti[èe]re|verdure|aubusson|painting|tableau|oil\s+on|huile|canvas|toile|portrait|landscape|watercolou?r|print|engraving|lamp|lighting|chandelier|lustre|sconce|applique|wall\s+light|candelabr\w*|bronze\s+sculpture|sculpture|statue|vase|porcelain|ceramic|clock|pendule)\b/i;
+/** Model-signal floor: the model's raw upper figure below which a thinly evidenced piece is widened down to the cheap end. */
+export const CHEAP_FLOOR_MAX_HIGH = 1500;
 
 const r = (x: number) => x >= 10000 ? Math.round(x / 500) * 500 : x >= 1000 ? Math.round(x / 50) * 50 : Math.round(x / 10) * 10;
 
@@ -67,9 +86,11 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
     && (['stamp_visible_in_photo', 'stamped_stated', 'stamped_confirmed'].includes(String(i.modelMakerStatus || ''))
       || ['stamp_in_photo', 'stamped_stated', 'stamped_confirmed'].includes(String(i.makerStatus || ''))
       || STAMP_IN_TEXT_RE.test(String(i.modelText || '').slice(0, 400)));
-  if (photoStamp && !periodBuilt) {
-    if (pc === 'confirmed_period') { pc = 'probable_period'; factors.push('photo_stamp_period_capped'); }
-    confidenceCap = Math.min(confidenceCap, 60);
+  if (photoStamp) {
+    // The period label may stand on construction evidence, but the price premium never rests on a photo-read
+    // stamp alone (the model now asserts construction more readily, which used to bypass this cap).
+    if (!periodBuilt && pc === 'confirmed_period') { pc = 'probable_period'; factors.push('photo_stamp_period_capped'); }
+    if (!periodBuilt) confidenceCap = Math.min(confidenceCap, 60);
     if (pc === 'confirmed_period' || pc === 'probable_period') {
       // The stamped premium is unproven: widen downward to the unstamped level, trim the top.
       low = low * 0.6; high = high * 0.9;
@@ -80,7 +101,11 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
 
   // 2. Later additions / marriages / composed of parts, while the model still treated it as fully period
   const addText = `${i.modelText} ${i.constructionEvidence || ''} ${i.userText}`;
-  if (hasAdditionsCue(addText) && (pc === 'confirmed_period' || (i.hasPhotos && pc === 'probable_period'))) {
+  const alt = i.alterations || null;
+  const altFlag = !!alt && ((Array.isArray(alt.later_additions) && alt.later_additions.filter(x => String(x || '').trim()).length > 0)
+    || ['yes', 'possible'].includes(String(alt.marriage)) || ['yes', 'possible'].includes(String(alt.composed_of_parts))
+    || ['yes', 'possible'].includes(String(alt.reconstruction)));
+  if ((altFlag || hasAdditionsCue(addText)) && (pc === 'confirmed_period' || (i.hasPhotos && pc === 'probable_period'))) {
     low = low * 0.8; high = high * 0.75;
     if (pc === 'confirmed_period') pc = 'probable_period';
     confidenceCap = Math.min(confidenceCap, 55);
@@ -96,6 +121,34 @@ export const applyPhotoJudgement = (i: PhotoJudgementInput): PhotoJudgementResul
     notes.push(periodBuilt
       ? 'The "later copy" reading comes from photos only, yet period construction or veneer signs were seen: kept as a hypothesis, with the upper figure covering a period piece.'
       : 'The "later copy" reading comes from photos only: kept as a hypothesis, so the upper figure also covers the case that it is period.');
+  }
+
+  // 4. Stamped level: a stamp (read or stated) by a recorded but not top-tier maître does not take a provincial-auction
+  //    piece into high four figures. Cap the top at STAMPED_MINOR_HIGH_CAP unless a top maker is named.
+  const anyStamp = photoStamp || (STAMP_IN_TEXT_RE.test(i.userText) && /\b(stamp|estampill|jme)/i.test(i.userText));
+  const topMaker = TOP_MAKER_RE.test(`${i.userText} ${String(i.modelText || '').slice(0, 600)}`);
+  const cat = String(i.category || '').toLowerCase();
+  // The picked category can be wrong (a carpet filed under furniture), so the model's title / the user's text naming a
+  // non-furniture object also keeps the cap off.
+  const namesOther = NON_FURNITURE_RE.test(`${i.userText} ${String(i.modelText || '').slice(0, 120)}`);
+  const isFurniture = (FURNITURE_CATS.has(cat) || !cat || cat === 'unknown') && !namesOther;
+  if (anyStamp && !topMaker && isFurniture && high > STAMPED_MINOR_HIGH_CAP) {
+    high = STAMPED_MINOR_HIGH_CAP;
+    low = Math.min(low, high / 3);
+    factors.push('stamped_minor_maker_cap');
+    notes.push('A stamp by a recorded maker who is not a top name adds a premium, not a multiple: the top of the range is capped at the level such stamped pieces typically make at regional auction.');
+  }
+
+  // 5. Model-signal floor. In the dev set the model gives cheap lots and €1k–5k lots the same mid-hundreds raw range, so
+  //    the upper figure cannot be cut without losing the €1k–5k hits. Instead, when the model's own signals are thin
+  //    (raw upper figure in the hundreds, period not confirmed, no stamp, no period construction, and not high
+  //    confidence, or reproduction risk / defects flagged), the low end is opened down to the cheap level.
+  const thin = high <= CHEAP_FLOOR_MAX_HIGH && pc !== 'confirmed_period' && !anyStamp && !periodBuilt
+    && (i.confidence !== 'high' || i.reproductionRisk === true || (i.defectCount || 0) > 0 || pc === 'later_style_or_revival');
+  if (i.hasPhotos && thin && low > high / 6) {
+    low = high / 6;
+    factors.push('model_signal_cheap_floor');
+    notes.push('The model\'s own signals are thin (mid-hundreds estimate, period unconfirmed, no stamp or construction evidence): the lower figure is opened to the level such pieces often make when they turn out later or tired.');
   }
 
   if (low > 0 && high / low > 6) low = high / 6;

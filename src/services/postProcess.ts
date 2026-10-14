@@ -136,6 +136,10 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       hasPhotos, userText: `${query || ''} ${lotFacts?.ok ? `${lotFacts.title || ''} ${(lotFacts as any).description || ''}` : ''}`,
       periodCertainty: originalPeriodCertainty, modelMakerStatus: item.item_summary?.maker?.status, makerStatus: maker?.status || null,
       constructionEvidence: item.item_summary.construction_evidence, modelText: pjModelText, styleEvidence: pjStyleEvidence,
+      alterations: (item.item_summary as any)?.alterations || null,
+      category: category && category !== 'unknown' ? category : (item.item_summary.category || ''),
+      confidence: item.item_summary.confidence, reproductionRisk: item.item_summary.reproduction_risk,
+      defectCount: Array.isArray((item.evidence_ledger as any)?.defects) ? (item.evidence_ledger as any).defects.length : 0,
     };
     const pjEarly = applyPhotoJudgement({ ...pjInput, low: Number(item.price_guidance?.estimated_market_range_low) || 0, high: Number(item.price_guidance?.estimated_market_range_high) || 0 });
     if (pjEarly.periodCertainty !== originalPeriodCertainty) item.item_summary.period_certainty = pjEarly.periodCertainty;
