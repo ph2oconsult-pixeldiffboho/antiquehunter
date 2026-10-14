@@ -89,6 +89,29 @@ export const applyVenueGuidance = <T extends Record<string, any>>(item: T): T =>
     ...item, venue, venue_note_key: noteKey, buy_decision: bd, negotiation_plan: plan,
     price_guidance: { ...pg, good_buy_below: f.good_buy_below, overpaying_above: f.walk_away_price, market_bargain_low: f.bargain_low, market_bargain_high: f.bargain_high },
     negotiation_strategy: withPlanOffers(ns1, plan),
+    // the red walk-away line and the Need More Evidence text read this: keep it on the venue's walk-away
+    ...(item.walk_away_threshold ? { walk_away_threshold: { ...item.walk_away_threshold, hammer: f.walk_away_price, all_in: null } } : {}),
   };
+};
+
+export type ProvisionalRangeKind = 'auction_hammer' | 'auction_equivalent';
+export interface NeedEvidenceWalkAway { walkAway: number; allIn: number | null; isAuction: boolean; premiumPct: number; venue: Venue; rangeKind: ProvisionalRangeKind }
+
+/**
+ * Need More Evidence: the app's provisional walk-away for the selected venue (the same figure as the red walk-away
+ * line: negotiation walk-away, else walk_away_threshold), and which kind of range the provisional range is. The
+ * provisional range is always price_guidance.estimated_market_range_* (the auction scale): hammer at auction,
+ * auction-equivalent for shops, private sellers and markets. Run on an item that went through applyVenueGuidance.
+ */
+export const needEvidenceWalkAway = (item: Record<string, any> | null | undefined): NeedEvidenceWalkAway | null => {
+  if (!item) return null;
+  const venue = venueOf(item.seller_context);
+  const wt = item.walk_away_threshold || {};
+  const walkAway = Math.round(Number(item.negotiation_strategy?.walk_away_price) || Number(wt.hammer) || 0);
+  if (!(walkAway > 0)) return null;
+  const isAuction = venue === 'auction';
+  const premiumPct = Number(wt.premium_pct ?? item.seller_context?.buyerPremiumRate) || 0;
+  const allIn = isAuction ? Math.round(walkAway * (1 + premiumPct / 100)) : null;
+  return { walkAway, allIn, isAuction, premiumPct, venue, rangeKind: isAuction ? 'auction_hammer' : 'auction_equivalent' };
 };
 

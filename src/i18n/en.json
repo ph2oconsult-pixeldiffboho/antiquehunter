@@ -200,7 +200,12 @@
     "reason_market_walk_away": "{{price}} is far above auction level (over {{overTop}}): walk away.",
     "venue_note_private": "From a private or estate seller, prices at or below auction level are possible, but there is no dealer guarantee or provenance check: inspect the piece and its condition yourself.",
     "walk_away_line": "Walk away above {{walkAway}}",
-    "walk_away_line_auction": "Walk away above {{walkAway}} hammer ({{walkAwayAllIn}} all-in with the {{premiumPct}}% premium)"
+    "walk_away_line_auction": "Walk away above {{walkAway}} hammer ({{walkAwayAllIn}} all-in with the {{premiumPct}}% premium)",
+    "nme_range_auction_hammer": "The provisional range is the auction hammer range.",
+    "nme_range_auction_equivalent": "The provisional range is auction-equivalent (what it would make at auction), not a shop or private price.",
+    "nme_walk_away_auction": "Provisional walk-away: {{walkAway}} hammer ({{walkAwayAllIn}} all-in with the {{premiumPct}}% premium).",
+    "nme_walk_away_dealer": "Provisional walk-away: {{walkAway}} (top of the dealer range; shops price above auction).",
+    "nme_walk_away_market": "Provisional walk-away: {{walkAway}} (the auction high)."
   },
   "results": {
     "title": "Dealer's Findings",
