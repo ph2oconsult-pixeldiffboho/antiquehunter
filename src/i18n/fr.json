@@ -637,5 +637,18 @@
     "for_piece_title": "Notes pour cette pièce",
     "for_piece_intro": "Contrôles adaptés au type, à l’époque et à la mention de maker de cette évaluation. Des tendances, pas des règles absolues.",
     "conservative_note": "Ce sont des tendances de marchand, pas des règles absolues. Confirmez sur la pièce devant vous."
+  },
+  "analysis_error": {
+    "title": "L'estimation n'a pas abouti",
+    "failed": "Un problème est survenu pendant l'estimation. Veuillez réessayer.",
+    "too_large": "Les photos sont trop lourdes à envoyer. Essayez avec moins de photos.",
+    "rate_limited": "Trop d'estimations en ce moment. Patientez une minute puis réessayez.",
+    "model_busy": "Le service d'estimation est très sollicité. Réessayez dans un instant.",
+    "bad_input": "Une des photos n'a pas pu être lue. Retirez-la ou reprenez-la.",
+    "timeout": "L'estimation a pris trop de temps. Veuillez réessayer.",
+    "network": "Pas de connexion. Vérifiez votre réseau et réessayez.",
+    "retry": "Réessayer",
+    "back": "Modifier les détails",
+    "rerun_kept": "La nouvelle estimation a échoué, l'estimation précédente est conservée. {{reason}}"
   }
 }

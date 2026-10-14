@@ -55,18 +55,31 @@ export const compsRequestFor = (m: MakerMatch, text: string, category: string | 
 // shipped to the browser. The client only builds the prompt + schema and parses the result.
 const APPRAISE_CLIENT_TIMEOUT_MS = 60_000;
 
+/** Stable failure codes for an appraisal request; the UI maps them to translated messages (analysis_error.*). */
+export type AppraisalErrorCode = 'too_large' | 'rate_limited' | 'model_busy' | 'bad_input' | 'timeout' | 'network' | 'failed';
+export class AppraisalError extends Error {
+  constructor(public code: AppraisalErrorCode, public status?: number) { super(`Appraisal request failed (${status ?? code})`); this.name = 'AppraisalError'; }
+}
+export const appraisalErrorCode = (status: number): AppraisalErrorCode =>
+  status === 413 ? 'too_large' : status === 429 ? 'rate_limited' : status === 503 || status === 504 ? 'model_busy' : status === 400 ? 'bad_input' : 'failed';
+
 /** Send the built request to the server, which holds the key and calls Gemini. Returns { text } like the SDK. */
 const generateAppraisalContent = async (req: { contents: unknown; config: unknown }): Promise<{ text: string }> => {
   const c = new AbortController();
   const timer = setTimeout(() => c.abort(), APPRAISE_CLIENT_TIMEOUT_MS);
   try {
-    const res = await fetch('/api/appraise', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req),
-      signal: c.signal,
-    });
-    if (!res.ok) throw new Error(`Appraisal request failed (${res.status})`);
+    let res: Response;
+    try {
+      res = await fetch('/api/appraise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req),
+        signal: c.signal,
+      });
+    } catch (e: any) {
+      throw new AppraisalError(e?.name === 'AbortError' ? 'timeout' : 'network');
+    }
+    if (!res.ok) throw new AppraisalError(appraisalErrorCode(res.status), res.status);
     const j = await res.json().catch(() => null);
     if (!j || typeof j.text !== 'string') throw new Error('Malformed appraisal response');
     return { text: j.text };

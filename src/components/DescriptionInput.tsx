@@ -144,7 +144,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim() && !lotUrl.trim() && !(evidenceRequest && images.length > 0)) return;
+    if (!description.trim() && !lotUrl.trim() && images.length === 0) return;
     
     if (showHint) {
       setShowHint(false);
@@ -571,7 +571,7 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
 
         <button
           type="submit"
-          disabled={isAnalyzing || (!description.trim() && !/^https?:\/\/\S+/i.test(lotUrl.trim()) && !(evidenceRequest && images.length > 0))}
+          disabled={isAnalyzing || (!description.trim() && !/^https?:\/\/\S+/i.test(lotUrl.trim()) && images.length === 0)}
           className="w-full py-4 bg-ink text-paper rounded-2xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-2xl shadow-ink/20"
         >
           {isAnalyzing ? (

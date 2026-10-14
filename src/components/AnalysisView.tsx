@@ -291,7 +291,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const [buyingGoal, setBuyingGoal] = useState<'investment' | 'must_have' | 'resale'>('investment');
 
   const currentItem = useMemo(() => {
-    if (!rawItem) return null;
+    // Error results ({ error }) and anything without a verdict never reach the renderer below
+    if (!rawItem || rawItem.error || !rawItem.buy_decision) return null;
     const originalDecision = rawItem.buy_decision;
     let score = originalDecision.score;
     let label = originalDecision.label;
@@ -396,6 +397,24 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     }
   }, []);
 
+  const [copied, setCopied] = React.useState(false);
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [moreDetailsText, setMoreDetailsText] = useState('');
+  const [rerunLoading, setRerunLoading] = useState(false);
+  const revealRef = React.useRef<HTMLDivElement>(null);
+  const prevPlanRef = React.useRef(plan);
+
+  React.useEffect(() => {
+    if (prevPlanRef.current === 'free' && plan !== 'free') {
+      // User just upgraded, scroll to the newly revealed content
+      setTimeout(() => {
+        revealRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+    prevPlanRef.current = plan;
+  }, [plan]);
+
+  // All hooks are above this line (rules of hooks); AppMain renders the error card for failed appraisals
   if (!currentItem) return null;
 
   const isPro = plan === 'pro' || plan === 'dealer';
@@ -449,7 +468,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     },
   ].filter(f => f.show);
 
-  const [copied, setCopied] = React.useState(false);
 
   const handleShare = async () => {
     const text = isHardPass 
@@ -555,21 +573,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
   const contextualMessage = getContextualPaywallMessage();
 
-  const [showMoreDetails, setShowMoreDetails] = useState(false);
-  const [moreDetailsText, setMoreDetailsText] = useState('');
-  const [rerunLoading, setRerunLoading] = useState(false);
-  const revealRef = React.useRef<HTMLDivElement>(null);
-  const prevPlanRef = React.useRef(plan);
-
-  React.useEffect(() => {
-    if (prevPlanRef.current === 'free' && plan !== 'free') {
-      // User just upgraded, scroll to the newly revealed content
-      setTimeout(() => {
-        revealRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
-    }
-    prevPlanRef.current = plan;
-  }, [plan]);
 
   const BuyingGoalSelector = () => (
     <div className="space-y-2">
