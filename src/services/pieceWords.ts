@@ -1,6 +1,6 @@
 // The user's own piece words (fix 1), extra site queries per search (fix 2) and the stricter "style" rule (fix 7).
 // Pure functions, unit-tested in scripts/check-hunt-logic.ts.
-import { ITEM_TYPES, LOCAL_TERMS, itemTypesInQuery, materialsInQuery, normalise, styleInQuery } from "./huntGeo.js";
+import { ITEM_TYPES, LOCAL_TERMS, STYLE_TERMS, itemTypesInQuery, materialsInQuery, normalise, styleInQuery } from "./huntGeo.js";
 
 const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[ -]/g, '[ -]?');
 const wordRe = (w: string) => new RegExp(`(^|[^a-z])${esc(w)}s?($|[^a-z])`, 'i');
@@ -81,7 +81,39 @@ export const headType = (title: string): string | null => {
  */
 const MINIATURE_RE = /(doll'?s?'? ?house|dollhouse|\bdolls\b|de poupee|\bpoupee\b|\bdockskap|\bmaquette\b|\bminiature\b|\bmaitrise\b|\btoy\b|\bjouet\b|apprentice piece)/;
 
+// ---------------------------------------------------------------------------
+// Style / origin mismatch (Peter's test: "French Louis Philippe walnut commode" returned Korean chests, a campaign
+// chest and a Welsh dresser). A lot that names ANOTHER style is dropped; a lot that names no style is kept.
+// ---------------------------------------------------------------------------
+
+const hasExactWord = (t: string, w: string) => new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`).test(t);
+// Words that are also ordinary catalogue words ("restauration d'usage", "transition") never signal another style
+const AMBIGUOUS_STYLE_WORDS = new Set(['restauration', 'transition']);
+// Styles that are British: a Welsh / campaign piece is not foreign to these
+const BRITISH_STYLES = new Set(['Regency', 'Georgian', 'Victorian']);
+// Non-French / non-continental origins and forms, checked on the title and the start of the description
+const FOREIGN_ORIGIN_RE = /(^|[^a-z])(korean?|coreen(ne)?|coree|japanese|japonais(e)?|chinese|chinois(e)?|oriental(e)?|asian|asiatique|campaign|welsh|anglo[- ]indian|indo[- ]portuguese|tibetan|indian)([^a-z]|$)/;
+// Japanese / Chinese lacquer panels are a French 18th-century technique ("commode en laque du Japon"): not foreign
+const LACQUER_RE = /(laque|lacquer|vernis martin|chinoiserie)/;
+
+/** Drop reason when a lot names a different style than the one asked for, or a non-French origin for a French style. */
+export const styleOriginProblem = (query: string, title?: string | null, description?: string | null): string | null => {
+  const style = styleInQuery(query);
+  if (!style) return null;
+  const text = normalise(`${title || ''} \n ${String(description || '').slice(0, 300)}`);
+  if (!text.trim()) return null;
+  const asked = style.match.some(w => hasExactWord(text, normalise(w)));
+  if (!asked) {
+    const other = STYLE_TERMS.some(([, st]) => st.fr !== style.fr && st.match.some(w => !AMBIGUOUS_STYLE_WORDS.has(w) && hasExactWord(text, normalise(w))));
+    if (other) return 'style_mismatch';
+  }
+  if (!BRITISH_STYLES.has(style.en) && FOREIGN_ORIGIN_RE.test(text) && !(/japon|japan|chin/.test(text) && LACQUER_RE.test(text)) && !FOREIGN_ORIGIN_RE.test(normalise(query))) return 'foreign_origin';
+  return null;
+};
+
 export const pieceProblem = (query: string, types: string[], title?: string | null, description?: string | null): string | null => {
+  const so = styleOriginProblem(query, title, description);
+  if (so) return so;
   if (!types.length) return null;
   const head = headType(String(title || ''));
   if (head && BLOCKING_HEADS.has(head) && !types.includes(head)) return 'not_requested_type';
