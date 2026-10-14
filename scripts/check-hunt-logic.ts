@@ -30,7 +30,7 @@ import { napoleonIIIProblem, siteQueries } from "../src/services/directSearch.ts
 import { candidateToMatch, crossListingKey, evaluateLot, periodProblemFor, finishDirect, searchDirectSites } from "../src/services/directSearch.ts";
 import { allIn, budgetMin } from "../src/services/budget.ts";
 import { localQueries } from "../src/services/huntGeo.ts";
-import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
+import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, styleOriginProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
 import { applyRanking } from "../src/services/hunting.ts";
 import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
 import { bandScore, dealerBands, saneDealerRange, reconcileDealerNegotiation, priceBandScore as pbs, decideBuy as decideBuyX, DEALER_WALK_AWAY_FACTOR } from "../src/services/appraisalMath.ts";
@@ -1789,6 +1789,38 @@ await acheck("appraise handler falls back to lighter models after primary 503/40
   assert.ok(ATTEMPT_DEADLINE_MS < 60_000);
   assert.equal(configFor("gemini-2.5-flash", body.config).thinkingConfig, undefined, "non-Gemini-3 drops thinkingLevel");
   assert.equal(configFor("gemini-2.5-flash", body.config).temperature, 0);
+});
+
+check("search: explicit style mismatch and non-French origin are dropped for a French style (Peter's Louis Philippe test)", () => {
+  const q = "French Louis Philippe walnut commode";
+  const types = itemTypesInQuery(q);
+  for (const t of ["Korean chest of drawers, 19th century", "Campaign chest of drawers in teak", "Welsh dresser, oak", "Coffre coréen en orme"])
+    assert.equal(styleOriginProblem(q, t, ""), "foreign_origin", t);
+  assert.equal(pieceProblem(q, types, "Korean chest of drawers, 19th century", ""), "foreign_origin");
+  assert.equal(styleOriginProblem(q, "Commode Napoléon III en noyer", ""), "style_mismatch");
+  assert.equal(styleOriginProblem(q, "Commode Louis XVI en acajou", ""), "style_mismatch");
+  // kept: the style asked for, or no style stated; "restauration" (repair) is not a style
+  for (const t of ["Commode Louis Philippe en noyer", "Commode en noyer, XIXe siècle", "Commode Louis-Philippe, restauration d'usage"])
+    assert.equal(styleOriginProblem(q, t, ""), null, t);
+  // Louis XV vs Louis XVI are told apart; Japanese lacquer on a French commode is not a foreign origin
+  assert.equal(styleOriginProblem("Louis XV commode", "Commode Louis XVI", ""), "style_mismatch");
+  assert.equal(styleOriginProblem("Louis XV commode", "Commode en laque du Japon, époque Louis XV", ""), null);
+  // British styles keep Welsh / campaign pieces; no style in the query = no check
+  assert.equal(styleOriginProblem("Georgian chest of drawers", "Welsh oak chest of drawers", ""), null);
+  assert.equal(styleOriginProblem("walnut commode", "Korean chest of drawers", ""), null);
+});
+check("search: Peter's road test of #38 (Wimbledon via Drouot): French campaign/Canterbury terms and wood mismatch are dropped", () => {
+  const q = "French Louis Philippe walnut commode";
+  const types = itemTypesInQuery(q);
+  for (const t of ["UNE COMMODE DE CAMPAGNE DU XIXe SIÈCLE", "UNE COMMODE DE CANTERBURY EN ACJEN DU XIXe SIÈCLE", "COMMODE EN CHÊNE DU DÉBUT DU XIXe SIÈCLE"])
+    assert.ok(pieceProblem(q, types, t, ""), `dropped: ${t}`);
+  assert.equal(pieceProblem(q, types, "COMMODE EN CHÊNE DU DÉBUT DU XIXe SIÈCLE", ""), "wood_mismatch");
+  assert.equal(pieceProblem(q, types, "Commode galloise en chêne", ""), "foreign_origin");
+  for (const t of ["Commode Louis-Philippe en noyer", "Commode en noyer début XIXe", "Commode plaquée de noyer, bâti en chêne", "Commode Louis Philippe", "COMMODE EN NOYER, ÉPOQUE LOUIS-PHILIPPE"])
+    assert.equal(pieceProblem(q, types, t, ""), null, `kept: ${t}`);
+  // no wood in the query = no wood check; mahogany / acajou are the same wood
+  assert.equal(pieceProblem("Louis Philippe commode", itemTypesInQuery("Louis Philippe commode"), "Commode Louis-Philippe en acajou", ""), null);
+  assert.equal(pieceProblem("mahogany commode", itemTypesInQuery("mahogany commode"), "Commode en acajou", ""), null);
 });
 check("appraise per-call timeout budget fits Vercel's 60 s", () => {
   assert.equal(callTimeoutFor(0, false), CALL_TIMEOUT_MS);
