@@ -391,7 +391,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         const overNme = overridesNeedEvidence(md, basis);
         if (basis !== 'need_evidence' || overNme) label = t(`motivation.verdict_${md.verdict}`);
         // negotiate / premium replace the price sentence (it says "walk away", which contradicts them); the venue note stays
-        const replace = (basis !== 'need_evidence' || overNme) && (md.verdict === 'negotiate' || md.verdict === 'premium' || overNme);
+        // over budget: the budget line replaces the old price sentence ("no margin at this price" was redundant)
+        const replace = (basis !== 'need_evidence' || overNme) && (md.verdict === 'negotiate' || md.verdict === 'premium' || md.verdict === 'over_budget' || overNme);
         const venueNote = rawItem.venue === 'dealer' ? t('analysis.venue_note_dealer') : rawItem.venue === 'market' ? t(rawItem.venue_note_key || 'analysis.venue_note_market') : '';
         const thin = '';
         reasonOut = replace ? `${t(`motivation.reason_${md.verdict}`, a)}${thin} ${venueNote}`.trim() : `${t(`motivation.reason_${md.verdict}`, a)} ${reasonOut}`;
