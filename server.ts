@@ -9,6 +9,7 @@ import { handleHuntRequest } from "./src/services/huntHandler.ts";
 import { fetchLotFacts } from "./src/services/lotFetch.ts";
 import { handleCompsRequest } from "./src/services/compsSearch.ts";
 import { handleAppraiseRequest } from "./src/services/appraiseHandler.ts";
+import { handleRangeClear } from "./src/services/rangeAdmin.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -41,6 +42,12 @@ async function startServer() {
   // Mirrors api/appraise.ts so `npm run dev` behaves like the Vercel deployment.
   app.post("/api/appraise", async (req, res) => {
     const { status, body } = await handleAppraiseRequest(req.body);
+    res.setHeader("Cache-Control", "no-store");
+    res.status(status).json(body);
+  });
+
+  app.all("/api/range-store/clear", async (req, res) => {
+    const { status, body } = await handleRangeClear({ method: req.method, headers: req.headers as any, body: req.body });
     res.setHeader("Cache-Control", "no-store");
     res.status(status).json(body);
   });

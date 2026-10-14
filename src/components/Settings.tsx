@@ -4,6 +4,7 @@ import { ArrowLeft, Globe, User, LogOut, Info, ChevronRight, MessageSquare } fro
 import { auth } from '../firebase';
 import { FeedbackHistory } from './FeedbackHistory';
 import { VersionFooter } from './VersionFooter';
+import { RangeAdminToken } from './RangeAdmin';
 
 interface SettingsProps {
   onBack: () => void;
@@ -194,6 +195,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigateToLegal, p
         <section className="space-y-4">
           <h2 className="text-[10px] uppercase tracking-widest font-bold text-muted px-2">{t('settings.about')}</h2>
           <div className="bg-white border border-border-custom rounded-[32px] p-6 space-y-4">
+            <RangeAdminToken />
             <VersionFooter compact />
             <button 
               onClick={onNavigateToLegal}

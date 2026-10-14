@@ -7,7 +7,7 @@ export const RANGE_KEY_PREFIX = 'ah:range:v1:';
 
 export interface SharedRange { low: number; high: number; fair_low: number; fair_high: number; model: string; ts: number }
 export type RangeStoreStatus = 'off' | 'hit' | 'stored' | 'miss' | 'error' | 'no_key';
-export interface RedisLike { get(key: string): Promise<string | null>; setNx(key: string, value: string, ttlS: number): Promise<boolean> }
+export interface RedisLike { get(key: string): Promise<string | null>; setNx(key: string, value: string, ttlS: number): Promise<boolean>; del?(key: string): Promise<number> }
 
 /** Vercel's Upstash integration names the vars KV_REST_API_* (or UPSTASH_REDIS_REST_* when connected directly). */
 export const redisEnv = (env: Record<string, string | undefined> = process.env): { url: string; token: string; names: string } | null => {
@@ -31,6 +31,7 @@ export const upstashClient = (url: string, token: string, fetchFn: typeof fetch 
   return {
     get: async (k) => { const v = await cmd(['GET', k]); return typeof v === 'string' ? v : null; },
     setNx: async (k, v, ttl) => (await cmd(['SET', k, v, 'NX', 'EX', ttl])) === 'OK',
+    del: async (k) => Number(await cmd(['DEL', k])) || 0,
   };
 };
 

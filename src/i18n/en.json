@@ -699,5 +699,13 @@
     "stretch": "Because it fills a gap and your budget allows, this goes {{amount}} above the walk-away ({{walkAway}}): a premium of at most {{pct}}%, never over your budget ({{budget}}).",
     "budget_ok": "Within your budget of {{budget}}.",
     "budget_over": "The asking price is {{gap}} over your budget of {{budget}}: the offers stay within it."
+  },
+  "range_admin": {
+    "token_label": "Admin token (shared price ranges)",
+    "save": "Save",
+    "remove": "Remove",
+    "reset": "Reset saved price range",
+    "done": "Saved range cleared: the next appraisal of this piece sets a new one.",
+    "error": "Could not clear the saved range (check the admin token)."
   }
 }

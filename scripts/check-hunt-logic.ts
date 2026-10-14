@@ -2,6 +2,7 @@
 // Run: npx tsx scripts/check-hunt-logic.ts
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller, needEvidenceWalkAway } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
+import { handleRangeClear, tokenMatches } from "../src/services/rangeAdmin.ts";
 import { redisEnv, upstashClient, resolveSharedRange, RANGE_STORE_TIMEOUT_MS } from "../src/services/rangeStore.ts";
 import { pieceKey, stableRange, RANGE_TTL_MS } from "../src/services/priceCache.ts";
 import { motivationDecision, overridesNeedEvidence, GAP_PREMIUM_PCT } from "../src/services/motivation.ts";
@@ -2056,6 +2057,26 @@ await acheck("shared range store: env detection, primary stored (NX), fallback n
   assert.equal(r2.body.range_store, "off"); assert.equal(r2.body.shared_range, undefined);
   const gem = readFileSync("src/services/gemini.ts", "utf8");
   assert.match(gem, /piece_key: rangeKey/); assert.match(gem, /source: 'shared_store'/);
+});
+await acheck("range store clear: admin token required (constant time), refused when unset, deletes the piece key", async () => {
+  const T = "x".repeat(40);
+  const db = new Map<string, string>([["ah:range:v1:abcd1234", "{}"]]);
+  const redis = { get: async (k: string) => db.get(k) ?? null, setNx: async () => true, del: async (k: string) => (db.delete(k) ? 1 : 0) };
+  const call = (env: any, auth?: string, body: any = { piece_key: "abcd1234" }, method = "POST") => handleRangeClear({ method, headers: auth ? { authorization: auth } : {}, body }, { env, redis });
+  assert.equal((await call({}, `Bearer ${T}`)).status, 503, "unset -> refused");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: "short" }, "Bearer short")).status, 503, "weak token -> refused");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: "y".repeat(23) }, `Bearer ${"y".repeat(23)}`)).status, 503, "23 chars -> refused");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: "y".repeat(24) }, `Bearer ${"y".repeat(24)}`, { piece_key: "00000000" })).status, 200, "24 chars -> accepted");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: T })).status, 401, "no auth");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}x`)).status, 401, "wrong token");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}`, {}, "GET")).status, 405);
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}`, { piece_key: "../x" })).status, 400);
+  const ok = await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}`); assert.deepEqual([ok.status, ok.body.deleted], [200, true]); assert.equal(db.size, 0);
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}`, JSON.stringify({ piece_key: "abcd1234" }), "DELETE")).body.deleted, false, "already gone");
+  assert.equal((await handleRangeClear({ method: "POST", headers: { authorization: `Bearer ${T}` }, body: { piece_key: "abcd1234" } }, { env: { RANGE_ADMIN_TOKEN: T }, redis: null })).status, 503, "no store");
+  assert.equal(tokenMatches(T, T), true); assert.equal(tokenMatches("", T), false); assert.equal(tokenMatches(T, undefined), false);
+  const src = readFileSync("src/services/rangeAdmin.ts", "utf8"); assert.match(src, /timingSafeEqual/);
+  assert.ok(!/RANGE_ADMIN_TOKEN\s*=\s*["'][^"']/.test(readFileSync("src/services/rangeAdmin.ts", "utf8") + readFileSync("api/range-store/clear.ts", "utf8")), "no token in the repo");
 });
 console.log(`
 ${passed} checks passed`);
