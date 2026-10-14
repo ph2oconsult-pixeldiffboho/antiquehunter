@@ -637,5 +637,18 @@
     "for_piece_title": "Field notes for this piece",
     "for_piece_intro": "Checks matched to the type, period and maker claim on this appraisal. Tendencies, not absolute rules.",
     "conservative_note": "These are dealer tendencies, not absolute rules. Confirm on the piece in front of you."
+  },
+  "analysis_error": {
+    "title": "Appraisal didn't go through",
+    "failed": "Something went wrong with the appraisal. Please try again.",
+    "too_large": "The photos are too large to send. Try fewer photos.",
+    "rate_limited": "Too many appraisals right now. Wait a minute and try again.",
+    "model_busy": "The appraisal service is very busy right now. Please try again in a moment.",
+    "bad_input": "One of the photos couldn't be read. Try removing or retaking it.",
+    "timeout": "The appraisal took too long. Please try again.",
+    "network": "No connection. Check your network and try again.",
+    "retry": "Try again",
+    "back": "Edit details",
+    "rerun_kept": "Re-run failed, your previous appraisal is kept. {{reason}}"
   }
 }

@@ -2,6 +2,9 @@
 // Run: npx tsx scripts/check-hunt-logic.ts
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
+import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
+import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS } from "../src/services/appraiseHandler.ts";
+import { appraisalErrorCode } from "../src/services/gemini.ts";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
 import {
@@ -1710,6 +1713,48 @@ check("venue split (display-side): Negotiate plan, how-to-buy box and payment ti
   assert.ok(d.negotiation_strategy.opening_offer < 450 && d.negotiation_strategy.opening_offer === d.negotiation_plan.opening_offer);
   const auc: any = { ...mk("Auction"), seller_context: { sellerType: "Auction", isAuction: true } };
   assert.equal(applyVenueGuidance(auc), auc, "auction untouched");
+});
+
+
+// ---- Appraisal robustness: image budget, Gemini retry, error codes (async checks) ----
+const acheck = async (name: string, fn: () => Promise<void>) => { await fn(); passed++; console.log("ok -", name); };
+check("fitWithin keeps aspect, never upscales", () => {
+  assert.deepEqual(fitWithin(4032, 3024, 1600), { width: 1600, height: 1200 });
+  assert.deepEqual(fitWithin(3024, 4032, 1600), { width: 1200, height: 1600 });
+  assert.deepEqual(fitWithin(800, 600, 1600), { width: 800, height: 600 });
+});
+await acheck("prepareImagesForUpload re-encodes, shrinks further, then caps count", async () => {
+  const big = "data:image/png;base64," + "A".repeat(3_000_000);
+  const sizes: Record<number, number> = { 1600: 900_000, 1200: 500_000, 900: 300_000 };
+  const shrink = async (_s: string, side: number) => "data:image/jpeg;base64," + "B".repeat(sizes[side]);
+  const two = await prepareImagesForUpload([big, big], shrink);
+  assert.equal(two.length, 2); assert.ok(two.every(x => x.startsWith("data:image/jpeg")));
+  assert.equal(payloadBytes(two[0]), 900_000, "first pass is enough for 2 photos");
+  const seven = await prepareImagesForUpload(Array(7).fill(big), shrink);
+  assert.equal(payloadBytes(seven[0]), 500_000, "7 photos need the 1200 px pass");
+  const twenty = await prepareImagesForUpload(Array(20).fill(big), shrink);
+  assert.ok(twenty.length < 20 && twenty.reduce((n, x) => n + payloadBytes(x), 0) <= 4 * 1024 * 1024);
+  const mixed = await prepareImagesForUpload(["https://x/y.jpg", big, "data:image/jpeg;base64,bad"], async (s, side) => { if (s.endsWith("bad")) throw new Error("x"); return shrink(s, side); });
+  assert.deepEqual(mixed.map(x => x.slice(0, 15)), ["https://x/y.jpg", "data:image/jpeg"], "URLs pass, undecodable dropped");
+});
+check("upstream status + failure mapping", () => {
+  assert.equal(upstreamStatus({ status: 503 }), 503);
+  assert.equal(upstreamStatus({ message: '{"error":{"code":429}} got status: 429' }), 429);
+  assert.equal(upstreamStatus(new Error("boom")), null);
+  assert.deepEqual([429, 503, 500, 400, 403, null].map(s => failureFor(s as any).body.code), ["rate_limited", "model_busy", "model_busy", "bad_input", "model_error", "model_error"]);
+  assert.deepEqual([413, 429, 503, 400, 502].map(appraisalErrorCode), ["too_large", "rate_limited", "model_busy", "bad_input", "failed"]);
+});
+await acheck("appraise handler retries 503 then succeeds; gives up with model_busy; no retry on 400", async () => {
+  const body = { contents: { parts: [{ text: "x" }] }, config: {} };
+  const waits: number[] = []; const sleep = async (ms: number) => { waits.push(ms); };
+  let n = 0;
+  const ok = await handleAppraiseRequest(body, { sleep, generate: async () => { if (++n < 3) throw Object.assign(new Error("overloaded"), { status: 503 }); return { text: "{}" }; } });
+  assert.equal(ok.status, 200); assert.equal(n, 3); assert.deepEqual(waits, RETRY_DELAYS_MS);
+  n = 0; const busy = await handleAppraiseRequest(body, { sleep, generate: async () => { n++; throw Object.assign(new Error("x"), { status: 503 }); } });
+  assert.equal(busy.status, 503); assert.equal(busy.body.code, "model_busy"); assert.equal(n, 3);
+  n = 0; const bad = await handleAppraiseRequest(body, { sleep, generate: async () => { n++; throw Object.assign(new Error("Unable to process input image"), { status: 400 }); } });
+  assert.equal(bad.status, 400); assert.equal(bad.body.code, "bad_input"); assert.equal(n, 1);
+  assert.ok(RETRY_DELAYS_MS.reduce((a, b) => a + b, 0) < 10_000);
 });
 
 console.log(`

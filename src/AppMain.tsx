@@ -26,6 +26,8 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Toast, type ToastKind, type ToastMessage } from './components/Toast';
 import { analysisItems, saveLocalFind } from './services/localFinds';
+import { prepareImagesForUpload, shrinkDataUrl, MAX_SIDE, JPEG_QUALITY } from './services/imageResize';
+import { AppraisalError } from './services/gemini';
 
 const SIGNIN_TIMEOUT_MS = 60_000;      // give up on the Google popup after 1 minute
 const SIGNIN_RETURN_GRACE_MS = 4_000;  // after the user comes back to the app, wait this long for the sign-in to land
@@ -125,7 +127,11 @@ export default function Main() {
     }
   };
 
+  const lastAnalyzeArgs = useRef<Parameters<typeof handleAnalyze> | null>(null);
   const handleAnalyze = async (input: string, details: any, inputIsImage = false, additionalImages: string[] = [], checkAnswers?: CheckAnswers, previousBase?: ChecklistBase | null) => {
+    lastAnalyzeArgs.current = [input, details, inputIsImage, additionalImages, checkAnswers, previousBase];
+    // A checklist re-run that fails must not throw away the appraisal it refines
+    const previousResult = checkAnswers && analysisItems(analysisResult).some((it: any) => it?.buy_decision) ? analysisResult : null;
     setIsAnalyzing(true);
     setLastDetails(details);
     setLastTyped(inputIsImage || input === t('upload_choice.default_prompt', "Analyze this antique from the images provided.") ? '' : String(input || ''));
@@ -159,9 +165,11 @@ export default function Main() {
       const sellerType = details.sellerType || (isAuctionSite ? 'Auction' : undefined);
       // The fee published by the sale wins over the default 25% (but not over a figure the user typed)
       const premium = details.premiumTouched ? details.buyerPremiumRate : (lotFacts?.ok && lotFacts.premiumPct ? lotFacts.premiumPct : details.buyerPremiumRate);
+      // Every image goes up as a downscaled JPEG within the total-size budget (photos added before this fix included)
+      const uploadImages = allImages.length > 0 ? await prepareImagesForUpload(allImages) : [];
       const result = await searchAntiques(
         text,
-        allImages.length > 0 ? allImages : undefined,
+        uploadImages.length > 0 ? uploadImages : undefined,
         details.askingPrice,
         details.currency || currency, // Use provided currency or fallback to global
         sellerType,
@@ -179,7 +187,14 @@ export default function Main() {
       }
     } catch (error) {
       console.error('Analysis error:', error);
-      setAnalysisResult({ error: "An error occurred during analysis. Please check your connection." });
+      const code = error instanceof AppraisalError ? error.code : 'failed';
+      const message = t(`analysis_error.${code}`, t('analysis_error.failed'));
+      if (previousResult) {
+        setAnalysisResult(previousResult);
+        showToast('error', t('analysis_error.rerun_kept', { reason: message }));
+      } else {
+        setAnalysisResult({ error: message, errorCode: code });
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -194,8 +209,10 @@ export default function Main() {
 
     files.forEach(file => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        newImages.push(reader.result as string);
+      reader.onloadend = async () => {
+        // Re-encode as JPEG (<= 1600 px, q0.8): keeps uploads under Vercel's 4.5 MB limit and the mimeType truthful
+        const raw = reader.result as string;
+        try { newImages.push(await shrinkDataUrl(raw, MAX_SIDE, JPEG_QUALITY)); } catch { if (raw) newImages.push(raw); }
         processed++;
         if (processed === files.length) {
           setIsDetailedScan(false);
@@ -493,6 +510,22 @@ export default function Main() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+            ) : analysisResult?.error ? (
+              <div data-testid="analysis-error" className="py-16 text-center space-y-6">
+                <h2 className="serif text-3xl text-ink">{t('analysis_error.title')}</h2>
+                <p className="text-muted">{String(analysisResult.error)}</p>
+                <div className="flex flex-col gap-3 items-center">
+                  <button type="button" data-testid="analysis-retry" disabled={!lastAnalyzeArgs.current}
+                    onClick={() => lastAnalyzeArgs.current && handleAnalyze(...lastAnalyzeArgs.current)}
+                    className="px-8 py-3 bg-ink text-paper rounded-full font-medium hover:opacity-90 disabled:opacity-40">
+                    {t('analysis_error.retry')}
+                  </button>
+                  <button type="button" onClick={() => { setAnalysisResult(null); setCurrentScreen('describe'); }}
+                    className="text-sm text-muted underline">
+                    {t('analysis_error.back')}
+                  </button>
                 </div>
               </div>
             ) : (

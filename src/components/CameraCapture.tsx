@@ -1,3 +1,4 @@
+import { fitWithin, MAX_SIDE, JPEG_QUALITY } from '../services/imageResize';
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Camera, RefreshCw, Check, X, Plus, Trash2 } from 'lucide-react';
@@ -43,10 +44,12 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCance
     if (videoRef.current && canvasRef.current) {
       const context = canvasRef.current.getContext('2d');
       if (context) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-        context.drawImage(videoRef.current, 0, 0);
-        const data = canvasRef.current.toDataURL('image/jpeg');
+        // Downscale at capture (long side <= 1600 px, JPEG q0.8) so uploads stay under the 4.5 MB body limit
+        const { width, height } = fitWithin(videoRef.current.videoWidth, videoRef.current.videoHeight, MAX_SIDE);
+        canvasRef.current.width = width;
+        canvasRef.current.height = height;
+        context.drawImage(videoRef.current, 0, 0, width, height);
+        const data = canvasRef.current.toDataURL('image/jpeg', JPEG_QUALITY);
         setCurrentPreview(data);
         stopCamera();
       }
