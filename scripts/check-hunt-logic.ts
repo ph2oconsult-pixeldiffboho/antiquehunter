@@ -1770,8 +1770,8 @@ await acheck("appraise handler falls back to lighter models after primary 503/40
   assert.equal(r.status, 200); assert.equal(r.body.model, FALLBACK_MODELS[0]);
   assert.deepEqual(seen, [APPRAISAL_MODEL, APPRAISAL_MODEL, APPRAISAL_MODEL, FALLBACK_MODELS[0]]);
   seen.length = 0;
-  const gone = await handleAppraiseRequest(body, { sleep, generate: async ({ model }: any) => { seen.push(model); if (model !== FALLBACK_MODELS[1]) throw Object.assign(new Error("not found"), { status: 404 }); return { text: "{}" }; } });
-  assert.equal(gone.body.model, FALLBACK_MODELS[1]); assert.deepEqual(seen, [APPRAISAL_MODEL, ...FALLBACK_MODELS], "404 is not retried, goes straight to the next model");
+  const gone = await handleAppraiseRequest(body, { sleep, generate: async ({ model }: any) => { seen.push(model); if (model !== FALLBACK_MODELS[FALLBACK_MODELS.length - 1]) throw Object.assign(new Error("not found"), { status: 404 }); return { text: "{}" }; } });
+  assert.equal(gone.body.model, FALLBACK_MODELS[FALLBACK_MODELS.length - 1]); assert.equal(APPRAISAL_MODEL, "gemini-3.1-flash-lite"); assert.ok(![APPRAISAL_MODEL, ...FALLBACK_MODELS].some(m => /preview/.test(m)), "no retired preview ids"); assert.deepEqual(seen, [APPRAISAL_MODEL, ...FALLBACK_MODELS], "404 is not retried, goes straight to the next model");
   seen.length = 0;
   const bad = await handleAppraiseRequest(body, { sleep, generate: async ({ model }: any) => { seen.push(model); throw Object.assign(new Error("bad image"), { status: 400 }); } });
   assert.equal(bad.status, 400); assert.deepEqual(seen, [APPRAISAL_MODEL], "400 never falls back");

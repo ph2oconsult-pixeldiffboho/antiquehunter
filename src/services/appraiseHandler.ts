@@ -12,13 +12,13 @@
 import { GoogleGenAI } from "@google/genai";
 
 /** The only model this endpoint will run. Client-supplied model values are ignored. */
-export const APPRAISAL_MODEL = "gemini-3.1-flash-lite-preview";
+export const APPRAISAL_MODEL = "gemini-3.1-flash-lite";
 /**
- * Lighter models tried, in order, once the primary is exhausted (429/5xx after retries) or gone (404).
- * Both are stable Gemini 3 Flash-Lite ids from ai.google.dev/gemini-api/docs/models (checked 14 Oct 2026),
+ * Models tried, in order, once the primary is exhausted (429/5xx after retries) or gone (404).
+ * The primary and this fallback are the stable Gemini 3 Flash-Lite ids from ai.google.dev/gemini-api/docs/models (checked 14 Oct 2026),
  * multimodal and supporting responseSchema + thinkingLevel. Still server-pinned; clients cannot pick.
  */
-export const FALLBACK_MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"];
+export const FALLBACK_MODELS = ["gemini-3.5-flash-lite"];
 /** Upstream statuses after which the next model is tried (404 = model id retired). */
 export const FALLBACK_STATUSES = [404, 429, 500, 503];
 /** Don't start a new model call after this much time; leaves room for one call inside maxDuration 60 s. */
