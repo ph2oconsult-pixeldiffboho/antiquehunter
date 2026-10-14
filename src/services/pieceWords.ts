@@ -92,7 +92,11 @@ const AMBIGUOUS_STYLE_WORDS = new Set(['restauration', 'transition']);
 // Styles that are British: a Welsh / campaign piece is not foreign to these
 const BRITISH_STYLES = new Set(['Regency', 'Georgian', 'Victorian']);
 // Non-French / non-continental origins and forms, checked on the title and the start of the description
-const FOREIGN_ORIGIN_RE = /(^|[^a-z])(korean?|coreen(ne)?|coree|japanese|japonais(e)?|chinese|chinois(e)?|oriental(e)?|asian|asiatique|campaign|welsh|anglo[- ]indian|indo[- ]portuguese|tibetan|indian)([^a-z]|$)/;
+const FOREIGN_ORIGIN_RE = new RegExp('(^|[^a-z])(' + [
+  'korean?', 'coreen(ne)?s?', 'coree', 'japanese', 'japonais(e)?s?', 'chinese', 'chinois(e)?s?', 'oriental(e)?s?', 'asian', 'asiatiques?',
+  'campaign', 'de campagne', 'welsh', 'gallois(e)?s?', 'du pays de galles', 'canterbury', 'anglo[- ]indian', 'anglo[- ]indien(ne)?s?',
+  'indo[- ]portuguese', 'indo[- ]portugais(e)?s?', 'tibetan', 'tibetain(e)?s?', 'indian', 'indien(ne)?s?', 'coloniale?s?',
+].join('|') + ')([^a-z]|$)');
 // Japanese / Chinese lacquer panels are a French 18th-century technique ("commode en laque du Japon"): not foreign
 const LACQUER_RE = /(laque|lacquer|vernis martin|chinoiserie)/;
 
@@ -111,8 +115,27 @@ export const styleOriginProblem = (query: string, title?: string | null, descrip
   return null;
 };
 
+// Woods: a query naming a wood ("walnut commode") drops lots naming another primary wood and not the requested one
+// (Peter's test: "COMMODE EN CHÊNE" for a walnut commode). Lots naming no wood are kept; a veneer of the requested wood
+// ("plaqué de noyer", "placage de noyer sur bâti de chêne") names it, so it is kept.
+const WOODS: Array<[string, string[]]> = [
+  ['walnut', ['walnut', 'noyer', 'noyers']], ['oak', ['oak', 'chene', 'chenes']], ['mahogany', ['mahogany', 'acajou', 'acajous']],
+  ['cherry', ['cherry', 'cherrywood', 'merisier']], ['rosewood', ['rosewood', 'palissandre']], ['elm', ['elm', 'orme']],
+  ['pine', ['pine', 'sapin', 'pitchpin']], ['fruitwood', ['fruitwood', 'bois fruitier']], ['birch', ['birch', 'bouleau']],
+  ['satinwood', ['satinwood', 'bois de citronnier', 'citronnier']], ['teak', ['teak', 'teck']], ['beech', ['beech', 'hetre']],
+  ['ash', ['frene']], ['maple', ['maple', 'erable']], ['yew', ['yew']],
+];
+const woodsIn = (t: string) => WOODS.filter(([, ws]) => ws.some(w => hasExactWord(t, w))).map(([k]) => k);
+export const woodProblem = (query: string, title?: string | null, description?: string | null): string | null => {
+  const asked = woodsIn(normalise(query));
+  if (!asked.length) return null;
+  const named = woodsIn(normalise(`${title || ''} \n ${String(description || '').slice(0, 300)}`));
+  if (!named.length || named.some(w => asked.includes(w))) return null;
+  return 'wood_mismatch';
+};
+
 export const pieceProblem = (query: string, types: string[], title?: string | null, description?: string | null): string | null => {
-  const so = styleOriginProblem(query, title, description);
+  const so = styleOriginProblem(query, title, description) || woodProblem(query, title, description);
   if (so) return so;
   if (!types.length) return null;
   const head = headType(String(title || ''));

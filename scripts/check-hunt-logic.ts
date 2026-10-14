@@ -1801,5 +1801,18 @@ check("search: explicit style mismatch and non-French origin are dropped for a F
   assert.equal(styleOriginProblem("Georgian chest of drawers", "Welsh oak chest of drawers", ""), null);
   assert.equal(styleOriginProblem("walnut commode", "Korean chest of drawers", ""), null);
 });
+check("search: Peter's road test of #38 (Wimbledon via Drouot): French campaign/Canterbury terms and wood mismatch are dropped", () => {
+  const q = "French Louis Philippe walnut commode";
+  const types = itemTypesInQuery(q);
+  for (const t of ["UNE COMMODE DE CAMPAGNE DU XIXe SIÈCLE", "UNE COMMODE DE CANTERBURY EN ACJEN DU XIXe SIÈCLE", "COMMODE EN CHÊNE DU DÉBUT DU XIXe SIÈCLE"])
+    assert.ok(pieceProblem(q, types, t, ""), `dropped: ${t}`);
+  assert.equal(pieceProblem(q, types, "COMMODE EN CHÊNE DU DÉBUT DU XIXe SIÈCLE", ""), "wood_mismatch");
+  assert.equal(pieceProblem(q, types, "Commode galloise en chêne", ""), "foreign_origin");
+  for (const t of ["Commode Louis-Philippe en noyer", "Commode en noyer début XIXe", "Commode plaquée de noyer, bâti en chêne", "Commode Louis Philippe", "COMMODE EN NOYER, ÉPOQUE LOUIS-PHILIPPE"])
+    assert.equal(pieceProblem(q, types, t, ""), null, `kept: ${t}`);
+  // no wood in the query = no wood check; mahogany / acajou are the same wood
+  assert.equal(pieceProblem("Louis Philippe commode", itemTypesInQuery("Louis Philippe commode"), "Commode Louis-Philippe en acajou", ""), null);
+  assert.equal(pieceProblem("mahogany commode", itemTypesInQuery("mahogany commode"), "Commode en acajou", ""), null);
+});
 console.log(`
 ${passed} checks passed`);
