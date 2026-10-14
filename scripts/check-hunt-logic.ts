@@ -350,6 +350,11 @@ check("geography: UK-only drops French sites, keeps UK sites", () => {
   assert.equal(checkGeography("https://auctionet.com/en/1-x", ["Barcelona"], regionsFor(["Sweden"])).ok, false);
   assert.equal(regionsFor(["Global/Rest of World", "France"]), null);
   assert.equal(regionsInLocation("Kyiv, Ukraine").has("United Kingdom"), false);
+  // "york" (UK) inside "new york" (US) must not make a New York sale British
+  assert.deepEqual(Array.from(regionsInLocation("New York, NY")), ["United States"]);
+  assert.deepEqual(Array.from(regionsInLocation("New York")), ["United States"]);
+  assert.deepEqual(Array.from(regionsInLocation("York, North Yorkshire")), ["United Kingdom"]);
+  assert.equal(checkGeography("https://www.christies.com/lot/1", ["New York, NY"], new Set(["France", "United Kingdom"] as any)).ok, false);
 });
 
 check("geography: platforms follow the selected regions", () => {
