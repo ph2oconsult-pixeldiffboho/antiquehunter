@@ -198,7 +198,9 @@
     "reason_market_fair": "{{price}} is above the bargain band but within the walk-away (auction high {{walkAway}}).",
     "reason_market_overpriced": "{{price}} is above the walk-away ({{walkAway}}, the auction high): you could likely do better at auction.",
     "reason_market_walk_away": "{{price}} is far above auction level (over {{overTop}}): walk away.",
-    "venue_note_private": "From a private or estate seller, prices at or below auction level are possible, but there is no dealer guarantee or provenance check: inspect the piece and its condition yourself."
+    "venue_note_private": "From a private or estate seller, prices at or below auction level are possible, but there is no dealer guarantee or provenance check: inspect the piece and its condition yourself.",
+    "walk_away_line": "Walk away above {{walkAway}}",
+    "walk_away_line_auction": "Walk away above {{walkAway}} hammer ({{walkAwayAllIn}} all-in with the {{premiumPct}}% premium)"
   },
   "results": {
     "title": "Dealer's Findings",

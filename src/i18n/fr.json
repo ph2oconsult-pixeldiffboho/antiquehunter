@@ -198,7 +198,9 @@
     "reason_market_fair": "{{price}} dépasse la fourchette « bonne affaire » mais reste sous le prix plafond (haut des enchères, {{walkAway}}).",
     "reason_market_overpriced": "{{price}} dépasse le prix plafond ({{walkAway}}, haut des enchères) : vous feriez sans doute mieux aux enchères.",
     "reason_market_walk_away": "{{price}} est très au-dessus du niveau des enchères (plus de {{overTop}}) : passez votre chemin.",
-    "venue_note_private": "Chez un particulier ou lors d'une succession, on peut acheter au niveau des enchères ou en dessous, mais sans garantie ni vérification de provenance d'un antiquaire : examinez vous-même la pièce et son état."
+    "venue_note_private": "Chez un particulier ou lors d'une succession, on peut acheter au niveau des enchères ou en dessous, mais sans garantie ni vérification de provenance d'un antiquaire : examinez vous-même la pièce et son état.",
+    "walk_away_line": "Renoncez au-delà de {{walkAway}}",
+    "walk_away_line_auction": "Renoncez au-delà de {{walkAway}} au marteau ({{walkAwayAllIn}} frais compris, avec {{premiumPct}} % de frais acheteur)"
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",

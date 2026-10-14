@@ -1,3 +1,4 @@
+import { sanitizeWalkAwayIf } from '../services/gemini';
 import React, { useState, useEffect, useMemo } from 'react';
 import { applyVenueGuidance } from '../services/venueGuidance';
 import { createPortal } from 'react-dom';
@@ -550,7 +551,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   const premiumPct = Number(currentItem.seller_context?.buyerPremiumRate) > 0 ? Number(currentItem.seller_context.buyerPremiumRate) : 25;
   const marketLow = Math.round(Number(currentItem.price_guidance?.estimated_market_range_low) || 0);
   const marketHigh = Math.round(Number(currentItem.price_guidance?.estimated_market_range_high) || 0);
-  const walkAway = Math.round(Number(currentItem.negotiation_strategy?.walk_away_price) || 0);
+  // Displayed walk-away: negotiation_strategy after venueGuidance (Market/Fair/Private/Dealer adjust it at display time),
+  // falling back to the post-processed walk_away_threshold; one figure used everywhere on this screen.
+  const walkAway = Math.round(Number(currentItem.negotiation_strategy?.walk_away_price) || Number(currentItem.walk_away_threshold?.hammer) || 0);
   const allInLow = allInCost(marketLow, premiumPct, true);
   const allInHigh = allInCost(marketHigh, premiumPct, true);
   const walkAwayAllIn = allInCost(walkAway, premiumPct, true);
@@ -1250,20 +1253,17 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             <h3 className="text-[10px] uppercase tracking-widest font-bold opacity-80">{t('analysis.when_to_walk_away')}</h3>
           </div>
           <div className="space-y-3">
-            <div className="flex flex-wrap items-baseline gap-2">
-              <p className="text-sm font-bold text-decision-red">
-                {t('analysis.walk_away_price_label')} {formatPrice(walkAway)}
-                {isAuctionItem && (
-                  <span className="text-xs font-normal text-decision-red/80 ml-1.5">
-                    (Max Hammer Bid — Total all-in: {formatPrice(walkAwayAllIn)})
-                  </span>
-                )}
+            {walkAway > 0 && (
+              <p data-testid="walk-away-line" className="text-sm font-bold text-decision-red">
+                {isAuctionItem
+                  ? t('analysis.walk_away_line_auction', { walkAway: formatPrice(walkAway), walkAwayAllIn: formatPrice(walkAwayAllIn), premiumPct })
+                  : t('analysis.walk_away_line', { walkAway: formatPrice(walkAway) })}
               </p>
-            </div>
+            )}
             <div className="space-y-2">
               <p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('analysis.walk_away_desc')}</p>
               <div className="space-y-2">
-                {(currentItem.walk_away_if?.length > 0 ? currentItem.walk_away_if : t('analysis.walk_away_points').split('\n')).slice(0, 3).map((condition: string, i: number) => (
+                {(sanitizeWalkAwayIf(currentItem.walk_away_if).length > 0 ? sanitizeWalkAwayIf(currentItem.walk_away_if) : t('analysis.walk_away_points').split('\n')).slice(0, 3).map((condition: string, i: number) => (
                   <p key={i} className="text-sm text-decision-red/80 leading-relaxed flex gap-2">
                     <span className="text-decision-red font-bold">!</span> {condition.replace('• ', '')}
                   </p>
