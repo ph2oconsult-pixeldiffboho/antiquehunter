@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { applyVenueGuidance, needEvidenceWalkAway } from '../services/venueGuidance';
 import { motivationDecision, overridesNeedEvidence } from '../services/motivation';
 import { OfferPlan } from './OfferPlan';
+import { ResetRangeButton } from './RangeAdmin';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen, Sparkles } from 'lucide-react';
@@ -965,6 +966,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </section>
       )}
 
+      <ResetRangeButton pieceKey={currentItem.range_source?.key} />
       <OfferPlan md={currentItem.motivation_decision} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
 
       {/* 3c. Maker attribution + verified auction comparables (public results; the anchored range itself is in the price card) */}

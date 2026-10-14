@@ -699,5 +699,13 @@
     "stretch": "Comme elle complète votre collection et que votre budget le permet, on monte de {{amount}} au-dessus du plafond ({{walkAway}}) : une prime de {{pct}} % au plus, jamais au-delà de votre budget ({{budget}}).",
     "budget_ok": "Dans votre budget de {{budget}}.",
     "budget_over": "Le prix demandé dépasse votre budget de {{gap}} ({{budget}}) : les offres restent dans votre budget."
+  },
+  "range_admin": {
+    "token_label": "Jeton admin (fourchettes partagées)",
+    "save": "Enregistrer",
+    "remove": "Supprimer",
+    "reset": "Réinitialiser la fourchette enregistrée",
+    "done": "Fourchette effacée : la prochaine estimation de cette pièce en enregistrera une nouvelle.",
+    "error": "Impossible d'effacer la fourchette (vérifiez le jeton admin)."
   }
 }
