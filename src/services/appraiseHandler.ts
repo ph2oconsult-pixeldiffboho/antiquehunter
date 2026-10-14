@@ -12,14 +12,32 @@
 import { GoogleGenAI } from "@google/genai";
 
 /** The only model this endpoint will run. Client-supplied model values are ignored. */
-const APPRAISAL_MODEL = "gemini-3.1-flash-lite-preview";
+export const APPRAISAL_MODEL = "gemini-3.1-flash-lite";
+/**
+ * Models tried, in order, once the primary is exhausted (429/5xx after retries) or gone (404).
+ * The primary and this fallback are the stable Gemini 3 Flash-Lite ids from ai.google.dev/gemini-api/docs/models (checked 14 Oct 2026),
+ * multimodal and supporting responseSchema + thinkingLevel. Still server-pinned; clients cannot pick.
+ */
+export const FALLBACK_MODELS = ["gemini-3.5-flash-lite"];
+/** Upstream statuses after which the next model is tried (404 = model id retired). */
+export const FALLBACK_STATUSES = [404, 429, 500, 503];
+/** Don't start a new model call after this much time; leaves room for one call inside maxDuration 60 s. */
+export const ATTEMPT_DEADLINE_MS = 40_000;
+
+/** Config for a given model: thinkingLevel is a Gemini 3 feature, so drop it for any non-Gemini-3 model. */
+export const configFor = (model: string, config: any): any => {
+  if (!config || typeof config !== "object") return undefined;
+  if (/^gemini-3/.test(model) || !config.thinkingConfig) return config;
+  const { thinkingConfig, ...rest } = config;
+  return rest;
+};
 
 /** Guard against oversized bodies (appraisals carry inline base64 images). */
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
 export interface AppraiseHttpResult {
   status: number;
-  body: { text?: string; error?: string; code?: string };
+  body: { text?: string; error?: string; code?: string; model?: string };
 }
 
 /** Upstream statuses worth retrying (rate limit, transient server error, overloaded model). */
@@ -43,12 +61,12 @@ export const failureFor = (status: number | null): AppraiseHttpResult => {
   return { status: 502, body: { error: "Model request failed", code: "model_error" } };
 };
 
-type Generate = (args: { contents: unknown; config: unknown }) => Promise<{ text?: string }>;
+type Generate = (args: { contents: unknown; config: unknown; model: string }) => Promise<{ text?: string }>;
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export const handleAppraiseRequest = async (
   rawBody: unknown,
-  deps: { generate?: Generate; sleep?: (ms: number) => Promise<void> } = {},
+  deps: { generate?: Generate; sleep?: (ms: number) => Promise<void>; now?: () => number } = {},
 ): Promise<AppraiseHttpResult> => {
   let body: any = rawBody;
   if (typeof body === "string") {
@@ -77,7 +95,7 @@ export const handleAppraiseRequest = async (
     }
     const ai = new GoogleGenAI({ apiKey });
     generate = (args) => ai.models.generateContent({
-      model: APPRAISAL_MODEL,
+      model: args.model,
       contents: args.contents as any,
       // responseMimeType/responseSchema/thinkingConfig/temperature/seed are built by the
       // caller and passed through unchanged, preserving the existing appraisal behaviour.
@@ -85,18 +103,36 @@ export const handleAppraiseRequest = async (
     });
   }
   const sleep = deps.sleep || defaultSleep;
+  const now = deps.now || Date.now;
+  const started = now();
   const cfg = config && typeof config === "object" ? config : undefined;
+  let lastStatus: number | null = null;
 
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const response = await generate({ contents, config: cfg });
-      return { status: 200, body: { text: response.text ?? "" } };
-    } catch (error: any) {
-      const status = upstreamStatus(error);
-      const retry = status !== null && RETRYABLE_STATUSES.includes(status) && attempt < RETRY_DELAYS_MS.length;
-      console.error(`Error running appraisal model (upstream ${status ?? "unknown"}, attempt ${attempt + 1}${retry ? ", retrying" : ""}):`, error?.message || error);
-      if (!retry) return failureFor(status);
-      await sleep(RETRY_DELAYS_MS[attempt]);
+  const models = [APPRAISAL_MODEL, ...FALLBACK_MODELS];
+  for (let m = 0; m < models.length; m++) {
+    const model = models[m];
+    // Primary gets the retry schedule; each fallback gets a single attempt
+    const retries = m === 0 ? RETRY_DELAYS_MS.length : 0;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      if (now() - started > ATTEMPT_DEADLINE_MS) {
+        console.error(`Appraisal model time budget spent before trying ${model}; giving up (last upstream ${lastStatus ?? "unknown"}).`);
+        return failureFor(lastStatus);
+      }
+      try {
+        const response = await generate({ contents, config: configFor(model, cfg), model });
+        console.log(`Appraisal served by ${model}${m > 0 ? " (fallback)" : ""}, attempt ${attempt + 1}.`);
+        return { status: 200, body: { text: response.text ?? "", model } };
+      } catch (error: any) {
+        const status = upstreamStatus(error);
+        lastStatus = status;
+        const retry = status !== null && RETRYABLE_STATUSES.includes(status) && attempt < retries;
+        const next = !retry && status !== null && FALLBACK_STATUSES.includes(status) && m < models.length - 1;
+        console.error(`Error running appraisal model ${model} (upstream ${status ?? "unknown"}, attempt ${attempt + 1}${retry ? ", retrying" : next ? ", trying fallback" : ""}):`, error?.message || error);
+        if (retry) { await sleep(RETRY_DELAYS_MS[attempt]); continue; }
+        if (next) break;
+        return failureFor(status);
+      }
     }
   }
+  return failureFor(lastStatus);
 };
