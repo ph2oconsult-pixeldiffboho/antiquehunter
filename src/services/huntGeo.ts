@@ -98,8 +98,22 @@ export const regionsInLocation = (location: unknown): Set<Region> => {
   const text = normalise(location);
   const out = new Set<Region>();
   if (!text.trim()) return out;
+  // Spans of every place match, so a place inside a longer place of another region ("york" in "new york")
+  // does not count: "New York, NY" is the United States only, not also the United Kingdom.
+  const hits: Array<{ region: Region; start: number; end: number }> = [];
   for (const [region, places] of Object.entries(REGION_PLACES) as Array<[Region, string[]]>) {
-    if (places.some(p => placeRegex(p).test(text))) out.add(region);
+    for (const p of places) {
+      const re = new RegExp(placeRegex(p).source, 'gi');
+      for (let m = re.exec(text); m; m = re.exec(text)) {
+        const start = m.index + m[1].length;
+        hits.push({ region, start, end: start + p.length });
+        if (re.lastIndex === m.index) re.lastIndex++;
+      }
+    }
+  }
+  for (const h of hits) {
+    const inside = hits.some(o => o.region !== h.region && o.start <= h.start && o.end >= h.end && o.end - o.start > h.end - h.start);
+    if (!inside) out.add(h.region);
   }
   return out;
 };
