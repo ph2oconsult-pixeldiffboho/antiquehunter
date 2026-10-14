@@ -197,7 +197,8 @@
     "reason_market_good_buy": "{{price}} est dans la fourchette « bonne affaire » ({{bargainLow}}–{{bargainHigh}}).",
     "reason_market_fair": "{{price}} dépasse la fourchette « bonne affaire » mais reste sous le prix plafond (haut des enchères, {{walkAway}}).",
     "reason_market_overpriced": "{{price}} dépasse le prix plafond ({{walkAway}}, haut des enchères) : vous feriez sans doute mieux aux enchères.",
-    "reason_market_walk_away": "{{price}} est très au-dessus du niveau des enchères (plus de {{overTop}}) : passez votre chemin."
+    "reason_market_walk_away": "{{price}} est très au-dessus du niveau des enchères (plus de {{overTop}}) : passez votre chemin.",
+    "venue_note_private": "Chez un particulier ou lors d'une succession, on peut acheter au niveau des enchères ou en dessous, mais sans garantie ni vérification de provenance d'un antiquaire : examinez vous-même la pièce et son état."
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",
@@ -310,7 +311,8 @@
     "upload_photo_hint": "Une photo est le point de départ. Les détails affinent le prix.",
     "simple_start_hint": "« Commencez par quelque chose de simple — même un verre ou un petit objet »",
     "lot_url_label": "Lien de la vente ou de l'annonce (Lot Link)",
-    "price_invalid": "Chiffres uniquement, ex. 1500, 1 500 ou 1 500,50"
+    "price_invalid": "Chiffres uniquement, ex. 1500, 1 500 ou 1 500,50",
+    "seller_market": "Brocante / marché"
   },
   "categories": {
     "furniture": "Meubles",

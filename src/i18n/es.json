@@ -159,7 +159,8 @@
     "reason_market_good_buy": "{{price}} is inside the market bargain band ({{bargainLow}}–{{bargainHigh}}).",
     "reason_market_fair": "{{price}} is above the bargain band but within the walk-away (auction high {{walkAway}}).",
     "reason_market_overpriced": "{{price}} is above the walk-away ({{walkAway}}, the auction high): you could likely do better at auction.",
-    "reason_market_walk_away": "{{price}} is far above auction level (over {{overTop}}): walk away."
+    "reason_market_walk_away": "{{price}} is far above auction level (over {{overTop}}): walk away.",
+    "venue_note_private": "From a private or estate seller, prices at or below auction level are possible, but there is no dealer guarantee or provenance check: inspect the piece and its condition yourself."
   },
   "results": {
     "title": "Hallazgos del anticuario",
@@ -270,7 +271,8 @@
     "try_item": "Prueba con un artículo — incluso algo cercano",
     "upload_photo_hint": "Una foto es el punto de partida. Los detalles afinan el precio.",
     "simple_start_hint": "“Empieza con algo sencillo — incluso un vaso o un objeto pequeño”",
-    "lot_url_label": "Pegar enlace de subasta o listado (Lote)"
+    "lot_url_label": "Pegar enlace de subasta o listado (Lote)",
+    "seller_market": "Market / Fair"
   },
   "categories": {
     "furniture": "Muebles",

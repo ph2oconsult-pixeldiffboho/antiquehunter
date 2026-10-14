@@ -1,6 +1,6 @@
 // Quick self-checks for the hunt URL filters and appraisal maths.
 // Run: npx tsx scripts/check-hunt-logic.ts
-import { applyVenueGuidance, venueOf, marketFigures } from "../src/services/venueGuidance";
+import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -1670,6 +1670,24 @@ check("venue split: auction unchanged, market bargain band + walk-away = auction
   const d: any = applyVenueGuidance({ ...base, seller_context: { sellerType: "Antique Shop" } });
   assert.equal(d.negotiation_strategy.walk_away_price, 1200); assert.equal(d.buy_decision.price_basis, "good_buy");
   const f = marketFigures(200, 600); assert.ok(f.opening_offer <= f.good_buy_below && f.good_buy_below <= f.walk_away_price);
+});
+
+check("venue split review fixes: missing auction low never shows 0; private seller gets its own note", () => {
+  for (const lo of [0, undefined as any, NaN]) {
+    const f = marketFigures(lo, 600);
+    assert.ok(f.bargain_low >= 150 && f.opening_offer > 0 && f.bargain_low <= f.bargain_high, JSON.stringify(f));
+    const m: any = applyVenueGuidance({ seller_context: { sellerType: "Market/Fair" }, price_guidance: { estimated_market_range_low: lo, estimated_market_range_high: 600 }, buy_decision: {} });
+    assert.ok(m.price_guidance.market_bargain_low > 0 && m.negotiation_strategy.opening_offer > 0, "no €0 shown");
+  }
+  const tiny = marketFigures(0, 12); assert.ok(tiny.bargain_low > 0 && tiny.opening_offer > 0, JSON.stringify(tiny));
+  assert.equal(isPrivateSeller({ sellerType: "Private Seller" }), true);
+  assert.equal(isPrivateSeller({ sellerType: "Estate sale" }), true);
+  assert.equal(isPrivateSeller({ sellerType: "Market/Fair" }), false);
+  assert.equal(isPrivateSeller({ sellerType: "Antique Shop" }), false);
+  const pv: any = applyVenueGuidance({ seller_context: { sellerType: "Private Seller" }, price_guidance: { estimated_market_range_low: 200, estimated_market_range_high: 600 }, buy_decision: {} });
+  assert.equal(pv.venue_note_key, "analysis.venue_note_private"); assert.equal(pv.negotiation_strategy.walk_away_price, 600, "same market bands");
+  const mk: any = applyVenueGuidance({ seller_context: { sellerType: "Market/Fair" }, price_guidance: { estimated_market_range_low: 200, estimated_market_range_high: 600 }, buy_decision: {} });
+  assert.equal(mk.venue_note_key, "analysis.venue_note_market");
 });
 
 console.log(`

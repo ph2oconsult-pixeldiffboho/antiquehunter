@@ -339,7 +339,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           bargainHigh: formatMoney(Number(mb.bargain_high) || 0, pg.currency),
           walkAway: formatMoney(Number(mb.walk_away) || 0, pg.currency),
           overTop: formatMoney(Number(mb.overpriced_to) || 0, pg.currency),
-        }) + ' ' + t('analysis.venue_note_market')
+        }) + ' ' + t(rawItem.venue_note_key || 'analysis.venue_note_market')
       : dealerReason
       ? t(`analysis.reason_dealer_${basis}`, {
           price: formatMoney(effective, pg.currency),
@@ -1090,7 +1090,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           </div>
 
           {(marketScale || dealerScale) && (
-            <p className="text-xs text-ink leading-relaxed" data-testid="venue-note">{t(marketScale ? 'analysis.venue_note_market' : 'analysis.venue_note_dealer')}</p>
+            <p className="text-xs text-ink leading-relaxed" data-testid="venue-note">{t(marketScale ? (currentItem.venue_note_key || 'analysis.venue_note_market') : 'analysis.venue_note_dealer')}</p>
           )}
           {dealerScale && (
             <p className="text-xs text-ink leading-relaxed" data-testid="dealer-scale-note">{t('analysis.dealer_scale_note')}</p>
