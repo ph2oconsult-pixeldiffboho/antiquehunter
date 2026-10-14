@@ -200,7 +200,12 @@
     "reason_market_walk_away": "{{price}} est très au-dessus du niveau des enchères (plus de {{overTop}}) : passez votre chemin.",
     "venue_note_private": "Chez un particulier ou lors d'une succession, on peut acheter au niveau des enchères ou en dessous, mais sans garantie ni vérification de provenance d'un antiquaire : examinez vous-même la pièce et son état.",
     "walk_away_line": "Renoncez au-delà de {{walkAway}}",
-    "walk_away_line_auction": "Renoncez au-delà de {{walkAway}} au marteau ({{walkAwayAllIn}} frais compris, avec {{premiumPct}} % de frais acheteur)"
+    "walk_away_line_auction": "Renoncez au-delà de {{walkAway}} au marteau ({{walkAwayAllIn}} frais compris, avec {{premiumPct}} % de frais acheteur)",
+    "nme_range_auction_hammer": "La fourchette provisoire est celle du prix au marteau.",
+    "nme_range_auction_equivalent": "La fourchette provisoire est un équivalent enchères (ce que la pièce ferait aux enchères), pas un prix boutique ou particulier.",
+    "nme_walk_away_auction": "Prix plafond provisoire : {{walkAway}} au marteau ({{walkAwayAllIn}} frais compris, avec {{premiumPct}} % de frais acheteur).",
+    "nme_walk_away_dealer": "Prix plafond provisoire : {{walkAway}} (haut de la fourchette marchand ; les boutiques vendent au-dessus des enchères).",
+    "nme_walk_away_market": "Prix plafond provisoire : {{walkAway}} (haut des enchères)."
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",

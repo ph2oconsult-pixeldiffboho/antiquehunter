@@ -1,6 +1,6 @@
 // Quick self-checks for the hunt URL filters and appraisal maths.
 // Run: npx tsx scripts/check-hunt-logic.ts
-import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller } from "../src/services/venueGuidance";
+import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller, needEvidenceWalkAway } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
 import { motivationDecision, GAP_PREMIUM_PCT } from "../src/services/motivation.ts";
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
@@ -1775,6 +1775,39 @@ check("motivation: offer plan figures (cash cap, best-and-final <= walk-away unl
   assert.match(readFileSync("src/components/AnalysisView.tsx", "utf8"), /md\.verdict === 'negotiate' \|\| md\.verdict === 'premium'/, "negotiate / premium replace the contradicting walk-away sentence");
   for (const f of ["en", "fr"]) { const j = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")); for (const k of ["verdict_negotiate", "verdict_premium", "verdict_over_budget", "reason_premium"]) assert.ok(j.motivation[k], f + k); assert.ok(j.offer.cash_capped && j.describe.motivation_fills_gap, f); }
   assert.ok(!/\d/.test(JSON.parse(readFileSync("src/i18n/en.json", "utf8")).motivation.reason_negotiate), "no figures in strings except placeholders");
+});
+check("need more evidence: provisional walk-away per venue comes from the app (dealer = dealer high, market/private = auction high, auction = hammer + all-in)", () => {
+  const base = (sellerType: string, isAuction: boolean, walk: number) => ({
+    seller_context: { sellerType, isAuction, buyerPremiumRate: isAuction ? 25 : 0 },
+    price_guidance: { estimated_market_range_low: 400, estimated_market_range_high: 900, fair_price_low: 1100, fair_price_high: 1800, currency: "EUR", provisional: true },
+    negotiation_strategy: { walk_away_price: walk, opening_offer: 500, target_price_high: 800 },
+    walk_away_threshold: { hammer: walk, all_in: isAuction ? Math.round(walk * 1.25) : null, is_auction: isAuction, premium_pct: isAuction ? 25 : 0 },
+    buy_decision: { price_basis: "need_evidence", score: 50, effective_price: 1250 },
+  });
+  const dealer = needEvidenceWalkAway(applyVenueGuidance(base("Antique Shop", false, 1800)))!;
+  assert.equal(dealer.walkAway, 1800); assert.equal(dealer.allIn, null); assert.equal(dealer.rangeKind, "auction_equivalent"); assert.equal(dealer.venue, "dealer");
+  for (const st of ["Private Seller", "Market/Fair"]) {
+    const it = applyVenueGuidance(base(st, false, 1800));
+    const m = needEvidenceWalkAway(it)!;
+    assert.equal(m.walkAway, 900, st + ": market walk-away = auction high"); assert.equal(m.venue, "market"); assert.equal(m.rangeKind, "auction_equivalent");
+    assert.equal(it.walk_away_threshold.hammer, 900, st + ": threshold synced with the red line");
+    assert.equal(it.buy_decision.price_basis, "need_evidence", st + ": verdict kept");
+  }
+  const a = needEvidenceWalkAway(applyVenueGuidance(base("Auction", true, 1200)))!;
+  assert.deepEqual([a.walkAway, a.allIn, a.isAuction, a.rangeKind], [1200, 1500, true, "auction_hammer"]);
+  assert.equal(needEvidenceWalkAway({ seller_context: { sellerType: "Antique Shop" } }), null, "no walk-away -> no line");
+  for (const f of ["en", "fr"]) {
+    const j = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")).analysis;
+    for (const k of ["nme_walk_away_dealer", "nme_walk_away_market", "nme_walk_away_auction"]) assert.match(j[k], /\{\{walkAway\}\}/, `${f}.${k}`);
+    assert.match(j.nme_walk_away_auction, /\{\{walkAwayAllIn\}\}/); assert.ok(j.nme_range_auction_hammer && j.nme_range_auction_equivalent);
+  }
+  const ui = readFileSync("src/components/AnalysisView.tsx", "utf8");
+  assert.match(ui, /basis === 'need_evidence' \? needEvidenceWalkAway\(rawItem\)/, "Buy Score text appends the provisional walk-away on Need More Evidence");
+});
+check("dealer walk-away above the provisional (auction) range is intended: walk = dealer high, dealer high >= auction high", () => {
+  const b = dealerBands(400, 900, 1100, 1800);
+  assert.equal(reconcileDealerNegotiation(b, 1100).walk_away_price, 1800);
+  assert.ok(dealerBands(400, 900, 0, 0).fairTop >= 900, "dealer high never below auction high");
 });
 const acheck = async (name: string, fn: () => Promise<void>) => { await fn(); passed++; console.log("ok -", name); };
 check("fitWithin keeps aspect, never upscales", () => {

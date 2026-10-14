@@ -1,6 +1,6 @@
 import { sanitizeWalkAwayIf } from '../services/gemini';
 import React, { useState, useEffect, useMemo } from 'react';
-import { applyVenueGuidance } from '../services/venueGuidance';
+import { applyVenueGuidance, needEvidenceWalkAway } from '../services/venueGuidance';
 import { motivationDecision } from '../services/motivation';
 import { OfferPlan } from './OfferPlan';
 import { createPortal } from 'react-dom';
@@ -373,7 +373,12 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         })
       : (score >= 65 ? t('analysis.buy_strong_desc') : score >= 45 ? t('analysis.buy_risky_desc') : t('analysis.buy_avoid_desc'));
 
-    let reasonOut = dealerReason ? `${reason} ${t('analysis.venue_note_dealer')}` : reason;
+    // Need More Evidence: state the app's provisional walk-away for this venue and what the provisional range is
+    const nw = basis === 'need_evidence' ? needEvidenceWalkAway(rawItem) : null;
+    const nmeLine = nw ? ' ' + t(`analysis.nme_range_${nw.rangeKind}`) + ' ' + (nw.isAuction && nw.allIn
+      ? t('analysis.nme_walk_away_auction', { walkAway: formatMoney(nw.walkAway, pg.currency), walkAwayAllIn: formatMoney(nw.allIn, pg.currency), premiumPct: nw.premiumPct })
+      : t(`analysis.nme_walk_away_${nw.venue}`, { walkAway: formatMoney(nw.walkAway, pg.currency) })) : '';
+    let reasonOut = (dealerReason ? `${reason} ${t('analysis.venue_note_dealer')}` : reason) + nmeLine;
     // Buyer motivation + budget: above the walk-away the verdict depends on them (all figures from motivation.ts)
     const md = motivationDecision(rawItem);
     if (md && !['high_risk', 'no_price'].includes(basis)) {
