@@ -372,9 +372,8 @@ export const decideBuy = (i: BuyDecisionInput): BuyDecision => {
     }
     // Period not established: a price that only looks good if the piece is period gets no buy verdict.
     // Overpriced / Walk Away stay (they hold whatever the period turns out to be).
-    if (i.needsEvidence && ['strong_buy', 'good_buy', 'fair'].includes(ps.basis)) {
-      return { score: 50, band: { min: 50, max: 50 }, basis: 'need_evidence', effectivePrice: effective, ...extra };
-    }
+    // (Peter, 14 Oct 2026: "help the buyer decide") Need More Evidence is no longer a verdict: the price verdict always
+    // stands; thin evidence is shown as a confidence note with 1-2 "check before you pay" tips (evidence_check).
     return { score: ps.score, band: ps.band, basis: ps.basis, effectivePrice: effective, cap, ...extra };
   }
   // No price: we cannot judge the deal; the score reflects the item only and stays below "Good buy"

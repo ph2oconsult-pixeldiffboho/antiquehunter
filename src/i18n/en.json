@@ -495,7 +495,15 @@
     "provisional_range": "Provisional market range",
     "provisional_note": "Provisional until the period is confirmed.",
     "describe_banner": "Add the evidence asked for: new photos are added to the ones you already have.",
-    "construction_seen": "Construction seen"
+    "construction_seen": "Construction seen",
+    "tips_title": "Check before you pay",
+    "tips": {
+      "underside_back": "Look underneath and at the back: old hand-cut wood and oxidised surfaces, not plywood or fresh saw marks.",
+      "drawer_joints": "Open a drawer: hand-cut dovetails (uneven) point to period work; machine-cut, even ones to a later piece.",
+      "hardware_mounts": "Check the hardware: hand-made screws and mounts with old wear, not cross-head screws or bright new metal.",
+      "seat_frame_webbing": "Feel under the seat: pegged joints and old webbing or tacks, not staples or modern foam.",
+      "stamp_label": "Look for a stamp, mark or label (top of the carcass, inside drawers, the frame)."
+    }
   },
   "checklist": {
     "title": "Before you buy",
@@ -674,7 +682,8 @@
     "reason_negotiate": "{{price}} is {{gap}} above the walk-away ({{walkAway}}). Worth having, but only if the price comes down: negotiate (see the offer plan).",
     "reason_premium": "{{price}} is {{gap}} over fair value (walk-away {{walkAway}}), within your budget of {{budget}}. It fills a gap in your collection, so paying a premium can make sense: know that you are paying {{gap}} more than it's worth.",
     "reason_over_budget": "{{outlay}} is {{budgetGap}} over your budget of {{budget}}.",
-    "within_budget": "Within your budget of {{budget}}."
+    "within_budget": "Within your budget of {{budget}}.",
+    "evidence_thin": "Confidence is lower: the period isn't confirmed, so check the points below before you pay."
   },
   "offer": {
     "title": "Offer plan",

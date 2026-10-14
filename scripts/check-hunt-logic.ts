@@ -2,7 +2,7 @@
 // Run: npx tsx scripts/check-hunt-logic.ts
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller, needEvidenceWalkAway } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
-import { motivationDecision, GAP_PREMIUM_PCT } from "../src/services/motivation.ts";
+import { motivationDecision, overridesNeedEvidence, GAP_PREMIUM_PCT } from "../src/services/motivation.ts";
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
 import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS, CALL_TIMEOUT_MS, TOTAL_BUDGET_MS, callTimeoutFor } from "../src/services/appraiseHandler.ts";
 import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
@@ -1056,12 +1056,11 @@ check("need more evidence: asks are specific to the kind of piece", () => {
   assert.deepEqual(evidenceAsks("mirror", { hasPhotos: false, hasCatalogue: true }), ["photos", "underside_back", "hardware_mounts", "stamp_label"]);
 });
 
-check("need more evidence: no Strong/Good Buy or Fair verdict, but Overpriced/Walk Away still shown", () => {
+check("thin evidence never blocks the verdict: the price verdict always stands (Peter: help the buyer decide)", () => {
   const d = (asking: number, needsEvidence: boolean) => decideBuy({ askingPrice: asking, isAuction: true, premiumPct: 28, hasPhotos: true, marketLow: 1000, marketHigh: 2500, retailHigh: 5000, smartBuy: 1200, walkAway: 2500, needsEvidence });
   assert.equal(d(850, false).basis, "strong_buy");
-  assert.equal(d(850, true).basis, "need_evidence");
-  assert.equal(d(850, true).score, 50);
-  assert.equal(d(2000, true).basis, "need_evidence");
+  assert.equal(d(850, true).basis, "strong_buy");
+  assert.equal(d(2000, true).basis, "fair");
   assert.equal(d(3000, true).basis, "overpriced");
   assert.equal(d(9000, true).basis, "walk_away");
 });
@@ -1079,8 +1078,8 @@ check("need more evidence: post-processing marks the range provisional and the v
     negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {}, }] });
   const ctx = { query: "Assess this antique from the images provided.", hasPhotos: true, askingPrice: 850, isAuction: true, premiumPct: 28, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture" };
   const amb: any = postProcessAppraisal(answer("ambiguous"), ctx)[0];
-  assert.equal(amb.buy_decision.price_basis, "need_evidence");
-  assert.equal(amb.buy_decision.label, "Need More Evidence");
+  assert.equal(amb.buy_decision.price_basis, "strong_buy", "thin evidence: decisive verdict, evidence kept as a note");
+  assert.equal(amb.evidence_check.required, true);
   assert.equal(amb.price_guidance.provisional, true);
   assert.equal(amb.evidence_check.pieceKind, "seating");
   assert.ok(amb.evidence_check.asks.includes("seat_frame_webbing"));
@@ -1469,7 +1468,7 @@ check("negotiate: opening / happy-at from the app's own figures, never above the
     for (const id of ["epoque", "estampille", "bronzes", "marbre", "glace", "restaurations"]) assert.ok(j.invoice_terms[id]);
   }
   const view = readFileSync(new URL("../src/components/AnalysisView.tsx", import.meta.url), "utf8");
-  assert.match(view, /<Negotiate embedded/); assert.match(view, /<Negotiate plan=/);
+  assert.match(view, /<Negotiate plan=/);
 });
 
 check("checklist and comparables texts exist in EN and FR (every item, status and fallback)", () => {
@@ -1484,7 +1483,7 @@ check("checklist and comparables texts exist in EN and FR (every item, status an
     assert.match(j.comps.stamp_warning, /(invoice|facture)/);
   }
   const view = readFileSync(new URL("../src/components/AnalysisView.tsx", import.meta.url), "utf8");
-  assert.match(view, /<MakerAndComparables/); assert.match(view, /<BeforeYouBuy embedded/); assert.match(view, /<BeforeYouBuy items/);
+  assert.match(view, /<MakerAndComparables/); assert.match(view, /data-testid="check-before-pay"/); assert.match(view, /<BeforeYouBuy items/);
 });
 
 check("comps server function: within the 50 s budget; never returns an unverified result; says so when nothing is verified", () => {
@@ -1734,7 +1733,7 @@ check("motivation: above the walk-away the verdict follows motivation and budget
     buy_decision: { price_basis: "overpriced", score: 30, effective_price: sellerType === "Auction" ? Math.round(price * 1.25) : price, compare_price: price },
   });
   const v = (st: string, m?: string, b?: number, p?: number, w?: number) => motivationDecision(it(st, m, b, p, w))!;
-  assert.equal(v("Market/Fair").verdict, "unchanged", "no motivation -> current behaviour");
+  assert.equal(v("Market/Fair").verdict, "negotiate", "no motivation -> the I'd like it behaviour");
   assert.equal(v("Market/Fair", "browsing").verdict, "walk_away");
   const wl = v("Market/Fair", "would_like"); assert.equal(wl.verdict, "negotiate"); assert.equal(wl.gap, 350);
   const fg = v("Market/Fair", "fills_gap", 1500); assert.equal(fg.verdict, "premium"); assert.equal(fg.gap, 350);
@@ -1808,6 +1807,32 @@ check("dealer walk-away above the provisional (auction) range is intended: walk 
   const b = dealerBands(400, 900, 1100, 1800);
   assert.equal(reconcileDealerNegotiation(b, 1100).walk_away_price, 1800);
   assert.ok(dealerBands(400, 900, 0, 0).fairTop >= 900, "dealer high never below auction high");
+});
+check("motivation verdict overrides a (saved) Need More Evidence above the walk-away or over budget; no motivation = I'd like it", () => {
+  const it = (sellerType: string, motivation?: string, budget?: number, price = 1250, walk = 900) => applyVenueGuidance({
+    seller_context: { sellerType, isAuction: sellerType === "Auction", buyerPremiumRate: sellerType === "Auction" ? 25 : 0, askingPrice: price, motivation, budget },
+    price_guidance: { estimated_market_range_low: 400, estimated_market_range_high: 900, fair_price_low: 1100, fair_price_high: 1800, good_buy_below: 650, currency: "EUR", provisional: true },
+    negotiation_strategy: { walk_away_price: walk }, walk_away_threshold: { hammer: walk, premium_pct: 25 },
+    buy_decision: { price_basis: "need_evidence", score: 50, effective_price: sellerType === "Auction" ? Math.round(price * 1.25) : price, compare_price: price },
+  });
+  const o = (st: string, m?: string, b?: number, p?: number, w?: number) => { const md = motivationDecision(it(st, m, b, p, w)); return [md?.verdict, overridesNeedEvidence(md, "need_evidence")]; };
+  for (const st of ["Private Seller", "Market/Fair"]) {
+    assert.deepEqual(o(st, "browsing", 1500), ["walk_away", true]);
+    assert.deepEqual(o(st, "would_like", 1500), ["negotiate", true]);
+    assert.deepEqual(o(st, "fills_gap", 1500), ["premium", true]);
+    assert.deepEqual(o(st, "would_like", 1000), ["over_budget", true]);
+    assert.deepEqual(o(st), ["negotiate", true], "no motivation: I'd like it");
+    assert.deepEqual(o(st, undefined, 1000), ["over_budget", true], "budget only: over budget");
+    assert.deepEqual(o(st, "would_like", 1500, 800), ["unchanged", false], "below the walk-away: stays");
+  }
+  assert.deepEqual(o("Auction", "would_like", 2000, 1000, 900), ["negotiate", true], "auction: hammer 1,000 > 900 (all-in 1,250 > 1,125)");
+  assert.equal(overridesNeedEvidence(motivationDecision(it("Market/Fair", "browsing", 1500)), "overpriced"), false, "only overrides need_evidence");
+  for (const f of ["en", "fr"]) assert.ok(JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")).motivation.evidence_thin, f);
+  const ui = readFileSync("src/components/AnalysisView.tsx", "utf8");
+  assert.match(ui, /if \(rawItem\.evidence_check\?\.required\) reasonOut = `\$\{reasonOut\} \$\{t\('motivation\.evidence_thin'\)\}`/, "thin evidence = a confidence note");
+  assert.match(ui, /\.slice\(0, 2\)\.map\(\(a\) => \(\s*<li key=\{a\} className="text-sm text-ink">• \{t\(`evidence\.tips\.\$\{a\}`\)\}/, "at most two check-before-you-pay tips");
+  assert.ok(!/<EvidenceStep/.test(ui), "no blocking evidence step");
+  for (const f of ["en", "fr"]) { const e = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")).evidence; for (const a of ["underside_back", "drawer_joints", "hardware_mounts", "seat_frame_webbing", "stamp_label"]) assert.ok(e.tips[a], f + a); assert.ok(e.tips_title); }
 });
 const acheck = async (name: string, fn: () => Promise<void>) => { await fn(); passed++; console.log("ok -", name); };
 check("fitWithin keeps aspect, never upscales", () => {
