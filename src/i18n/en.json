@@ -189,7 +189,7 @@
     "reason_dealer_good_buy": "{{price}} is at or below {{goodTop}} (the lower of the auction high and the dealer low) – a good shop price.",
     "reason_dealer_fair": "{{price}} is within the dealer range ({{dealerLow}}–{{dealerHigh}}) – a fair shop price.",
     "reason_dealer_overpriced": "{{price}} is above the dealer high ({{dealerHigh}}) – overpriced, even for a shop. Don't go above {{dealerHigh}}.",
-    "reason_dealer_walk_away": "{{price}} is well above the dealer range (over {{overTop}}) – walk away.",
+    "reason_dealer_walk_away": "{{price}} is well above the dealer high ({{dealerHigh}}), our walk-away price – walk away.",
     "market_bargain_band": "Market bargain band",
     "venue_note_market": "At a brocante or flea market, bargains below auction level are possible, but quality is not guaranteed: no provenance, no guarantee, and condition is as found.",
     "venue_note_dealer": "Dealers cost more than auction, but quality is generally more guaranteed: provenance, a guarantee and professional restoration are usually part of the price.",

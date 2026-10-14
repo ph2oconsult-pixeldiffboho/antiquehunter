@@ -1345,6 +1345,8 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   for (const lang of ["en", "fr"]) {
     const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8")).analysis;
     for (const k of ["auction_range", "dealer_range", "dealer_scale_note", "reason_dealer_strong_buy", "reason_dealer_good_buy", "reason_dealer_fair", "reason_dealer_overpriced", "reason_dealer_walk_away"]) assert.ok(j[k], `${lang} ${k}`);
+    // The walk-away reason cites the walk-away (dealer high), never the 1.5x band edge (e.g. €975 next to a €650 walk-away)
+    assert.ok(j.reason_dealer_walk_away.includes("{{dealerHigh}}") && !j.reason_dealer_walk_away.includes("{{overTop}}"), `${lang} reason_dealer_walk_away cites dealerHigh`);
   }
 });
 
