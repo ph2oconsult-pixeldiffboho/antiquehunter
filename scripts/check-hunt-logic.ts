@@ -1772,6 +1772,7 @@ check("motivation: offer plan figures (cash cap, best-and-final <= walk-away unl
   assert.equal(ag.max_hammer, 1000, "fills a gap: min(walk +15% rounded down, budget / 1.25 = 1,040)");
   assert.equal(motivationDecision(it("Auction", "fills_gap", 1200))!.plan!.max_hammer, 960, "budget-bound: 1,200 / 1.25 = 960"); assert.ok(ag.max_all_in! <= 1300);
   assert.equal(motivationDecision(it("Market/Fair", undefined, undefined, 500, 900))!.plan, null, "below fair value: no plan");
+  assert.match(readFileSync("src/components/AnalysisView.tsx", "utf8"), /md\.verdict === 'negotiate' \|\| md\.verdict === 'premium'/, "negotiate / premium replace the contradicting walk-away sentence");
   for (const f of ["en", "fr"]) { const j = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")); for (const k of ["verdict_negotiate", "verdict_premium", "verdict_over_budget", "reason_premium"]) assert.ok(j.motivation[k], f + k); assert.ok(j.offer.cash_capped && j.describe.motivation_fills_gap, f); }
   assert.ok(!/\d/.test(JSON.parse(readFileSync("src/i18n/en.json", "utf8")).motivation.reason_negotiate), "no figures in strings except placeholders");
 });
