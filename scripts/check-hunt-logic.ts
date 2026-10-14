@@ -1299,7 +1299,27 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 1400, category: "mirrors" }))[0].buy_decision.label, "Overpriced");
   assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 2000, category: "mirrors" }))[0].buy_decision.label, "Walk Away");
   // private seller: same dealer range scale
-  assert.equal(postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 950, category: "mirrors", sellerType: "Market/Fair" }))[0].buy_decision.price_scale, "dealer");
+  // venue split (PR #28): Market/Fair and private sellers use the market bands; every figure on the page agrees
+  for (const st of ["Market/Fair", "Private Seller"]) {
+    const v: any = postProcessAppraisal(lpRaw(), dealerCtx(q, { askingPrice: 450, category: "mirrors", sellerType: st }))[0];
+    assert.equal(v.buy_decision.price_scale, "market", st);
+    assert.equal(v.negotiation_strategy.walk_away_price, 700, st + ": walk-away = auction high");
+    assert.equal(v.price_guidance.overpaying_above, 700); assert.equal(v.negotiation_plan.walk_away, 700, st + ": Negotiate box uses the venue walk-away");
+    assert.equal(v.price_guidance.good_buy_below, 500); assert.equal(v.price_guidance.market_bargain_low, 300);
+    assert.ok(v.negotiation_strategy.target_price_high <= 700 && v.negotiation_plan.happy_at <= 700 && v.negotiation_plan.opening_offer <= v.negotiation_plan.happy_at);
+    assert.equal(v.buy_decision.label, "Good Buy", st + ": €450 inside the bargain band €300–500");
+    assert.equal(v.buy_decision.dealer_bands, null);
+    assert.equal(v.negotiation_plan.payment.mode, st === "Market/Fair" ? "cash_market" : "cash_private_receipt");
+    assert.ok(v.walk_away_if.some((x: string) => /walk-away of €700/.test(x)) && !v.walk_away_if.some((x: string) => /450/.test(x)), JSON.stringify(v.walk_away_if));
+  }
+  const dl: any = postProcessAppraisal((() => { const r = lpRaw(); r.items[0].walk_away_if = ["The price exceeds 450 EUR.", "Glass replaced."]; return r; })(), dealerCtx(q, { askingPrice: 450, category: "mirrors", sellerType: "Antique Shop" }))[0];
+  assert.equal(dl.negotiation_plan.walk_away, 1100); assert.equal(dl.negotiation_strategy.walk_away_price, 1100); assert.equal(dl.negotiation_plan.payment.mode, "cash");
+  const auV: any = postProcessAppraisal((() => { const r = lpRaw(); r.items[0].walk_away_if = ["The total cost (hammer + 25% premium) exceeds 800 EUR.", "Glass replaced."]; return r; })(), dealerCtx(q, { askingPrice: 450, category: "mirrors", sellerType: "Auction", isAuction: true, premiumPct: 25 }))[0];
+  assert.equal(auV.buy_decision.price_scale, "auction"); assert.equal(auV.negotiation_plan.walk_away, auV.negotiation_strategy.walk_away_price);
+  const wV = auV.negotiation_strategy.walk_away_price;
+  assert.equal(auV.walk_away_if[1], `The hammer goes above €${wV.toLocaleString("en")} (about €${Math.round(wV * 1.25).toLocaleString("en")} all-in with the 25% buyer's premium).`, JSON.stringify(auV.walk_away_if));
+  assert.equal(auV.negotiation_plan.bidding.max_all_in, Math.round(wV * 1.25));
+  assert.deepEqual(dl.walk_away_if, ["Glass replaced.", "The final price goes above your walk-away of €1,100."]);
   // the model's dealer range out of line: clamped (low >= auction mid, high >= auction high)
   const bad = lpRaw(); Object.assign(bad.items[0].price_guidance, { fair_price_low: 320, fair_price_high: 650 });
   const c: any = postProcessAppraisal(bad, dealerCtx(q, { askingPrice: 950, category: "mirrors" }))[0];

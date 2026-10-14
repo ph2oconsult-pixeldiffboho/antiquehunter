@@ -618,7 +618,8 @@
     "bid_discipline": "Ne dépassez pas votre maximum dans l'ambiance de la salle ; une autre occasion viendra.",
     "bid_costs": "Ajoutez les frais : TVA sur les frais, frais d'enchères en ligne et transport.",
     "bid_max_note": "avec {{pct}} % de frais acheteur",
-    "bid_max_locked": "Fixez votre maximum avant la vente, frais acheteur de {{pct}} % compris. Votre enchère maximale suggérée :"
+    "bid_max_locked": "Fixez votre maximum avant la vente, frais acheteur de {{pct}} % compris. Votre enchère maximale suggérée :",
+    "pay_cash_market": "Sur un marché, le liquide fait la différence : payez en espèces et repassez en fin de journée, quand le marchand préfère vendre plutôt que remballer ({{lo}} à {{hi}} % de remise sont courants{{amount}}). Beaucoup d'exposants sont des professionnels : un résident fiscal français ne peut pas leur payer plus de {{cap}} en espèces."
   },
   "field_notes": {
     "title": "Notes de terrain",

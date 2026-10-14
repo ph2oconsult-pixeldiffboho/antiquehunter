@@ -23,7 +23,9 @@ export const sellerKindOf = (sellerType: string | undefined, isAuction: boolean)
 const nice = (x: number) => x <= 0 ? 0 : x < 1000 ? Math.round(x / 10) * 10 : x < 10000 ? Math.round(x / 50) * 50 : Math.round(x / 100) * 100;
 
 export interface NegotiationInput {
-  sellerType?: string; isAuction: boolean; askingPrice?: number; currency: string;
+  sellerType?: string; isAuction: boolean;
+  /** 'market' (brocante / flea market) or 'private' when known; dealer / auction come from sellerType */
+  venue?: 'market' | 'private' | 'dealer' | 'auction'; askingPrice?: number; currency: string;
   walkAway: number;            // the app's walk-away (dealer: all-in price; auction: max hammer)
   openingOffer?: number;       // the app's reconciled opening offer (<= smart buy)
   targetHigh?: number;         // the app's reconciled target high (<= walk-away)
@@ -37,7 +39,7 @@ export interface NegotiationPlan {
   kind: SellerKind;
   opening_offer?: number; happy_at?: number; walk_away: number; asking?: number;
   asking_over_walk_pct?: number;           // how far the asking price is above the walk-away (dealer / private)
-  payment?: { mode: 'cash' | 'cash_private_receipt' | 'transfer'; discount_pct: [number, number]; discount_amount?: [number, number]; cap_eur: number; cap_non_resident_eur: number; over_cap: boolean };
+  payment?: { mode: 'cash' | 'cash_private_receipt' | 'cash_market' | 'transfer'; discount_pct: [number, number]; discount_amount?: [number, number]; cap_eur: number; cap_non_resident_eur: number; over_cap: boolean };
   levers: Array<{ id: 'bundle' | 'flaws' | 'delivery' | 'timing'; flaws?: string[] }>;
   invoice: { terms: string[] };
   bidding?: { max_hammer: number; max_all_in: number; premium_pct: number };
@@ -86,7 +88,8 @@ export const buildNegotiationPlan = (i: NegotiationInput): NegotiationPlan => {
 
   // Payment leverage. The amount actually paid is ~ the "happy at" price.
   const paidEur = convertApprox(happy || ask || walk, i.currency, 'EUR') ?? (happy || ask || walk);
-  const mode: 'cash' | 'cash_private_receipt' | 'transfer' = kind === 'private' ? 'cash_private_receipt' : paidEur <= CASH_CAP_FR_RESIDENT_EUR ? 'cash' : 'transfer';
+  const market = kind === 'private' && i.venue === 'market';
+  const mode: 'cash' | 'cash_private_receipt' | 'cash_market' | 'transfer' = market ? (paidEur <= CASH_CAP_FR_RESIDENT_EUR ? 'cash_market' : 'transfer') : kind === 'private' ? 'cash_private_receipt' : paidEur <= CASH_CAP_FR_RESIDENT_EUR ? 'cash' : 'transfer';
   const base = happy || ask || 0;
   const payment = { mode, over_cap: paidEur > CASH_CAP_FR_RESIDENT_EUR, discount_pct: CASH_DISCOUNT_PCT, cap_eur: CASH_CAP_FR_RESIDENT_EUR, cap_non_resident_eur: CASH_CAP_FR_NON_RESIDENT_EUR,
     ...(mode !== 'transfer' && base > 0 ? { discount_amount: [nice(base * 0.05), nice(base * 0.10)] as [number, number] } : {}) };

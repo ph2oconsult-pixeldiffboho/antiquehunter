@@ -618,7 +618,8 @@
     "bid_discipline": "Don't bid above your maximum in the heat of the room; the next one will come.",
     "bid_costs": "Add the costs: VAT on the premium, online-bidding fees and transport.",
     "bid_max_note": "with the {{pct}}% buyer's premium",
-    "bid_max_locked": "Set your maximum before the sale, including the {{pct}}% buyer's premium. Your suggested maximum bid:"
+    "bid_max_locked": "Set your maximum before the sale, including the {{pct}}% buyer's premium. Your suggested maximum bid:",
+    "pay_cash_market": "At a market, cash talks: offer cash, and come back near the end of the day, when stallholders would rather sell than pack up ({{lo}}–{{hi}}% off is typical{{amount}}). Many stallholders are professionals: a French tax resident may pay a trader in cash only up to {{cap}}."
   },
   "field_notes": {
     "title": "Dealer Field Notes",

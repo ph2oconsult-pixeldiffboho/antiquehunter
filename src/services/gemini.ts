@@ -10,6 +10,7 @@ import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
 import { buildNegotiationPlan } from "./negotiation";
+import { venueOf, isPrivateSeller, marketBands, marketFigures, walkAwayConditions, MARKET_OVER_FACTOR } from "./venueGuidance";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
 
@@ -618,13 +619,23 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // Dealer, shop and private prices are judged against the DEALER range (the retail tier), not the auction range:
     // the dealer range is made sane first (dealer low >= auction mid, dealer high >= auction high), the walk-away is
     // the dealer high. Auction mode is unchanged.
+    // Venue split (PR #28): Market/Fair and private sellers are judged on their own market bands (bargain band up to the
+    // auction mid, walk-away = auction high); dealers keep the dealer range; auctions are unchanged.
+    const venue = venueOf({ isAuction, sellerType });
+    const marketVenue = venue === 'market';
     let bands: VerdictBands | undefined;
-    if (!isAuction) {
+    if (marketVenue) {
+      bands = marketBands(pg.estimated_market_range_low, pg.estimated_market_range_high);
+      const dr = saneDealerRange(pg.estimated_market_range_low, pg.estimated_market_range_high, pg.fair_price_low, pg.fair_price_high);
+      pg.fair_price_low = dr.low; pg.fair_price_high = dr.high;
+    } else if (!isAuction) {
       const dr = saneDealerRange(pg.estimated_market_range_low, pg.estimated_market_range_high, pg.fair_price_low, pg.fair_price_high);
       pg.fair_price_low = dr.low; pg.fair_price_high = dr.high;
       bands = dealerBands(pg.estimated_market_range_low, pg.estimated_market_range_high, dr.low, dr.high);
     }
-    const nf = bands ? reconcileDealerNegotiation(bands, pg.fair_price_low) : reconcileNegotiation(
+    const mf = marketVenue ? marketFigures(pg.estimated_market_range_low, pg.estimated_market_range_high) : null;
+    const nf = mf ? { good_buy_below: mf.good_buy_below, opening_offer: mf.opening_offer, target_price_low: mf.target_price_low, target_price_high: mf.target_price_high, walk_away_price: mf.walk_away_price }
+      : bands ? reconcileDealerNegotiation(bands, pg.fair_price_low) : reconcileNegotiation(
       { good_buy_below: pg.good_buy_below, ...(ns || {}) },
       pg.estimated_market_range_low, pg.estimated_market_range_high, premiumPct, isAuction
     );
@@ -632,6 +643,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // "Overpaying" starts exactly at the walk-away price (same units: hammer at auction), so every price maps to
     // one band: <= smart buy (good) / <= walk-away (fair) / above walk-away (overpriced) / above retail (walk away)
     pg.overpaying_above = nf.walk_away_price;
+    if (mf) { (pg as any).market_bargain_low = mf.bargain_low; (pg as any).market_bargain_high = mf.bargain_high; }
     if (ns) {
       ns.opening_offer = nf.opening_offer;
       ns.target_price_low = nf.target_price_low;
@@ -653,7 +665,9 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     if (!item.teaser_insight || teaserHasMoney) {
       if (item.price_guidance?.good_buy_below) {
         const money = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
-        item.teaser_insight = bands
+        item.teaser_insight = marketVenue
+          ? `A bargain here is below ${money(item.price_guidance.good_buy_below)}. Above ${money(nf.walk_away_price)} (the auction high), you are overpaying.`
+          : bands
           ? `A good shop price is below ${money(item.price_guidance.good_buy_below)}. Above ${money(nf.walk_away_price)} (the top of the dealer range), you are overpaying.`
           : `Dealers would typically buy below ${money(item.price_guidance.good_buy_below)}${isAuction ? ' (hammer)' : ''}. Above ${money(nf.walk_away_price)}, you are overpaying.`;
       } else {
@@ -709,6 +723,14 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         overpriced: [`${ask} is above the dealer range (${dl}–${dh}): overpriced, even for a shop.`, `${ask} dépasse la fourchette marchand (${dl}–${dh}) : trop cher, même en boutique.`],
         walk_away: [`${ask} is well above the dealer range (${dl}–${dh}): walk away.`, `${ask} est bien au-dessus de la fourchette marchand (${dl}–${dh}) : passez votre chemin.`],
       };
+      if (marketVenue) {
+        const bl = m(nf.opening_offer > 0 ? Number((pg as any).market_bargain_low) || pg.estimated_market_range_low : pg.estimated_market_range_low), bh = m(nf.good_buy_below), wa = m(nf.walk_away_price), ot = m(pg.estimated_market_range_high * MARKET_OVER_FACTOR);
+        band.strong_buy = [`${ask} is at or below the auction low: a real market bargain.`, `${ask} est au niveau ou sous le bas des enchères : une vraie affaire.`];
+        band.good_buy = [`${ask} is inside the bargain band (${bl}–${bh}).`, `${ask} est dans la fourchette « bonne affaire » (${bl}–${bh}).`];
+        band.fair = [`${ask} is above the bargain band but within the walk-away (${wa}, the auction high).`, `${ask} dépasse la fourchette « bonne affaire » mais reste sous le prix plafond (${wa}, haut des enchères).`];
+        band.overpriced = [`${ask} is above the walk-away (${wa}, the auction high): you could likely do better at auction.`, `${ask} dépasse le prix plafond (${wa}, haut des enchères) : vous feriez sans doute mieux aux enchères.`];
+        band.walk_away = [`${ask} is far above auction level (over ${ot}): walk away.`, `${ask} est très au-dessus du niveau des enchères (plus de ${ot}) : passez votre chemin.`];
+      }
       const verdictLine = band[basis][fr ? 1 : 0];
       const auctionLine = fr ? `Aux enchères, la pièce ferait environ ${al}–${ah} (marteau).` : `At auction it would make about ${al}–${ah} (hammer).`;
       const fix = (t: any) => { if (typeof t !== 'string') return t; const r = dropContradictions(t, basis); proseRemoved += r.removed; return r.text || verdictLine; };
@@ -752,11 +774,17 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     });
 
     const nsF = item.negotiation_strategy || {};
+    {
+      const fr = String(language || '').toLowerCase().startsWith('fr');
+      const mny = (n: number) => { try { return new Intl.NumberFormat(fr ? 'fr-FR' : (language || 'en'), { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
+      const wa = Number(nsF.walk_away_price) || 0;
+      item.walk_away_if = walkAwayConditions(item.walk_away_if, { venue, walkAway: wa, allIn: Math.round(wa * (1 + (isAuction ? premiumPct : 0) / 100)), premiumPct, money: mny, fr });
+    }
     const negotiationPlan = buildNegotiationPlan({
-      sellerType, isAuction, askingPrice: Number(askingPrice) || undefined, currency: targetCurrency,
+      sellerType, isAuction, venue: marketVenue ? (isPrivateSeller({ sellerType }) ? 'private' : 'market') : venue, askingPrice: Number(askingPrice) || undefined, currency: targetCurrency,
       walkAway: Number(nsF.walk_away_price) || Number(item.price_guidance?.estimated_market_range_high) || 0,
       openingOffer: Number(nsF.opening_offer) || undefined, targetHigh: Number(nsF.target_price_high) || undefined, premiumPct,
-      dealerLow: bands ? Number(item.price_guidance?.fair_price_low) || undefined : undefined,
+      dealerLow: bands && !marketVenue ? Number(item.price_guidance?.fair_price_low) || undefined : undefined,
       checklist: checklistItems, answers: checkAnswers, maker: makerAsClaimed && !['mentioned', 'dealer_label'].includes(makerAsClaimed.status) ? makerAsClaimed.name : null,
       period: item.item_summary.likely_period, text: `${query} ${titleText}`, pieces, pieceKind,
     });
@@ -798,9 +826,9 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         effective_price: allIn || null,
         compare_price: decision.comparePrice || null,
         // which range the price was judged against: 'dealer' (shop / dealer / private) or 'auction'
-        price_scale: bands ? 'dealer' : 'auction',
+        price_scale: marketVenue ? 'market' : bands ? 'dealer' : 'auction',
         prose_sentences_removed: bands ? proseRemoved : undefined,
-        dealer_bands: bands ? { strong_buy_to: Math.round(bands.strongTop), good_buy_to: Math.round(bands.goodTop), fair_to: Math.round(bands.fairTop), overpriced_to: Math.round(bands.overTop) } : null,
+        dealer_bands: bands && !marketVenue ? { strong_buy_to: Math.round(bands.strongTop), good_buy_to: Math.round(bands.goodTop), fair_to: Math.round(bands.fairTop), overpriced_to: Math.round(bands.overTop) } : null,
         label: getBuyLabel(basis),
         confidence: confLabel
       }

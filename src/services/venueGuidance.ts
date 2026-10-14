@@ -70,3 +70,19 @@ export const applyVenueGuidance = <T extends Record<string, any>>(item: T): T =>
     negotiation_strategy: { ...(item.negotiation_strategy || {}), opening_offer: f.opening_offer, target_price_low: f.target_price_low, target_price_high: f.target_price_high, walk_away_price: f.walk_away_price },
   };
 };
+
+const MONEY_RE = /(\d[\d\s.,\u00a0\u202f]*\s?(€|£|\$|kr|eur|gbp|usd|sek)\b)|((€|£|\$)\s?\d)/i;
+
+/** "When to walk away" conditions: any condition quoting a money figure is replaced by one line built from the app's own
+ *  walk-away (auction: max hammer bid and its all-in cost), so the list can never contradict the walk-away card. */
+export const walkAwayConditions = (list: unknown, o: { venue: Venue; walkAway: number; allIn?: number; premiumPct?: number; money: (n: number) => string; fr?: boolean }): string[] => {
+  const items = (Array.isArray(list) ? list : []).map(x => String(x || '').trim()).filter(Boolean);
+  const kept = items.filter(x => !MONEY_RE.test(x));
+  if (!(o.walkAway > 0)) return kept;
+  const w = o.money(o.walkAway);
+  const line = o.venue === 'auction'
+    ? (o.fr ? `L'enchère dépasse ${w} au marteau (environ ${o.money(o.allIn || o.walkAway)} frais compris, avec ${o.premiumPct || 0} % de frais acheteur).`
+            : `The hammer goes above ${w} (about ${o.money(o.allIn || o.walkAway)} all-in with the ${o.premiumPct || 0}% buyer's premium).`)
+    : (o.fr ? `Le prix final dépasse votre prix plafond de ${w}.` : `The final price goes above your walk-away of ${w}.`);
+  return [...kept.slice(0, 2), line];
+};
