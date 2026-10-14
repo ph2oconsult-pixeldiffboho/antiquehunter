@@ -725,7 +725,10 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
 
   // A web-search error with nothing else found still fails; a web-search TIMEOUT returns what the direct sources
   // found (possibly nothing) with a notice instead of failing the whole request (fix 8)
-  if (geminiError && !(geminiError instanceof HuntTimeoutError) && auctionet.matches.length === 0 && directMatches.length === 0) throw geminiError;
+  // ...but when an auction site WAS read and its lots were all filtered out, that is an honest "no matching listings",
+  // not an interrupted search (Peter's #38 test: Gemini 429 + every Drouot lot filtered -> "Sourcing Interrupted").
+  const directRead = !!direct.result && direct.result.coveredDomains.length > 0;
+  if (geminiError && !(geminiError instanceof HuntTimeoutError) && !directRead && auctionet.matches.length === 0 && directMatches.length === 0) throw geminiError;
 
   // Validation of web-search results gets at most VALIDATION_BUDGET_MS, never past the overall budget
   const deadline = Math.min(geminiDone + VALIDATION_BUDGET_MS, startedAt + FUNCTION_BUDGET_MS);
@@ -784,11 +787,12 @@ export const huntAntiquesLive = async (params: HuntParams): Promise<HuntResults>
       ...(rankerError ? { rankerError } : {}),
     },
   };
+  const webWhy = geminiError instanceof HuntTimeoutError || geminiError?.name === 'HuntTimeoutError' ? 'The web search took too long' : 'The web search is unavailable right now';
   if (geminiError) results.notice = finalMatches.length === 0
-    ? 'The web search took too long and the auction sites searched directly had no matching live lots. Try again, or widen the budget or regions.'
+    ? `${webWhy}, and the auction sites searched directly had no live lots matching your search${directReturned ? ` (${directReturned} lots checked, none matched the piece, style, wood or period asked for)` : ''}. Try again later, or broaden the description, budget or regions.`
     : directMatches.length
-      ? 'The web search took too long, so only lots found directly on the auction sites are shown.'
-      : 'The web search took too long, so only lots found directly on Auctionet are shown.';
+      ? `${webWhy}, so only lots found directly on the auction sites are shown.`
+      : `${webWhy}, so only lots found directly on Auctionet are shown.`;
   if (finalMatches.length === 0) results.message = NO_VERIFIED_MESSAGE;
   return results;
 };

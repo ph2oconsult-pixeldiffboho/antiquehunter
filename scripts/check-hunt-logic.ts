@@ -3,7 +3,7 @@
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
-import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS } from "../src/services/appraiseHandler.ts";
+import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS, CALL_TIMEOUT_MS, TOTAL_BUDGET_MS, callTimeoutFor } from "../src/services/appraiseHandler.ts";
 import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -30,7 +30,7 @@ import { napoleonIIIProblem, siteQueries } from "../src/services/directSearch.ts
 import { candidateToMatch, crossListingKey, evaluateLot, periodProblemFor, finishDirect, searchDirectSites } from "../src/services/directSearch.ts";
 import { allIn, budgetMin } from "../src/services/budget.ts";
 import { localQueries } from "../src/services/huntGeo.ts";
-import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
+import { frenchSiteQuery, frenchSiteQueries, headType, partlyPeriodProblem, pieceProblem, requestedStyleOnlyProblem, styleOriginProblem, subtypeInQuery } from "../src/services/pieceWords.ts";
 import { applyRanking } from "../src/services/hunting.ts";
 import { auctionetItemId, drouotFullDescription, drouotPhotoUrls, lotFactsPrompt, pickAuctionetItem } from "../src/services/lotFetch.ts";
 import { bandScore, dealerBands, saneDealerRange, reconcileDealerNegotiation, priceBandScore as pbs, decideBuy as decideBuyX, DEALER_WALK_AWAY_FACTOR } from "../src/services/appraisalMath.ts";
@@ -39,6 +39,7 @@ import { calibratedConfidence, confidenceLabel, normaliseConfidence, evidenceChe
 import { detectMaker, makerStatusFromText, countPieces, materialOf, pieceOf, combineMakerStatus, findMaker } from "../src/services/makers.ts";
 import { parseChristiesLot, parseBonhamsLot, priceOnPage, verifyComparable, anchorOnComparables, classifyStamp, type Comparable } from "../src/services/compsMath.ts";
 import { buildNegotiationPlan, CASH_CAP_FR_RESIDENT_EUR, CASH_CAP_FR_NON_RESIDENT_EUR } from "../src/services/negotiation.ts";
+import { FAST_MODEL as COMPS_FAST_MODEL, FAST_FALLBACK_MODEL as COMPS_FALLBACK_MODEL } from "../src/services/compsSearch.ts";
 import { findComparables, handleCompsRequest, parseLooseJson, COMPS_TOTAL_BUDGET_MS, COMPS_GEMINI_TIMEOUT_MS, COMPS_VERIFY_BUDGET_MS } from "../src/services/compsSearch.ts";
 import { buildChecklist, checksEffect, checksPrompt, DENIAL_FACTOR } from "../src/services/checklist.ts";
 import { COMPS_CLIENT_TIMEOUT_MS } from "../src/services/gemini.ts";
@@ -350,6 +351,11 @@ check("geography: UK-only drops French sites, keeps UK sites", () => {
   assert.equal(checkGeography("https://auctionet.com/en/1-x", ["Barcelona"], regionsFor(["Sweden"])).ok, false);
   assert.equal(regionsFor(["Global/Rest of World", "France"]), null);
   assert.equal(regionsInLocation("Kyiv, Ukraine").has("United Kingdom"), false);
+  // "york" (UK) inside "new york" (US) must not make a New York sale British
+  assert.deepEqual(Array.from(regionsInLocation("New York, NY")), ["United States"]);
+  assert.deepEqual(Array.from(regionsInLocation("New York")), ["United States"]);
+  assert.deepEqual(Array.from(regionsInLocation("York, North Yorkshire")), ["United Kingdom"]);
+  assert.equal(checkGeography("https://www.christies.com/lot/1", ["New York, NY"], new Set(["France", "United Kingdom"] as any)).ok, false);
 });
 
 check("geography: platforms follow the selected regions", () => {
@@ -1344,6 +1350,8 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   for (const lang of ["en", "fr"]) {
     const j = JSON.parse(readFileSync(new URL(`../src/i18n/${lang}.json`, import.meta.url), "utf8")).analysis;
     for (const k of ["auction_range", "dealer_range", "dealer_scale_note", "reason_dealer_strong_buy", "reason_dealer_good_buy", "reason_dealer_fair", "reason_dealer_overpriced", "reason_dealer_walk_away"]) assert.ok(j[k], `${lang} ${k}`);
+    // The walk-away reason cites the walk-away (dealer high), never the 1.5x band edge (e.g. €975 next to a €650 walk-away)
+    assert.ok(j.reason_dealer_walk_away.includes("{{dealerHigh}}") && !j.reason_dealer_walk_away.includes("{{overTop}}"), `${lang} reason_dealer_walk_away cites dealerHigh`);
   }
 });
 
@@ -1751,7 +1759,7 @@ await acheck("appraise handler retries 503 then succeeds; gives up with model_bu
   const ok = await handleAppraiseRequest(body, { sleep, generate: async () => { if (++n < 3) throw Object.assign(new Error("overloaded"), { status: 503 }); return { text: "{}" }; } });
   assert.equal(ok.status, 200); assert.equal(n, 3); assert.deepEqual(waits, RETRY_DELAYS_MS);
   n = 0; const busy = await handleAppraiseRequest(body, { sleep, generate: async () => { n++; throw Object.assign(new Error("x"), { status: 503 }); } });
-  assert.equal(busy.status, 503); assert.equal(busy.body.code, "model_busy"); assert.equal(n, 3);
+  assert.equal(busy.status, 503); assert.equal(busy.body.code, "model_busy"); assert.equal(n, 3 + FALLBACK_MODELS.length, "primary x3 then each fallback once");
   n = 0; const bad = await handleAppraiseRequest(body, { sleep, generate: async () => { n++; throw Object.assign(new Error("Unable to process input image"), { status: 400 }); } });
   assert.equal(bad.status, 400); assert.equal(bad.body.code, "bad_input"); assert.equal(n, 1);
   assert.ok(RETRY_DELAYS_MS.reduce((a, b) => a + b, 0) < 10_000);
@@ -1794,6 +1802,95 @@ check("walk-away: qualitative walk_away_if only, one authoritative threshold (de
     if (ctx.isAuction) assert.equal(it.walk_away_threshold.all_in, Math.round(it.walk_away_threshold.hammer * 1.28), `${name}: all-in = hammer x (1 + premium)`);
     else assert.equal(it.walk_away_threshold.all_in, null, name);
   }
+});
+await acheck("appraise handler falls back to lighter models after primary 503/404, within the time budget", async () => {
+  const body = { contents: { parts: [{ text: "x" }] }, config: { thinkingConfig: { thinkingLevel: "LOW" }, temperature: 0 } };
+  const sleep = async () => {};
+  const seen: string[] = [];
+  const r = await handleAppraiseRequest(body, { sleep, generate: async ({ model, config }: any) => {
+    seen.push(model);
+    if (model === APPRAISAL_MODEL) throw Object.assign(new Error("overloaded"), { status: 503 });
+    assert.ok(config.thinkingConfig, "Gemini 3 fallback keeps thinkingLevel");
+    return { text: "{}" };
+  } });
+  assert.equal(r.status, 200); assert.equal(r.body.model, FALLBACK_MODELS[0]);
+  assert.deepEqual(seen, [APPRAISAL_MODEL, APPRAISAL_MODEL, APPRAISAL_MODEL, FALLBACK_MODELS[0]]);
+  seen.length = 0;
+  const gone = await handleAppraiseRequest(body, { sleep, generate: async ({ model }: any) => { seen.push(model); if (model !== FALLBACK_MODELS[FALLBACK_MODELS.length - 1]) throw Object.assign(new Error("not found"), { status: 404 }); return { text: "{}" }; } });
+  assert.equal(gone.body.model, FALLBACK_MODELS[FALLBACK_MODELS.length - 1]); assert.equal(APPRAISAL_MODEL, "gemini-3.1-flash-lite"); assert.ok(![APPRAISAL_MODEL, ...FALLBACK_MODELS].some(m => /preview/.test(m)), "no retired preview ids"); assert.deepEqual(seen, [APPRAISAL_MODEL, ...FALLBACK_MODELS], "404 is not retried, goes straight to the next model");
+  seen.length = 0;
+  const bad = await handleAppraiseRequest(body, { sleep, generate: async ({ model }: any) => { seen.push(model); throw Object.assign(new Error("bad image"), { status: 400 }); } });
+  assert.equal(bad.status, 400); assert.deepEqual(seen, [APPRAISAL_MODEL], "400 never falls back");
+  let t = 0; seen.length = 0;
+  const slow = await handleAppraiseRequest(body, { sleep, now: () => t, generate: async ({ model }: any) => { seen.push(model); t += 25_000; throw Object.assign(new Error("busy"), { status: 503 }); } });
+  assert.equal(slow.body.code, "model_busy"); assert.equal(seen.length, 2, "stops starting calls after the deadline");
+  assert.ok(ATTEMPT_DEADLINE_MS < 60_000);
+  assert.equal(configFor("gemini-2.5-flash", body.config).thinkingConfig, undefined, "non-Gemini-3 drops thinkingLevel");
+  assert.equal(configFor("gemini-2.5-flash", body.config).temperature, 0);
+});
+
+check("search: explicit style mismatch and non-French origin are dropped for a French style (Peter's Louis Philippe test)", () => {
+  const q = "French Louis Philippe walnut commode";
+  const types = itemTypesInQuery(q);
+  for (const t of ["Korean chest of drawers, 19th century", "Campaign chest of drawers in teak", "Welsh dresser, oak", "Coffre coréen en orme"])
+    assert.equal(styleOriginProblem(q, t, ""), "foreign_origin", t);
+  assert.equal(pieceProblem(q, types, "Korean chest of drawers, 19th century", ""), "foreign_origin");
+  assert.equal(styleOriginProblem(q, "Commode Napoléon III en noyer", ""), "style_mismatch");
+  assert.equal(styleOriginProblem(q, "Commode Louis XVI en acajou", ""), "style_mismatch");
+  // kept: the style asked for, or no style stated; "restauration" (repair) is not a style
+  for (const t of ["Commode Louis Philippe en noyer", "Commode en noyer, XIXe siècle", "Commode Louis-Philippe, restauration d'usage"])
+    assert.equal(styleOriginProblem(q, t, ""), null, t);
+  // Louis XV vs Louis XVI are told apart; Japanese lacquer on a French commode is not a foreign origin
+  assert.equal(styleOriginProblem("Louis XV commode", "Commode Louis XVI", ""), "style_mismatch");
+  assert.equal(styleOriginProblem("Louis XV commode", "Commode en laque du Japon, époque Louis XV", ""), null);
+  // British styles keep Welsh / campaign pieces; no style in the query = no check
+  assert.equal(styleOriginProblem("Georgian chest of drawers", "Welsh oak chest of drawers", ""), null);
+  assert.equal(styleOriginProblem("walnut commode", "Korean chest of drawers", ""), null);
+});
+check("search: Peter's road test of #38 (Wimbledon via Drouot): French campaign/Canterbury terms and wood mismatch are dropped", () => {
+  const q = "French Louis Philippe walnut commode";
+  const types = itemTypesInQuery(q);
+  for (const t of ["UNE COMMODE DE CAMPAGNE DU XIXe SIÈCLE", "UNE COMMODE DE CANTERBURY EN ACJEN DU XIXe SIÈCLE", "COMMODE EN CHÊNE DU DÉBUT DU XIXe SIÈCLE"])
+    assert.ok(pieceProblem(q, types, t, ""), `dropped: ${t}`);
+  assert.equal(pieceProblem(q, types, "COMMODE EN CHÊNE DU DÉBUT DU XIXe SIÈCLE", ""), "wood_mismatch");
+  assert.equal(pieceProblem(q, types, "Commode galloise en chêne", ""), "foreign_origin");
+  for (const t of ["Commode Louis-Philippe en noyer", "Commode en noyer début XIXe", "Commode plaquée de noyer, bâti en chêne", "Commode Louis Philippe", "COMMODE EN NOYER, ÉPOQUE LOUIS-PHILIPPE"])
+    assert.equal(pieceProblem(q, types, t, ""), null, `kept: ${t}`);
+  // no wood in the query = no wood check; mahogany / acajou are the same wood
+  assert.equal(pieceProblem("Louis Philippe commode", itemTypesInQuery("Louis Philippe commode"), "Commode Louis-Philippe en acajou", ""), null);
+  assert.equal(pieceProblem("mahogany commode", itemTypesInQuery("mahogany commode"), "Commode en acajou", ""), null);
+});
+check("appraise per-call timeout budget fits Vercel's 60 s", () => {
+  assert.equal(callTimeoutFor(0, false), CALL_TIMEOUT_MS);
+  assert.equal(callTimeoutFor(50_000, false), TOTAL_BUDGET_MS - 50_000);
+  assert.equal(callTimeoutFor(20_000, true), TOTAL_BUDGET_MS - 20_000, "last model gets the rest of the budget");
+  assert.ok(TOTAL_BUDGET_MS < 60_000 && CALL_TIMEOUT_MS >= 15_000 && CALL_TIMEOUT_MS <= 18_000);
+});
+await acheck("appraise: a hung primary call times out and fails over to the fallback (no same-model retry)", async () => {
+  const body = { contents: { parts: [{ text: "x" }] }, config: {} };
+  const seen: string[] = []; let aborted = false;
+  // Fake clock: each hung call "takes" its whole timeout; real timers are shortened by scaling
+  const realSetTimeout = globalThis.setTimeout;
+  (globalThis as any).setTimeout = (fn: any, ms: number) => realSetTimeout(fn, Math.min(ms, 5));
+  try {
+    const r = await handleAppraiseRequest(body, { sleep: async () => {}, generate: async ({ model, signal }: any) => {
+      seen.push(model);
+      if (model === APPRAISAL_MODEL) return new Promise((_, rej) => signal.addEventListener("abort", () => { aborted = true; rej(new Error("aborted")); }));
+      return { text: "{}" };
+    } });
+    assert.equal(r.status, 200); assert.equal(r.body.model, FALLBACK_MODELS[0]);
+    assert.deepEqual(seen, [APPRAISAL_MODEL, FALLBACK_MODELS[0]], "timed-out primary not retried");
+    assert.ok(aborted, "the hung call is aborted");
+    seen.length = 0;
+    const all = await handleAppraiseRequest(body, { sleep: async () => {}, generate: async ({ model }: any) => { seen.push(model); return new Promise(() => {}); } });
+    assert.equal(all.status, 503); assert.equal(all.body.code, "model_busy", "all timed out -> model_busy");
+  } finally { (globalThis as any).setTimeout = realSetTimeout; }
+});
+await acheck("comps: stable fast model, falls back to 3.5 flash-lite on error", async () => {
+  assert.equal(COMPS_FAST_MODEL, "gemini-3.1-flash-lite"); assert.ok(!/preview/.test(COMPS_FAST_MODEL + COMPS_FALLBACK_MODEL));
+  const used: string[] = [];
+  await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), { search: async (_p: string, _s: AbortSignal, model?: string) => { used.push(String(model)); if (model === COMPS_FAST_MODEL) throw new Error("503 overloaded"); return { text: '{"results":[]}', grounded: [], queries: 0 }; }, fetchHtml: async () => "" } as any);
+  assert.ok(used.includes(COMPS_FAST_MODEL) && used.includes(COMPS_FALLBACK_MODEL), "used: " + used.join(","));
 });
 console.log(`
 ${passed} checks passed`);
