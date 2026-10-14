@@ -2064,6 +2064,8 @@ await acheck("range store clear: admin token required (constant time), refused w
   const call = (env: any, auth?: string, body: any = { piece_key: "abcd1234" }, method = "POST") => handleRangeClear({ method, headers: auth ? { authorization: auth } : {}, body }, { env, redis });
   assert.equal((await call({}, `Bearer ${T}`)).status, 503, "unset -> refused");
   assert.equal((await call({ RANGE_ADMIN_TOKEN: "short" }, "Bearer short")).status, 503, "weak token -> refused");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: "y".repeat(23) }, `Bearer ${"y".repeat(23)}`)).status, 503, "23 chars -> refused");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: "y".repeat(24) }, `Bearer ${"y".repeat(24)}`, { piece_key: "00000000" })).status, 200, "24 chars -> accepted");
   assert.equal((await call({ RANGE_ADMIN_TOKEN: T })).status, 401, "no auth");
   assert.equal((await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}x`)).status, 401, "wrong token");
   assert.equal((await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}`, {}, "GET")).status, 405);

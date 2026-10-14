@@ -3,7 +3,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { redisEnv, upstashClient, validKey, RANGE_KEY_PREFIX, type RedisLike } from "./rangeStore.js";
 
-export const MIN_ADMIN_TOKEN_LENGTH = 32;
+export const MIN_ADMIN_TOKEN_LENGTH = 24;
 /** Constant time: both sides are hashed to 32 bytes first, so lengths never leak. */
 export const tokenMatches = (given: unknown, expected: string | undefined): boolean => {
   if (!expected || expected.length < MIN_ADMIN_TOKEN_LENGTH || typeof given !== "string" || !given) return false;
