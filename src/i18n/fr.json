@@ -314,7 +314,14 @@
     "simple_start_hint": "« Commencez par quelque chose de simple — même un verre ou un petit objet »",
     "lot_url_label": "Lien de la vente ou de l'annonce (Lot Link)",
     "price_invalid": "Chiffres uniquement, ex. 1500, 1 500 ou 1 500,50",
-    "seller_market": "Brocante / marché"
+    "seller_market": "Brocante / marché",
+    "motivation": "À quel point la voulez-vous ? (facultatif)",
+    "motivation_none": "Non précisé",
+    "motivation_browsing": "Je regarde",
+    "motivation_would_like": "Elle me plaît",
+    "motivation_fills_gap": "Elle complète ma collection",
+    "budget": "Votre budget (facultatif)",
+    "budget_placeholder": "ex. 1 500"
   },
   "categories": {
     "furniture": "Meubles",
@@ -652,5 +659,31 @@
     "retry": "Réessayer",
     "back": "Modifier les détails",
     "rerun_kept": "La nouvelle estimation a échoué, l'estimation précédente est conservée. {{reason}}"
+  },
+  "motivation": {
+    "verdict_walk_away": "Passez votre chemin",
+    "verdict_negotiate": "Au-dessus de sa valeur — négociez",
+    "verdict_premium": "Vous payez une prime",
+    "verdict_over_budget": "Au-dessus de votre budget",
+    "reason_walk_away": "{{price}} dépasse de {{gap}} votre prix plafond ({{walkAway}}). Vous ne faites que regarder : laissez passer.",
+    "reason_negotiate": "{{price}} dépasse de {{gap}} votre prix plafond ({{walkAway}}). La pièce vous plaît, mais seulement si le prix baisse : négociez (voir le plan d'offre).",
+    "reason_premium": "{{price}} dépasse de {{gap}} sa juste valeur (plafond {{walkAway}}), dans votre budget de {{budget}}. Elle complète votre collection, une prime peut se justifier : sachez que vous payez {{gap}} de plus que sa valeur.",
+    "reason_over_budget": "{{outlay}} dépasse de {{budgetGap}} votre budget de {{budget}}.",
+    "within_budget": "Dans votre budget de {{budget}}."
+  },
+  "offer": {
+    "title": "Plan d'offre",
+    "opening": "Première offre : {{amount}}.",
+    "cash_dealer": "Prix en espèces : {{amount}} (jusqu'à 1 000 € en espèces chez un professionnel en France).",
+    "cash_private": "Prix en espèces : {{amount}} (pas de plafond entre particuliers ; demandez un reçu écrit).",
+    "cash_market": "Prix en espèces : {{amount}} (les espèces sont l'usage en brocante).",
+    "cash_capped": "Pas d'offre en espèces : en France un professionnel ne peut pas encaisser plus de 1 000 € en espèces ; payez par virement ou carte.",
+    "best_final": "Dernier prix : {{amount}}.",
+    "max_bid": "Enchère maximale : {{hammer}} au marteau ({{allIn}} frais compris, avec {{pct}} % de frais). On enchérit, on ne fait pas d'offre.",
+    "never_above": "Ne dépassez pas votre prix plafond ({{walkAway}}).",
+    "never_above_auction": "N'enchérissez pas au-delà de votre plafond ({{walkAway}} au marteau).",
+    "stretch": "Comme elle complète votre collection et que votre budget le permet, on monte de {{amount}} au-dessus du plafond ({{walkAway}}) : une prime de {{pct}} % au plus, jamais au-delà de votre budget ({{budget}}).",
+    "budget_ok": "Dans votre budget de {{budget}}.",
+    "budget_over": "Le prix demandé dépasse votre budget de {{gap}} ({{budget}}) : les offres restent dans votre budget."
   }
 }

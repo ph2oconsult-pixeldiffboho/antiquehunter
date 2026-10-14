@@ -2,6 +2,7 @@
 // Run: npx tsx scripts/check-hunt-logic.ts
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
+import { motivationDecision, GAP_PREMIUM_PCT } from "../src/services/motivation.ts";
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
 import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS, CALL_TIMEOUT_MS, TOTAL_BUDGET_MS, callTimeoutFor } from "../src/services/appraiseHandler.ts";
 import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
@@ -1725,6 +1726,55 @@ check("venue split (display-side): Negotiate plan, how-to-buy box and payment ti
 
 
 // ---- Appraisal robustness: image budget, Gemini retry, error codes (async checks) ----
+check("motivation: above the walk-away the verdict follows motivation and budget; defaults unchanged", () => {
+  const it = (sellerType: string, motivation?: string, budget?: number, price = 1250, walk = 900) => applyVenueGuidance({
+    seller_context: { sellerType, isAuction: sellerType === "Auction", buyerPremiumRate: sellerType === "Auction" ? 25 : 0, askingPrice: price, motivation, budget },
+    price_guidance: { estimated_market_range_low: 400, estimated_market_range_high: 900, fair_price_low: 1100, fair_price_high: 1800, good_buy_below: 650, currency: "EUR" },
+    negotiation_strategy: { walk_away_price: walk }, walk_away_threshold: { hammer: walk, premium_pct: 25 },
+    buy_decision: { price_basis: "overpriced", score: 30, effective_price: sellerType === "Auction" ? Math.round(price * 1.25) : price, compare_price: price },
+  });
+  const v = (st: string, m?: string, b?: number, p?: number, w?: number) => motivationDecision(it(st, m, b, p, w))!;
+  assert.equal(v("Market/Fair").verdict, "unchanged", "no motivation -> current behaviour");
+  assert.equal(v("Market/Fair", "browsing").verdict, "walk_away");
+  const wl = v("Market/Fair", "would_like"); assert.equal(wl.verdict, "negotiate"); assert.equal(wl.gap, 350);
+  const fg = v("Market/Fair", "fills_gap", 1500); assert.equal(fg.verdict, "premium"); assert.equal(fg.gap, 350);
+  assert.equal(v("Market/Fair", "fills_gap").verdict, "negotiate", "fills a gap without a budget -> negotiate");
+  for (const m of ["browsing", "would_like", "fills_gap"]) assert.equal(v("Private Seller", m, 1000).verdict, "over_budget", m);
+  assert.equal(v("Antique Shop", "would_like", 1000, 1250, 1800).verdict, "over_budget", "over budget flagged even below the walk-away");
+  assert.equal(v("Antique Shop", "would_like", 1500, 1250, 1800).verdict, "unchanged", "below the walk-away: unchanged");
+  assert.equal(v("Auction", "fills_gap", 1500, 1250, 900).verdict, "over_budget", "auction budget vs all-in (1,563)");
+});
+check("motivation: offer plan figures (cash cap, best-and-final <= walk-away unless fills a gap within budget; auction max bid)", () => {
+  const it = (sellerType: string, motivation?: string, budget?: number, price = 1250, walk = 900) => applyVenueGuidance({
+    seller_context: { sellerType, isAuction: sellerType === "Auction", buyerPremiumRate: sellerType === "Auction" ? 25 : 0, askingPrice: price, motivation, budget },
+    price_guidance: { estimated_market_range_low: 400, estimated_market_range_high: 900, fair_price_low: 1100, fair_price_high: 1800, good_buy_below: 650, currency: "EUR" },
+    negotiation_strategy: { walk_away_price: walk }, walk_away_threshold: { hammer: walk, premium_pct: 25 },
+    buy_decision: { price_basis: "overpriced", score: 30, effective_price: sellerType === "Auction" ? Math.round(price * 1.25) : price, compare_price: price },
+  });
+  for (const st of ["Market/Fair", "Private Seller"]) for (const m of ["browsing", "would_like"]) {
+    const p = motivationDecision(it(st, m, 1500))!.plan!;
+    assert.equal(p.best_and_final, 900, `${st} ${m}: best = walk-away`); assert.ok(p.opening_offer! < p.best_and_final!); assert.ok(p.cash_price! > 0 && p.cash_price! <= 900); assert.equal(p.over_walk_away, 0);
+  }
+  const g = motivationDecision(it("Market/Fair", "fills_gap", 1500))!.plan!;
+  assert.equal(g.best_and_final, 1000, "walk 900 + at most 15% (1,035) rounded down"); assert.ok(g.best_and_final! <= 900 * (1 + GAP_PREMIUM_PCT / 100)); assert.equal(g.over_walk_away, g.best_and_final! - 900);
+  assert.equal(motivationDecision(it("Market/Fair", "fills_gap", 950))!.plan!.best_and_final, 950, "capped at the budget");
+  assert.equal(motivationDecision(it("Market/Fair", "would_like", 800))!.plan!.best_and_final, 800, "never over the budget");
+  const d = motivationDecision(it("Antique Shop", "would_like", 1500, 1400, 1300))!.plan!;
+  assert.equal(d.cash_price, null, "dealer: no cash offer above €1,000"); assert.equal(d.cash_capped, true); assert.equal(d.best_and_final, 1300);
+  assert.equal(motivationDecision(it("Antique Shop", "would_like", 1500, 1250, 1100))!.plan!.cash_price, 1000, "dealer cash at exactly €1,000 is allowed");
+  const d2 = motivationDecision(it("Antique Shop", "would_like", undefined, 1000, 800))!.plan!;
+  assert.ok(d2.cash_price! <= 1000 && d2.cash_capped === false, "dealer cash allowed up to €1,000");
+  const big = it("Private Seller", "fills_gap", 5000, 3000); big.price_guidance.estimated_market_range_high = 2500; big.negotiation_strategy.walk_away_price = 2500;
+  assert.ok(motivationDecision(big)!.plan!.cash_price! > 1000, "private: no cash cap");
+  const a = motivationDecision(it("Auction", "would_like", 2000))!.plan!;
+  assert.deepEqual([a.max_hammer, a.max_all_in, a.opening_offer], [900, 1125, undefined]);
+  const ag = motivationDecision(it("Auction", "fills_gap", 1300))!.plan!;
+  assert.equal(ag.max_hammer, 1000, "fills a gap: min(walk +15% rounded down, budget / 1.25 = 1,040)");
+  assert.equal(motivationDecision(it("Auction", "fills_gap", 1200))!.plan!.max_hammer, 960, "budget-bound: 1,200 / 1.25 = 960"); assert.ok(ag.max_all_in! <= 1300);
+  assert.equal(motivationDecision(it("Market/Fair", undefined, undefined, 500, 900))!.plan, null, "below fair value: no plan");
+  for (const f of ["en", "fr"]) { const j = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")); for (const k of ["verdict_negotiate", "verdict_premium", "verdict_over_budget", "reason_premium"]) assert.ok(j.motivation[k], f + k); assert.ok(j.offer.cash_capped && j.describe.motivation_fills_gap, f); }
+  assert.ok(!/\d/.test(JSON.parse(readFileSync("src/i18n/en.json", "utf8")).motivation.reason_negotiate), "no figures in strings except placeholders");
+});
 const acheck = async (name: string, fn: () => Promise<void>) => { await fn(); passed++; console.log("ok -", name); };
 check("fitWithin keeps aspect, never upscales", () => {
   assert.deepEqual(fitWithin(4032, 3024, 1600), { width: 1600, height: 1200 });

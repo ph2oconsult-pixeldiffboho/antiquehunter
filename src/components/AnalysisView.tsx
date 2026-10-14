@@ -1,6 +1,8 @@
 import { sanitizeWalkAwayIf } from '../services/gemini';
 import React, { useState, useEffect, useMemo } from 'react';
 import { applyVenueGuidance } from '../services/venueGuidance';
+import { motivationDecision } from '../services/motivation';
+import { OfferPlan } from './OfferPlan';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen, Sparkles } from 'lucide-react';
@@ -371,8 +373,21 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         })
       : (score >= 65 ? t('analysis.buy_strong_desc') : score >= 45 ? t('analysis.buy_risky_desc') : t('analysis.buy_avoid_desc'));
 
-    const reasonOut = dealerReason ? `${reason} ${t('analysis.venue_note_dealer')}` : reason;
-    return { ...rawItem, buy_decision: { ...originalDecision, score, label, price_basis: basis, reason: reasonOut } };
+    let reasonOut = dealerReason ? `${reason} ${t('analysis.venue_note_dealer')}` : reason;
+    // Buyer motivation + budget: above the walk-away the verdict depends on them (all figures from motivation.ts)
+    const md = motivationDecision(rawItem);
+    if (md && !['high_risk', 'no_price'].includes(basis)) {
+      const cur = pg.currency;
+      const a = { gap: formatMoney(md.gap, cur), walkAway: formatMoney(md.walkAway, cur), price: formatMoney(md.price, cur), budget: formatMoney(md.budget || 0, cur), budgetGap: formatMoney(md.budgetGap, cur), outlay: formatMoney(md.outlay, cur) };
+      if (md.verdict !== 'unchanged') {
+        // Need More Evidence keeps its label (no buy verdict until the period is known); the motivation line is added
+        if (basis !== 'need_evidence') label = t(`motivation.verdict_${md.verdict}`);
+        reasonOut = `${t(`motivation.reason_${md.verdict}`, a)} ${reasonOut}`;
+      } else if (md.budget) {
+        reasonOut = `${reasonOut} ${t('motivation.within_budget', a)}`;
+      }
+    }
+    return { ...rawItem, motivation_decision: md, buy_decision: { ...originalDecision, score, label, price_basis: basis, reason: reasonOut } };
   }, [rawItem, buyingGoal, t]);
 
   // Keep the floating action bar from covering the end of the page (bar height + safe area).
@@ -934,6 +949,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           <Negotiate embedded plan={currentItem.negotiation_plan} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
         </EvidenceStep>
       )}
+
+      <OfferPlan md={currentItem.motivation_decision} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
 
       {/* 3c. Maker attribution + verified auction comparables (public results; the anchored range itself is in the price card) */}
       <MakerAndComparables item={currentItem} />

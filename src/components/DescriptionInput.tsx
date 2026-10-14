@@ -59,6 +59,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
   const [premiumTouched, setPremiumTouched] = useState(!!d0.premiumTouched);
   const [category, setCategory] = useState<AntiqueCategory>(d0.category || 'unknown');
   const [location, setLocation] = useState(d0.location || '');
+  const [motivation, setMotivation] = useState<string>(d0.motivation || '');
+  const [budget, setBudget] = useState(d0.budget ? String(d0.budget) : '');
   const [isListening, setIsListening] = useState(false);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
 
@@ -170,6 +172,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
       lotUrl: effectiveLotUrl,
       buyerPremiumRate: sellerType === 'Auction' && buyersPremium ? parseFloat(buyersPremium) : undefined,
       premiumTouched,
+      motivation: motivation || undefined,
+      budget: parsePriceInput(budget) ?? undefined,
     });
   };
 
@@ -536,6 +540,25 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
               <option value="Antique Shop">{t('describe.seller_dealer')}</option>
               <option value="Auction">{t('describe.seller_auction')}</option>
             </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('describe.motivation')}</label>
+            <select data-testid="motivation" value={motivation} onChange={(e) => setMotivation(e.target.value)}
+              className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm appearance-none cursor-pointer text-ink">
+              <option value="">{t('describe.motivation_none')}</option>
+              <option value="browsing">{t('describe.motivation_browsing')}</option>
+              <option value="would_like">{t('describe.motivation_would_like')}</option>
+              <option value="fills_gap">{t('describe.motivation_fills_gap')}</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('describe.budget')}</label>
+            <input data-testid="budget" type="text" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^\d\s.,]/g, ''))}
+              placeholder={t('describe.budget_placeholder')}
+              className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm text-ink" />
           </div>
         </div>
 
