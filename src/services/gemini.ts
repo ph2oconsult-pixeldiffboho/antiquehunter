@@ -1,11 +1,11 @@
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
 import {
   alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, reconcileDealerNegotiation, saneDealerRange, dealerBands, dropContradictions, sanitizeDeep,
   type PriceBasis, type ScoreBand, type VerdictBands,
 } from "./appraisalMath";
-import { lotFactsPrompt, type LotFacts } from "./lotFetch";
+import { lotFactsPrompt, type LotFacts } from "./lotFacts";
 import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
@@ -50,8 +50,30 @@ export const compsRequestFor = (m: MakerMatch, text: string, category: string | 
   maker: m.search, piece: pieceOf(text, category)?.key, material: materialOf(text), pieces: countPieces(text), language,
 });
 
-// Antique assessment service using Gemini 3.1 Flash Lite
-const API_KEY = process.env.GEMINI_API_KEY || "";
+// Antique assessment service using Gemini 3.1 Flash Lite.
+// The model call runs on the server (POST /api/appraise) so the GEMINI_API_KEY is never
+// shipped to the browser. The client only builds the prompt + schema and parses the result.
+const APPRAISE_CLIENT_TIMEOUT_MS = 60_000;
+
+/** Send the built request to the server, which holds the key and calls Gemini. Returns { text } like the SDK. */
+const generateAppraisalContent = async (req: { contents: unknown; config: unknown }): Promise<{ text: string }> => {
+  const c = new AbortController();
+  const timer = setTimeout(() => c.abort(), APPRAISE_CLIENT_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/appraise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal: c.signal,
+    });
+    if (!res.ok) throw new Error(`Appraisal request failed (${res.status})`);
+    const j = await res.json().catch(() => null);
+    if (!j || typeof j.text !== 'string') throw new Error('Malformed appraisal response');
+    return { text: j.text };
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 export type AntiqueCategory = 
   | 'furniture' 
@@ -83,8 +105,7 @@ export const searchAntiques = async (
   buyerPremiumRate?: number,
   extra: AppraisalExtra = {}
 ) => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
-  const model = "gemini-3.1-flash-lite-preview";
+  // The Gemini call is made server-side via generateAppraisalContent (POST /api/appraise).
   
   const categoryPrompts: Record<AntiqueCategory, string> = {
     furniture: `Focus on: joinery (dovetails, mortise/tenon), wood type (solid vs veneer), back panels (hand-planed?), wear patterns, stripping/refinishing evidence, hardware authenticity, carving quality, and resale constraints from size.`,
@@ -266,8 +287,7 @@ ${getGlossaryPrompt(language)}`;
   let compsP: Promise<CompsResponse | null> | null = extra.comps !== undefined ? Promise.resolve(extra.comps)
     : makerFromText ? getComps(compsRequestFor(makerFromText, query, category, language)).catch(() => null) : null;
 
-  const response = await ai.models.generateContent({
-    model,
+  const response = await generateAppraisalContent({
     contents,
     config: {
       systemInstruction,

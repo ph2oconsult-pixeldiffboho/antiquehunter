@@ -3,6 +3,9 @@
     "cdg1"
   ],
   "functions": {
+    "api/appraise.ts": {
+      "maxDuration": 60
+    },
     "api/hunt.ts": {
       "maxDuration": 60
     },

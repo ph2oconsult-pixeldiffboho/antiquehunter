@@ -2,31 +2,17 @@
 // text, estimate, fees and photos. Nothing is invented: a field is only set when it was read from the page / API.
 // The hammer result of an already-sold lot is never returned (the appraisal must not see it).
 import { fetchSource } from "./sources/fetchSource.js";
+import { assertPublicUrl } from "./sources/ssrfGuard.js";
 import { parseDrouotLotPage } from "./sources/drouot.js";
 import { parseJsLiteralAfter } from "./sources/jsLiteral.js";
 import { cleanText, hostMatches, hostOf, interencheresItemApiUrl, interencheresLotId, parseInterencheresItem, parsePage } from "./huntValidation.js";
 import { auctionetSearchUrl, type AuctionetItem } from "./huntValidation.js";
 
-export interface LotFacts {
-  ok: boolean;
-  url: string;
-  site: 'drouot' | 'auctionet' | 'interencheres' | 'other';
-  title?: string;
-  description?: string;
-  estimateLow?: number;
-  estimateHigh?: number;
-  currency?: string;
-  premiumPct?: number;
-  saleDate?: string;      // ISO
-  house?: string;
-  city?: string;
-  imageUrls: string[];
-  /** Photos as data URLs (JPEG), read on the server so the browser does not hit cross-origin limits */
-  images?: string[];
-  /** The sale has ended (the result is NOT returned) */
-  ended?: boolean;
-  error?: string;
-}
+// LotFacts + lotFactsPrompt moved to ./lotFacts (pure, client-safe). Imported for local use in
+// the signatures below and re-exported so existing server-side importers of ./lotFetch keep working.
+import type { LotFacts } from "./lotFacts.js";
+export type { LotFacts };
+export { lotFactsPrompt } from "./lotFacts.js";
 
 const LOT_TTL = 30 * 60_000;
 const DROUOT_PHOTO = 'https://cdn.drouot.com/d/lot/ftall/';
@@ -67,6 +53,8 @@ const toDataUrls = async (urls: string[], deadline: number): Promise<string[]> =
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), left);
     try {
+      // SSRF: image URLs come from scraped pages (attacker-influencable og:image etc.).
+      await assertPublicUrl(u);
       const r = await fetch(u, { signal: ctl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (AntiqueHunter lot reader)' } });
       if (!r.ok) return null;
       const type = r.headers.get('content-type') || 'image/jpeg';
@@ -144,21 +132,3 @@ export const fetchLotFacts = async (rawUrl: string, opts: { withImages?: boolean
   return facts;
 };
 
-/** The lot facts as prompt text. Only what was read; says so when the estimate is missing. */
-export const lotFactsPrompt = (f: LotFacts | null | undefined, fmt: (n: number, cur: string) => string = (n, c) => `${Math.round(n)} ${c}`): string => {
-  if (!f) return '';
-  if (!f.ok) return `LOT LINK: ${f.url}\nThe lot page could NOT be read. You have NOT seen its catalogue, estimate or photos: do not mention, guess or "anchor to" any catalogue estimate for this lot.`;
-  const est = f.estimateLow || f.estimateHigh
-    ? `${fmt(f.estimateLow || f.estimateHigh!, f.currency || 'EUR')}${f.estimateHigh && f.estimateLow && f.estimateHigh !== f.estimateLow ? ` – ${fmt(f.estimateHigh, f.currency || 'EUR')}` : ''} (hammer, before fees)`
-    : 'none published on the page';
-  return [
-    `LOT LINK (read from the auction site): ${f.url}`,
-    f.house || f.city ? `Auction house: ${[f.house, f.city].filter(Boolean).join(', ')}` : '',
-    f.title ? `Catalogue title: ${f.title}` : '',
-    f.description ? `Catalogue description: ${f.description}` : '',
-    `Auction house estimate: ${est}`,
-    f.premiumPct ? `Buyer's premium published by the sale: ${f.premiumPct}%` : '',
-    f.ended ? 'This sale has ended (the result is not given to you).' : '',
-    f.images?.length ? `${f.images.length} catalogue photo(s) from the lot page are attached.` : '',
-  ].filter(Boolean).join('\n');
-};
