@@ -2,6 +2,7 @@
 // Run: npx tsx scripts/check-hunt-logic.ts
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller, needEvidenceWalkAway } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
+import { redisEnv, upstashClient, resolveSharedRange, RANGE_STORE_TIMEOUT_MS } from "../src/services/rangeStore.ts";
 import { pieceKey, stableRange, RANGE_TTL_MS } from "../src/services/priceCache.ts";
 import { motivationDecision, overridesNeedEvidence, GAP_PREMIUM_PCT } from "../src/services/motivation.ts";
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
@@ -2018,6 +2019,42 @@ await acheck("comps: stable fast model, falls back to 3.5 flash-lite on error", 
   const used: string[] = [];
   await findComparables({ maker: "Bellangé", piece: "armchair" }, undefined, Date.now(), { search: async (_p: string, _s: AbortSignal, model?: string) => { used.push(String(model)); if (model === COMPS_FAST_MODEL) throw new Error("503 overloaded"); return { text: '{"results":[]}', grounded: [], queries: 0 }; }, fetchHtml: async () => "" } as any);
   assert.ok(used.includes(COMPS_FAST_MODEL) && used.includes(COMPS_FALLBACK_MODEL), "used: " + used.join(","));
+});
+await acheck("shared range store: env detection, primary stored (NX), fallback never stored, errors / timeouts degrade", async () => {
+  assert.equal(redisEnv({}), null);
+  assert.equal(redisEnv({ KV_REST_API_URL: "https://x.upstash.io/", KV_REST_API_TOKEN: "t" })!.url, "https://x.upstash.io");
+  assert.equal(redisEnv({ UPSTASH_REDIS_REST_URL: "https://y", UPSTASH_REDIS_REST_TOKEN: "t" })!.names, "UPSTASH_REDIS_REST_*");
+  assert.equal(redisEnv({ KV_REST_API_URL: "https://x" }), null, "url without token");
+  const db = new Map<string, string>(); const sets: string[] = [];
+  const redis = { get: async (k: string) => db.get(k) ?? null, setNx: async (k: string, v: string) => { sets.push(k); if (db.has(k)) return false; db.set(k, v); return true; } };
+  const ans = (lo: number, hi: number) => JSON.stringify({ items: [{ price_guidance: { estimated_market_range_low: lo, estimated_market_range_high: hi, fair_price_low: lo * 2, fair_price_high: hi * 2 } }] });
+  const key = "abcd1234";
+  assert.equal((await resolveSharedRange(redis, key, ans(400, 900), "gemini-3.5-flash-lite", false)).status, "miss", "fallback first: not stored");
+  assert.equal(db.size, 0);
+  const a = await resolveSharedRange(redis, key, ans(200, 600), "gemini-3.1-flash-lite", true); assert.deepEqual([a.status, a.range!.high], ["stored", 600]);
+  const b = await resolveSharedRange(redis, key, ans(250, 650), "gemini-3.1-flash-lite", true); assert.deepEqual([b.status, b.range!.high], ["hit", 600], "second primary: stored one served");
+  const c = await resolveSharedRange(redis, key, ans(400, 900), "gemini-3.5-flash-lite", false); assert.deepEqual([c.status, c.range!.high], ["hit", 600], "fallback: served the canonical range");
+  assert.equal(sets.length, 2, "fallback never writes");
+  assert.equal((await resolveSharedRange(null, key, ans(1, 2), "m", true)).status, "off");
+  assert.equal((await resolveSharedRange(redis, "../evil", ans(1, 2), "m", true)).status, "no_key");
+  const bad = { get: async () => { throw new Error("down"); }, setNx: async () => { throw new Error("down"); } };
+  assert.equal((await resolveSharedRange(bad, key, ans(1, 2), "m", true)).status, "error");
+  // REST client: commands, auth header and the short timeout
+  const calls: any[] = [];
+  const ok = upstashClient("https://r", "tok", (async (_u: any, init: any) => { calls.push(JSON.parse(init.body)); assert.equal(init.headers.Authorization, "Bearer tok"); return { ok: true, json: async () => ({ result: calls.length === 1 ? "OK" : "v" }) }; }) as any);
+  assert.equal(await ok.setNx("k", "v", 60), true); assert.equal(await ok.get("k"), "v");
+  assert.deepEqual(calls[0], ["SET", "k", "v", "NX", "EX", 60]);
+  const slow = upstashClient("https://r", "t", ((_u: any, init: any) => new Promise((_r, rej) => init.signal.addEventListener("abort", () => rej(new Error("aborted"))))) as any, 30);
+  const t0 = Date.now(); assert.equal((await resolveSharedRange(slow, key, ans(1, 2), "m", true)).status, "error"); assert.ok(Date.now() - t0 < 500);
+  assert.ok(RANGE_STORE_TIMEOUT_MS <= 1000, "store adds at most ~1 s per call");
+  // handler: range_store flag + shared range in the response; no piece key -> unchanged
+  const gen = async () => ({ text: ans(300, 700) });
+  const r1 = await handleAppraiseRequest({ contents: [{}], piece_key: "feedbeef" }, { generate: gen, sleep: async () => {}, redis });
+  assert.equal(r1.body.range_store, "stored"); assert.equal((r1.body.shared_range as any).high, 700);
+  const r2 = await handleAppraiseRequest({ contents: [{}] }, { generate: gen, sleep: async () => {}, redis: null });
+  assert.equal(r2.body.range_store, "off"); assert.equal(r2.body.shared_range, undefined);
+  const gem = readFileSync("src/services/gemini.ts", "utf8");
+  assert.match(gem, /piece_key: rangeKey/); assert.match(gem, /source: 'shared_store'/);
 });
 console.log(`
 ${passed} checks passed`);

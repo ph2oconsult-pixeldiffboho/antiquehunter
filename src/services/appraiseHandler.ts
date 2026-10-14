@@ -10,6 +10,7 @@
 // be put behind auth and/or rate limiting + Firebase App Check before/along with this change,
 // otherwise it can be used as a proxy to spend Gemini quota.
 import { GoogleGenAI } from "@google/genai";
+import { redisEnv, upstashClient, resolveSharedRange, type RedisLike } from "./rangeStore.js";
 
 /** The only model this endpoint will run. Client-supplied model values are ignored. */
 export const APPRAISAL_MODEL = "gemini-3.1-flash-lite";
@@ -49,7 +50,7 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
 export interface AppraiseHttpResult {
   status: number;
-  body: { text?: string; error?: string; code?: string; model?: string };
+  body: { text?: string; error?: string; code?: string; model?: string; range_store?: string; shared_range?: unknown };
 }
 
 /** Upstream statuses worth retrying (rate limit, transient server error, overloaded model). */
@@ -78,7 +79,7 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 export const handleAppraiseRequest = async (
   rawBody: unknown,
-  deps: { generate?: Generate; sleep?: (ms: number) => Promise<void>; now?: () => number } = {},
+  deps: { generate?: Generate; sleep?: (ms: number) => Promise<void>; now?: () => number; redis?: RedisLike | null } = {},
 ): Promise<AppraiseHttpResult> => {
   let body: any = rawBody;
   if (typeof body === "string") {
@@ -142,7 +143,14 @@ export const handleAppraiseRequest = async (
           }),
         ]);
         console.log(`Appraisal served by ${model}${m > 0 ? " (fallback)" : ""}, attempt ${attempt + 1}.`);
-        return { status: 200, body: { text: response.text ?? "", model } };
+        const text = response.text ?? "";
+        // Shared range store: the main model's range is canonical; a fallback answer only reads it (rangeStore.ts)
+        let redis: RedisLike | null = null;
+        if (deps.redis !== undefined) redis = deps.redis;
+        else { const env = redisEnv(); redis = env ? upstashClient(env.url, env.token) : null; }
+        const sr = body.piece_key ? await resolveSharedRange(redis, body.piece_key, text, model, m === 0) : { status: redis ? 'no_key' : 'off' };
+        console.log(`Range store: ${sr.status}${redisEnv() ? ` (${redisEnv()!.names})` : ' (no KV_REST_API_* / UPSTASH_REDIS_REST_* env)'}.`);
+        return { status: 200, body: { text, model, range_store: sr.status, ...((sr as any).range ? { shared_range: (sr as any).range } : {}) } };
       } catch (error: any) {
         const status = error?.timedOut ? TIMEOUT_STATUS : upstreamStatus(error);
         lastStatus = status;
