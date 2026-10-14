@@ -8,7 +8,9 @@ import { isGroundingRedirect } from "./huntValidation.js";
 
 const MODEL = "gemini-3.5-flash";
 /** Fast model for memory-based candidates (verified from their pages like everything else). */
-const FAST_MODEL = "gemini-3.1-flash-lite-preview";
+export const FAST_MODEL = "gemini-3.1-flash-lite";
+/** Tried once for a scope when the fast model errors (busy / retired) and its deadline has time left. */
+export const FAST_FALLBACK_MODEL = "gemini-3.5-flash-lite";
 export const COMPS_GEMINI_TIMEOUT_MS = 20_000;
 export const COMPS_VERIFY_BUDGET_MS = 10_000;
 export const COMPS_TOTAL_BUDGET_MS = 32_000;
@@ -147,8 +149,15 @@ export const findComparables = async (req: CompsRequest, apiKey: string | undefi
   // gemini-3.5-flash + search took 30 s+ (timed out) in every preview run, so only the fast model is used; it reported
   // 0 web searches, so its candidates are treated as leads only: each is kept only if its own page verifies it.
   const jobs: Array<[string, string]> = COMPS_SEARCH_SCOPES.map(sc => [sc, FAST_MODEL] as [string, string]);
+  const searchWithFallback = async (prompt: string, signal: AbortSignal, model: string) => {
+    try { return await search(prompt, signal, model); }
+    catch (e: any) {
+      if (signal.aborted || e?.name === 'AbortError' || model !== FAST_MODEL) throw e;
+      return search(prompt, signal, FAST_FALLBACK_MODEL);
+    }
+  };
   const run = (scope: string, model: string, i: number) => withDeadline(COMPS_GEMINI_TIMEOUT_MS, (signal) => Promise.race([
-    search(buildCompsPrompt(req, scope), signal, model),
+    searchWithFallback(buildCompsPrompt(req, scope), signal, model),
     new Promise<never>((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('timeout'), { name: 'AbortError' })))),
   ])).finally(() => { searchMs[i] = Date.now() - g0; });
   const promises = jobs.map(([scope, model], i) => run(scope, model, i));
