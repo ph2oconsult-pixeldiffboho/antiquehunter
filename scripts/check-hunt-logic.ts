@@ -2,6 +2,7 @@
 // Run: npx tsx scripts/check-hunt-logic.ts
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller, needEvidenceWalkAway } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
+import { pieceKey, stableRange, RANGE_TTL_MS } from "../src/services/priceCache.ts";
 import { motivationDecision, GAP_PREMIUM_PCT } from "../src/services/motivation.ts";
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
 import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS, CALL_TIMEOUT_MS, TOTAL_BUDGET_MS, callTimeoutFor } from "../src/services/appraiseHandler.ts";
@@ -1808,6 +1809,23 @@ check("dealer walk-away above the provisional (auction) range is intended: walk 
   const b = dealerBands(400, 900, 1100, 1800);
   assert.equal(reconcileDealerNegotiation(b, 1100).walk_away_price, 1800);
   assert.ok(dealerBands(400, 900, 0, 0).fairTop >= 900, "dealer high never below auction high");
+});
+check("stable range: same piece -> same key (venue, price, motivation not in it); primary answer reused, fallback replaced", () => {
+  const k = pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "EUR" });
+  assert.equal(k, pieceKey({ text: "  louis philippe  WALNUT commode ", category: "furniture", currency: "EUR" }));
+  assert.notEqual(k, pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "GBP" }));
+  assert.notEqual(k, pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "EUR", images: ["data:image/jpeg;base64,AAAA"] }));
+  const m = new Map<string, string>(); const store = { get: (x: string) => m.get(x) ?? null, set: (x: string, v: string) => { m.set(x, v); } };
+  const P = { low: 200, high: 600, fair_low: 500, fair_high: 1200, model: "gemini-3.1-flash-lite", primary: true };
+  const F = { low: 400, high: 900, fair_low: 1000, fair_high: 2500, model: "gemini-3.5-flash-lite", primary: false };
+  assert.deepEqual([stableRange(store, k, F, 1).reused, stableRange(store, k, F, 2).range.high], [false, 900], "fallback kept while nothing better");
+  assert.equal(stableRange(store, k, P, 3).reused, false, "primary replaces a cached fallback");
+  for (let i = 0; i < 8; i++) { const r = stableRange(store, k, i % 3 ? F : { ...P, high: 650 }, 4 + i); assert.equal(r.range.high, 600, `run ${i}`); assert.equal(r.reused, true); }
+  assert.equal(stableRange(store, k, F, 3 + RANGE_TTL_MS + 1).range.high, 900, "expired -> fresh answer");
+  assert.equal(stableRange(null, k, F).range.high, 900, "no storage -> unchanged behaviour");
+  const gem = readFileSync("src/services/gemini.ts", "utf8");
+  assert.match(gem, new RegExp(`APPRAISAL_MODEL_ID = '${APPRAISAL_MODEL}'`), "client primary id = server primary");
+  assert.match(gem, /!lotFacts\?\.ok && !extra\.checkAnswers/, "not on lot pages or checklist re-runs");
 });
 const acheck = async (name: string, fn: () => Promise<void>) => { await fn(); passed++; console.log("ok -", name); };
 check("fitWithin keeps aspect, never upscales", () => {
