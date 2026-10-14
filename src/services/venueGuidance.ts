@@ -51,6 +51,16 @@ export const applyVenueGuidance = <T extends Record<string, any>>(item: T): T =>
   if (venue === 'auction') return item;
   const noteKey = isPrivateSeller(item.seller_context) ? 'analysis.venue_note_private' : 'analysis.venue_note_market';
   if (venue === 'dealer') return { ...item, venue, venue_note_key: 'analysis.venue_note_dealer' };
+  // Already computed on the server (gemini.ts, same figures): only the note is added, nothing is recomputed
+  if (item.buy_decision?.price_scale === 'market') {
+    const bd0 = item.buy_decision;
+    const pg0 = item.price_guidance || {};
+    const lo0 = Number(pg0.estimated_market_range_low) || 0, hi0 = Number(pg0.estimated_market_range_high) || 0;
+    const f0 = marketFigures(lo0, hi0);
+    return { ...item, venue, venue_note_key: noteKey,
+      buy_decision: { ...bd0, market_bands: bd0.market_bands || { bargain_low: f0.bargain_low, bargain_high: f0.bargain_high, walk_away: f0.walk_away_price, overpriced_to: r(hi0 * MARKET_OVER_FACTOR) } },
+      price_guidance: { ...pg0, market_bargain_low: pg0.market_bargain_low || f0.bargain_low, market_bargain_high: pg0.market_bargain_high || f0.bargain_high } };
+  }
   const pg = item.price_guidance || {};
   const lo = Number(pg.estimated_market_range_low) || 0, hi = Number(pg.estimated_market_range_high) || 0;
   if (!(hi > 0)) return { ...item, venue, venue_note_key: noteKey };

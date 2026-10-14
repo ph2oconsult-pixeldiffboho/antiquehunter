@@ -789,6 +789,11 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       period: item.item_summary.likely_period, text: `${query} ${titleText}`, pieces, pieceKind,
     });
 
+    // One set of offer figures per page: off auction, the "how to buy" box shows the Negotiate plan's opening offer and
+    // the range up to its "happy at" price (both <= the venue walk-away and below the asking price when one is given).
+    if (!isAuction && item.negotiation_strategy && Number(negotiationPlan.happy_at) > 0) {
+      item.negotiation_strategy = { ...item.negotiation_strategy, opening_offer: negotiationPlan.opening_offer, target_price_low: negotiationPlan.opening_offer, target_price_high: negotiationPlan.happy_at };
+    }
     return {
       ...item,
       negotiation_plan: negotiationPlan,

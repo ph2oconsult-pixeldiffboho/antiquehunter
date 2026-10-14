@@ -1309,11 +1309,14 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
     assert.ok(v.negotiation_strategy.target_price_high <= 700 && v.negotiation_plan.happy_at <= 700 && v.negotiation_plan.opening_offer <= v.negotiation_plan.happy_at);
     assert.equal(v.buy_decision.label, "Good Buy", st + ": €450 inside the bargain band €300–500");
     assert.equal(v.buy_decision.dealer_bands, null);
+    assert.deepEqual([v.negotiation_strategy.opening_offer, v.negotiation_strategy.target_price_high], [v.negotiation_plan.opening_offer, v.negotiation_plan.happy_at], st + ": how-to-buy box = Negotiate box");
+    const cv: any = applyVenueGuidance(v);
+    assert.deepEqual([cv.negotiation_strategy, cv.price_guidance.good_buy_below, cv.buy_decision.price_basis], [v.negotiation_strategy, v.price_guidance.good_buy_below, v.buy_decision.price_basis], "client keeps the server's venue figures");
     assert.equal(v.negotiation_plan.payment.mode, st === "Market/Fair" ? "cash_market" : "cash_private_receipt");
     assert.ok(v.walk_away_if.some((x: string) => /walk-away of €700/.test(x)) && !v.walk_away_if.some((x: string) => /450/.test(x)), JSON.stringify(v.walk_away_if));
   }
   const dl: any = postProcessAppraisal((() => { const r = lpRaw(); r.items[0].walk_away_if = ["The price exceeds 450 EUR.", "Glass replaced."]; return r; })(), dealerCtx(q, { askingPrice: 450, category: "mirrors", sellerType: "Antique Shop" }))[0];
-  assert.equal(dl.negotiation_plan.walk_away, 1100); assert.equal(dl.negotiation_strategy.walk_away_price, 1100); assert.equal(dl.negotiation_plan.payment.mode, "cash");
+  assert.equal(dl.negotiation_plan.walk_away, 1100); assert.equal(dl.negotiation_strategy.opening_offer, dl.negotiation_plan.opening_offer); assert.ok(dl.negotiation_strategy.opening_offer < 450); assert.equal(dl.negotiation_strategy.walk_away_price, 1100); assert.equal(dl.negotiation_plan.payment.mode, "cash");
   const auV: any = postProcessAppraisal((() => { const r = lpRaw(); r.items[0].walk_away_if = ["The total cost (hammer + 25% premium) exceeds 800 EUR.", "Glass replaced."]; return r; })(), dealerCtx(q, { askingPrice: 450, category: "mirrors", sellerType: "Auction", isAuction: true, premiumPct: 25 }))[0];
   assert.equal(auV.buy_decision.price_scale, "auction"); assert.equal(auV.negotiation_plan.walk_away, auV.negotiation_strategy.walk_away_price);
   const wV = auV.negotiation_strategy.walk_away_price;
