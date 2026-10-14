@@ -189,7 +189,16 @@
     "reason_dealer_good_buy": "{{price}} est au niveau ou en dessous de {{goodTop}} (le plus bas entre le haut de la fourchette aux enchères et le bas de la fourchette marchand) – un bon prix en boutique.",
     "reason_dealer_fair": "{{price}} est dans la fourchette marchand ({{dealerLow}}–{{dealerHigh}}) – un prix correct en boutique.",
     "reason_dealer_overpriced": "{{price}} dépasse le haut de la fourchette marchand ({{dealerHigh}}) – trop cher, même en boutique. Ne dépassez pas {{dealerHigh}}.",
-    "reason_dealer_walk_away": "{{price}} est bien au-dessus de la fourchette marchand (plus de {{overTop}}) – passez votre chemin."
+    "reason_dealer_walk_away": "{{price}} est bien au-dessus de la fourchette marchand (plus de {{overTop}}) – passez votre chemin.",
+    "market_bargain_band": "Fourchette « bonne affaire » (brocante)",
+    "venue_note_market": "En brocante ou aux puces, on peut trouver des affaires sous le niveau des enchères, mais la qualité n'est pas garantie : ni provenance, ni garantie, état en l'état.",
+    "venue_note_dealer": "Un antiquaire coûte plus cher que les enchères, mais la qualité est en général mieux garantie : provenance, garantie et restauration professionnelle sont comprises dans le prix.",
+    "reason_market_strong_buy": "{{price}} est au niveau ou sous le bas des enchères ({{bargainLow}}) : une vraie affaire.",
+    "reason_market_good_buy": "{{price}} est dans la fourchette « bonne affaire » ({{bargainLow}}–{{bargainHigh}}).",
+    "reason_market_fair": "{{price}} dépasse la fourchette « bonne affaire » mais reste sous le prix plafond (haut des enchères, {{walkAway}}).",
+    "reason_market_overpriced": "{{price}} dépasse le prix plafond ({{walkAway}}, haut des enchères) : vous feriez sans doute mieux aux enchères.",
+    "reason_market_walk_away": "{{price}} est très au-dessus du niveau des enchères (plus de {{overTop}}) : passez votre chemin.",
+    "venue_note_private": "Chez un particulier ou lors d'une succession, on peut acheter au niveau des enchères ou en dessous, mais sans garantie ni vérification de provenance d'un antiquaire : examinez vous-même la pièce et son état."
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",
@@ -302,7 +311,8 @@
     "upload_photo_hint": "Une photo est le point de départ. Les détails affinent le prix.",
     "simple_start_hint": "« Commencez par quelque chose de simple — même un verre ou un petit objet »",
     "lot_url_label": "Lien de la vente ou de l'annonce (Lot Link)",
-    "price_invalid": "Chiffres uniquement, ex. 1500, 1 500 ou 1 500,50"
+    "price_invalid": "Chiffres uniquement, ex. 1500, 1 500 ou 1 500,50",
+    "seller_market": "Brocante / marché"
   },
   "categories": {
     "furniture": "Meubles",
@@ -608,7 +618,8 @@
     "bid_discipline": "Ne dépassez pas votre maximum dans l'ambiance de la salle ; une autre occasion viendra.",
     "bid_costs": "Ajoutez les frais : TVA sur les frais, frais d'enchères en ligne et transport.",
     "bid_max_note": "avec {{pct}} % de frais acheteur",
-    "bid_max_locked": "Fixez votre maximum avant la vente, frais acheteur de {{pct}} % compris. Votre enchère maximale suggérée :"
+    "bid_max_locked": "Fixez votre maximum avant la vente, frais acheteur de {{pct}} % compris. Votre enchère maximale suggérée :",
+    "pay_cash_market": "Sur un marché, le liquide fait la différence : payez en espèces et repassez en fin de journée, quand le marchand préfère vendre plutôt que remballer ({{lo}} à {{hi}} % de remise sont courants{{amount}}). Beaucoup d'exposants sont des professionnels : un résident fiscal français ne peut pas leur payer plus de {{cap}} en espèces."
   },
   "field_notes": {
     "title": "Notes de terrain",

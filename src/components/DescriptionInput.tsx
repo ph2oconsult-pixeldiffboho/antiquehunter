@@ -532,7 +532,8 @@ export const DescriptionInput: React.FC<DescriptionInputProps> = ({
               onChange={(e) => setSellerType(e.target.value)}
               className="w-full p-4 bg-paper border border-border-custom rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all text-sm appearance-none cursor-pointer text-ink"
             >
-              <option value="Market/Fair">{t('describe.seller_private')}</option>
+              <option value="Market/Fair">{t('describe.seller_market')}</option>
+              <option value="Private Seller">{t('describe.seller_private')}</option>
               <option value="Antique Shop">{t('describe.seller_dealer')}</option>
               <option value="Auction">{t('describe.seller_auction')}</option>
             </select>

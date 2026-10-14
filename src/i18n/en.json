@@ -189,7 +189,16 @@
     "reason_dealer_good_buy": "{{price}} is at or below {{goodTop}} (the lower of the auction high and the dealer low) – a good shop price.",
     "reason_dealer_fair": "{{price}} is within the dealer range ({{dealerLow}}–{{dealerHigh}}) – a fair shop price.",
     "reason_dealer_overpriced": "{{price}} is above the dealer high ({{dealerHigh}}) – overpriced, even for a shop. Don't go above {{dealerHigh}}.",
-    "reason_dealer_walk_away": "{{price}} is well above the dealer range (over {{overTop}}) – walk away."
+    "reason_dealer_walk_away": "{{price}} is well above the dealer range (over {{overTop}}) – walk away.",
+    "market_bargain_band": "Market bargain band",
+    "venue_note_market": "At a brocante or flea market, bargains below auction level are possible, but quality is not guaranteed: no provenance, no guarantee, and condition is as found.",
+    "venue_note_dealer": "Dealers cost more than auction, but quality is generally more guaranteed: provenance, a guarantee and professional restoration are usually part of the price.",
+    "reason_market_strong_buy": "{{price}} is at or below the auction low ({{bargainLow}}): a real market bargain.",
+    "reason_market_good_buy": "{{price}} is inside the market bargain band ({{bargainLow}}–{{bargainHigh}}).",
+    "reason_market_fair": "{{price}} is above the bargain band but within the walk-away (auction high {{walkAway}}).",
+    "reason_market_overpriced": "{{price}} is above the walk-away ({{walkAway}}, the auction high): you could likely do better at auction.",
+    "reason_market_walk_away": "{{price}} is far above auction level (over {{overTop}}): walk away.",
+    "venue_note_private": "From a private or estate seller, prices at or below auction level are possible, but there is no dealer guarantee or provenance check: inspect the piece and its condition yourself."
   },
   "results": {
     "title": "Dealer's Findings",
@@ -302,7 +311,8 @@
     "upload_photo_hint": "A photo is the starting point. Details sharpen the price.",
     "simple_start_hint": "“Start with something simple — even a glass or small item”",
     "lot_url_label": "Paste Auction or Listing Link (Lot Link)",
-    "price_invalid": "Enter numbers only, e.g. 1500, 1 500 or 1,500.50"
+    "price_invalid": "Enter numbers only, e.g. 1500, 1 500 or 1,500.50",
+    "seller_market": "Market / Fair"
   },
   "categories": {
     "furniture": "Furniture",
@@ -608,7 +618,8 @@
     "bid_discipline": "Don't bid above your maximum in the heat of the room; the next one will come.",
     "bid_costs": "Add the costs: VAT on the premium, online-bidding fees and transport.",
     "bid_max_note": "with the {{pct}}% buyer's premium",
-    "bid_max_locked": "Set your maximum before the sale, including the {{pct}}% buyer's premium. Your suggested maximum bid:"
+    "bid_max_locked": "Set your maximum before the sale, including the {{pct}}% buyer's premium. Your suggested maximum bid:",
+    "pay_cash_market": "At a market, cash talks: offer cash, and come back near the end of the day, when stallholders would rather sell than pack up ({{lo}}–{{hi}}% off is typical{{amount}}). Many stallholders are professionals: a French tax resident may pay a trader in cash only up to {{cap}}."
   },
   "field_notes": {
     "title": "Dealer Field Notes",

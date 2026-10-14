@@ -1,5 +1,6 @@
 // Quick self-checks for the hunt URL filters and appraisal maths.
 // Run: npx tsx scripts/check-hunt-logic.ts
+import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -1653,6 +1654,63 @@ check("field notes: cash-cap note matches negotiation constants", () => {
   assert.ok(teaserNotes({ count: 2 }).length === 2);
 });
 
+
+check("venue split: auction unchanged, market bargain band + walk-away = auction high, dealer keeps its range", () => {
+  const base = { price_guidance: { estimated_market_range_low: 200, estimated_market_range_high: 600, fair_price_low: 450, fair_price_high: 1200, good_buy_below: 500 },
+    negotiation_strategy: { walk_away_price: 1200 }, buy_decision: { effective_price: 550, price_basis: "good_buy", score: 70, price_scale: "dealer" } };
+  const auc = { ...base, seller_context: { isAuction: true, sellerType: "Auction" } };
+  assert.equal(applyVenueGuidance(auc), auc, "auction item untouched");
+  assert.equal(venueOf({ sellerType: "Market/Fair" }), "market");
+  assert.equal(venueOf({ sellerType: "Antique Shop" }), "dealer");
+  const m: any = applyVenueGuidance({ ...base, seller_context: { sellerType: "Market/Fair" } });
+  assert.equal(m.negotiation_strategy.walk_away_price, 600);
+  assert.equal(m.price_guidance.market_bargain_low, 200); assert.equal(m.price_guidance.market_bargain_high, 400);
+  assert.equal(m.buy_decision.price_basis, "fair", "550 is above the bargain band, under the auction high");
+  assert.equal(m.price_guidance.fair_price_high, 1200, "dealer range still carried");
+  const d: any = applyVenueGuidance({ ...base, seller_context: { sellerType: "Antique Shop" } });
+  assert.equal(d.negotiation_strategy.walk_away_price, 1200); assert.equal(d.buy_decision.price_basis, "good_buy");
+  const f = marketFigures(200, 600); assert.ok(f.opening_offer <= f.good_buy_below && f.good_buy_below <= f.walk_away_price);
+});
+
+check("venue split review fixes: missing auction low never shows 0; private seller gets its own note", () => {
+  for (const lo of [0, undefined as any, NaN]) {
+    const f = marketFigures(lo, 600);
+    assert.ok(f.bargain_low >= 150 && f.opening_offer > 0 && f.bargain_low <= f.bargain_high, JSON.stringify(f));
+    const m: any = applyVenueGuidance({ seller_context: { sellerType: "Market/Fair" }, price_guidance: { estimated_market_range_low: lo, estimated_market_range_high: 600 }, buy_decision: {} });
+    assert.ok(m.price_guidance.market_bargain_low > 0 && m.negotiation_strategy.opening_offer > 0, "no €0 shown");
+  }
+  const tiny = marketFigures(0, 12); assert.ok(tiny.bargain_low > 0 && tiny.opening_offer > 0, JSON.stringify(tiny));
+  assert.equal(isPrivateSeller({ sellerType: "Private Seller" }), true);
+  assert.equal(isPrivateSeller({ sellerType: "Estate sale" }), true);
+  assert.equal(isPrivateSeller({ sellerType: "Market/Fair" }), false);
+  assert.equal(isPrivateSeller({ sellerType: "Antique Shop" }), false);
+  const pv: any = applyVenueGuidance({ seller_context: { sellerType: "Private Seller" }, price_guidance: { estimated_market_range_low: 200, estimated_market_range_high: 600 }, buy_decision: {} });
+  assert.equal(pv.venue_note_key, "analysis.venue_note_private"); assert.equal(pv.negotiation_strategy.walk_away_price, 600, "same market bands");
+  const mk: any = applyVenueGuidance({ seller_context: { sellerType: "Market/Fair" }, price_guidance: { estimated_market_range_low: 200, estimated_market_range_high: 600 }, buy_decision: {} });
+  assert.equal(mk.venue_note_key, "analysis.venue_note_market");
+});
+
+check("venue split (display-side): Negotiate plan, how-to-buy box and payment tip follow the venue figures", () => {
+  const plan0 = { kind: "private", opening_offer: 400, happy_at: 420, walk_away: 700, levers: [{ id: "bundle" }], invoice: { terms: ["epoque"] }, payment: { mode: "cash_private_receipt" } };
+  const mk = (st: string) => ({ seller_context: { sellerType: st, isAuction: false }, negotiation_plan: plan0,
+    price_guidance: { currency: "EUR", estimated_market_range_low: 200, estimated_market_range_high: 600, fair_price_low: 600, fair_price_high: 1200 },
+    negotiation_strategy: { opening_offer: 600, target_price_low: 600, target_price_high: 900, walk_away_price: 1200 },
+    buy_decision: { effective_price: 450, compare_price: 450, price_basis: "strong_buy", price_scale: "dealer" } });
+  for (const st of ["Market/Fair", "Private Seller"]) {
+    const v: any = applyVenueGuidance(mk(st));
+    assert.equal(v.negotiation_plan.walk_away, 600, st + ": Negotiate walk-away = auction high");
+    assert.equal(v.negotiation_strategy.walk_away_price, 600); assert.equal(v.price_guidance.overpaying_above, 600);
+    assert.ok(v.negotiation_plan.opening_offer <= v.negotiation_plan.happy_at && v.negotiation_plan.happy_at <= 600 && v.negotiation_plan.happy_at < 450, JSON.stringify(v.negotiation_plan));
+    assert.deepEqual([v.negotiation_strategy.opening_offer, v.negotiation_strategy.target_price_high], [v.negotiation_plan.opening_offer, v.negotiation_plan.happy_at], "how-to-buy box = Negotiate box");
+    assert.equal(v.negotiation_plan.payment.mode, st === "Market/Fair" ? "cash_market" : "cash_private_receipt");
+    assert.deepEqual(v.negotiation_plan.levers, plan0.levers, "levers kept");
+  }
+  const d: any = applyVenueGuidance(mk("Antique Shop"));
+  assert.equal(d.negotiation_plan.walk_away, 1200); assert.equal(d.negotiation_plan.payment.mode, "cash");
+  assert.ok(d.negotiation_strategy.opening_offer < 450 && d.negotiation_strategy.opening_offer === d.negotiation_plan.opening_offer);
+  const auc: any = { ...mk("Auction"), seller_context: { sellerType: "Auction", isAuction: true } };
+  assert.equal(applyVenueGuidance(auc), auc, "auction untouched");
+});
 
 console.log(`
 ${passed} checks passed`);

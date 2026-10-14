@@ -48,7 +48,7 @@ export const Negotiate: React.FC<{ plan?: NegotiationPlan | null; currency?: str
           {p.mode === 'transfer' ? (
             <p className="text-sm text-ink leading-snug">{t('negotiate.pay_transfer', { cap: money(p.cap_eur), capNr: money(p.cap_non_resident_eur) })}</p>
           ) : (
-            <p className="text-sm text-ink leading-snug">{t(p.mode === 'cash' ? 'negotiate.pay_cash' : 'negotiate.pay_cash_private', { lo: p.discount_pct[0], hi: p.discount_pct[1], amount: showPrices && p.discount_amount ? ` (${money(p.discount_amount[0])}–${money(p.discount_amount[1])})` : '', cap: money(p.cap_eur) })}
+            <p className="text-sm text-ink leading-snug">{t(p.mode === 'cash' ? 'negotiate.pay_cash' : p.mode === 'cash_market' ? 'negotiate.pay_cash_market' : 'negotiate.pay_cash_private', { lo: p.discount_pct[0], hi: p.discount_pct[1], amount: showPrices && p.discount_amount ? ` (${money(p.discount_amount[0])}–${money(p.discount_amount[1])})` : '', cap: money(p.cap_eur) })}
               {p.mode === 'cash_private_receipt' && p.over_cap ? ` ${t('negotiate.pay_private_trader', { cap: money(p.cap_eur) })}` : ''}</p>
           )}
         </div>
