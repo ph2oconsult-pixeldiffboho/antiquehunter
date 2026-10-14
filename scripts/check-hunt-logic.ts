@@ -1,5 +1,6 @@
 // Quick self-checks for the hunt URL filters and appraisal maths.
 // Run: npx tsx scripts/check-hunt-logic.ts
+import { applyVenueGuidance, venueOf, marketFigures } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -1653,6 +1654,23 @@ check("field notes: cash-cap note matches negotiation constants", () => {
   assert.ok(teaserNotes({ count: 2 }).length === 2);
 });
 
+
+check("venue split: auction unchanged, market bargain band + walk-away = auction high, dealer keeps its range", () => {
+  const base = { price_guidance: { estimated_market_range_low: 200, estimated_market_range_high: 600, fair_price_low: 450, fair_price_high: 1200, good_buy_below: 500 },
+    negotiation_strategy: { walk_away_price: 1200 }, buy_decision: { effective_price: 550, price_basis: "good_buy", score: 70, price_scale: "dealer" } };
+  const auc = { ...base, seller_context: { isAuction: true, sellerType: "Auction" } };
+  assert.equal(applyVenueGuidance(auc), auc, "auction item untouched");
+  assert.equal(venueOf({ sellerType: "Market/Fair" }), "market");
+  assert.equal(venueOf({ sellerType: "Antique Shop" }), "dealer");
+  const m: any = applyVenueGuidance({ ...base, seller_context: { sellerType: "Market/Fair" } });
+  assert.equal(m.negotiation_strategy.walk_away_price, 600);
+  assert.equal(m.price_guidance.market_bargain_low, 200); assert.equal(m.price_guidance.market_bargain_high, 400);
+  assert.equal(m.buy_decision.price_basis, "fair", "550 is above the bargain band, under the auction high");
+  assert.equal(m.price_guidance.fair_price_high, 1200, "dealer range still carried");
+  const d: any = applyVenueGuidance({ ...base, seller_context: { sellerType: "Antique Shop" } });
+  assert.equal(d.negotiation_strategy.walk_away_price, 1200); assert.equal(d.buy_decision.price_basis, "good_buy");
+  const f = marketFigures(200, 600); assert.ok(f.opening_offer <= f.good_buy_below && f.good_buy_below <= f.walk_away_price);
+});
 
 console.log(`
 ${passed} checks passed`);

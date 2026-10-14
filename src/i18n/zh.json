@@ -151,7 +151,15 @@
     "paddle_rule_label": "商家竞拍规则：",
     "paddle_rule": "您的最高落槌出价（放弃价）为 {{hammer}}。加上 {{pct}}% 的买家佣金，总计 {{allIn}}。经验法则：最高落槌出价 = 总预算 ÷ {{mult}}。",
     "reason_hammer_suffix": " 落槌价（含{{pct}}%买家佣金约{{allIn}}）",
-    "hammer_word": "落槌价"
+    "hammer_word": "落槌价",
+    "market_bargain_band": "Market bargain band",
+    "venue_note_market": "At a brocante or flea market, bargains below auction level are possible, but quality is not guaranteed: no provenance, no guarantee, and condition is as found.",
+    "venue_note_dealer": "Dealers cost more than auction, but quality is generally more guaranteed: provenance, a guarantee and professional restoration are usually part of the price.",
+    "reason_market_strong_buy": "{{price}} is at or below the auction low ({{bargainLow}}): a real market bargain.",
+    "reason_market_good_buy": "{{price}} is inside the market bargain band ({{bargainLow}}–{{bargainHigh}}).",
+    "reason_market_fair": "{{price}} is above the bargain band but within the walk-away (auction high {{walkAway}}).",
+    "reason_market_overpriced": "{{price}} is above the walk-away ({{walkAway}}, the auction high): you could likely do better at auction.",
+    "reason_market_walk_away": "{{price}} is far above auction level (over {{overTop}}): walk away."
   },
   "results": {
     "title": "经销商发现",

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { applyVenueGuidance } from '../services/venueGuidance';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen, Sparkles } from 'lucide-react';
@@ -283,7 +284,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   };
 
   const items = Array.isArray(localResult) ? localResult : [localResult];
-  const rawItem = items[currentIndex];
+  // Venue split (Market/Fair vs Antique Shop vs Auction): auction items pass through unchanged
+  const rawItem = useMemo(() => applyVenueGuidance(items[currentIndex]), [items, currentIndex]);
 
   const [selectedPack, setSelectedPack] = useState('3pack');
   const [buyingGoal, setBuyingGoal] = useState<'investment' | 'must_have' | 'resale'>('investment');
@@ -327,8 +329,18 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const walkHammer = Number(ns.walk_away_price) || Number(pg.overpaying_above) || 0;
     // Dealer / shop / private: the price was judged against the dealer range (gemini.ts); its own reason texts
     const db = originalDecision.price_scale === 'dealer' ? originalDecision.dealer_bands : null;
+    const mb = originalDecision.price_scale === 'market' ? originalDecision.market_bands : null;
+    const marketReason = mb && effective > 0 && ['strong_buy', 'good_buy', 'fair', 'overpriced', 'walk_away'].includes(basis);
     const dealerReason = db && effective > 0 && ['strong_buy', 'good_buy', 'fair', 'overpriced', 'walk_away'].includes(basis);
-    const reason = dealerReason
+    const reason = marketReason
+      ? t(`analysis.reason_market_${basis}`, {
+          price: formatMoney(effective, pg.currency),
+          bargainLow: formatMoney(Number(mb.bargain_low) || 0, pg.currency),
+          bargainHigh: formatMoney(Number(mb.bargain_high) || 0, pg.currency),
+          walkAway: formatMoney(Number(mb.walk_away) || 0, pg.currency),
+          overTop: formatMoney(Number(mb.overpriced_to) || 0, pg.currency),
+        }) + ' ' + t('analysis.venue_note_market')
+      : dealerReason
       ? t(`analysis.reason_dealer_${basis}`, {
           price: formatMoney(effective, pg.currency),
           auctionMid: formatMoney(Number(db.strong_buy_to) || 0, pg.currency),
@@ -357,7 +369,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         })
       : (score >= 65 ? t('analysis.buy_strong_desc') : score >= 45 ? t('analysis.buy_risky_desc') : t('analysis.buy_avoid_desc'));
 
-    return { ...rawItem, buy_decision: { ...originalDecision, score, label, price_basis: basis, reason } };
+    const reasonOut = dealerReason ? `${reason} ${t('analysis.venue_note_dealer')}` : reason;
+    return { ...rawItem, buy_decision: { ...originalDecision, score, label, price_basis: basis, reason: reasonOut } };
   }, [rawItem, buyingGoal, t]);
 
   // Keep the floating action bar from covering the end of the page (bar height + safe area).
@@ -515,6 +528,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
   // Buyer's premium figures: computed once and reused everywhere so totals always match
   const isAuctionItem = !!(currentItem.seller_context?.isAuction || currentItem.seller_context?.sellerType?.toLowerCase().includes('auction'));
   const dealerScale = currentItem.buy_decision?.price_scale === 'dealer';
+  const marketScale = currentItem.buy_decision?.price_scale === 'market';
   const premiumPct = Number(currentItem.seller_context?.buyerPremiumRate) > 0 ? Number(currentItem.seller_context.buyerPremiumRate) : 25;
   const marketLow = Math.round(Number(currentItem.price_guidance?.estimated_market_range_low) || 0);
   const marketHigh = Math.round(Number(currentItem.price_guidance?.estimated_market_range_high) || 0);
@@ -1048,12 +1062,21 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
                 </p>
               )}
             </div>
+            {marketScale ? (
+            <div className="space-y-1">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-ink">{t('analysis.market_bargain_band')}</p>
+              <p className="text-xl font-medium text-ink" data-testid="range-market">
+                {formatPrice(currentItem.price_guidance.market_bargain_low)} - {formatPrice(currentItem.price_guidance.market_bargain_high)}
+              </p>
+            </div>
+            ) : (
             <div className="space-y-1">
               <p className={`text-[9px] uppercase tracking-widest font-bold ${dealerScale ? 'text-ink' : 'text-muted'}`}>{dealerScale ? t('analysis.dealer_range') : t('analysis.retail_range', 'Retail Range')}</p>
               <p className={dealerScale ? 'text-xl font-medium text-ink' : 'text-lg font-medium text-muted'} data-testid="range-dealer">
                 {formatPrice(currentItem.price_guidance.fair_price_low)} - {formatPrice(currentItem.price_guidance.fair_price_high)}
               </p>
             </div>
+            )}
             <div className="space-y-1">
               <p className="text-[9px] uppercase tracking-widest font-bold text-decision-red/80">{t('analysis.overpaying', 'Overpaying')}</p>
               {/* Overpaying starts at the walk-away price, so the bands are contiguous: smart buy / walk-away / overpaying */}
@@ -1066,6 +1089,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
             </div>
           </div>
 
+          {(marketScale || dealerScale) && (
+            <p className="text-xs text-ink leading-relaxed" data-testid="venue-note">{t(marketScale ? 'analysis.venue_note_market' : 'analysis.venue_note_dealer')}</p>
+          )}
           {dealerScale && (
             <p className="text-xs text-ink leading-relaxed" data-testid="dealer-scale-note">{t('analysis.dealer_scale_note')}</p>
           )}
