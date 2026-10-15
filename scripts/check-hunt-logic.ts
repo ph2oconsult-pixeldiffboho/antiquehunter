@@ -1816,6 +1816,13 @@ check("stable range: same piece -> same key (venue, price, motivation not in it)
   const k = pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "EUR" });
   assert.equal(k, pieceKey({ text: "  louis philippe  WALNUT commode ", category: "furniture", currency: "EUR" }));
   assert.notEqual(k, pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "GBP" }));
+  // v2: one key per piece across devices (the mobile run left the category on Unknown: 6407b3d2 vs e19ea8ce in v1)
+  for (const o of [{ category: "unknown" }, { category: "furniture", location: "Paris" }, { location: "  paris, France " }, { currency: "eur" }, { lotUrl: "" }])
+    assert.equal(pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "EUR", ...o }), k, JSON.stringify(o));
+  assert.equal(pieceKey({ text: "Louis-Philippe walnut commode.", currency: "EUR" }), k, "punctuation");
+  assert.equal(pieceKey({ text: "LOUIS PHILIPPE  walnut\ncommode", currency: "EUR" }), k, "case / whitespace");
+  assert.notEqual(pieceKey({ text: "Louis Philippe mahogany commode", currency: "EUR" }), k, "a different piece");
+  assert.notEqual(k, "e19ea8ce", "v1 keys are not reused (they expire)");
   assert.notEqual(k, pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "EUR", images: ["data:image/jpeg;base64,AAAA"] }));
   const m = new Map<string, string>(); const store = { get: (x: string) => m.get(x) ?? null, set: (x: string, v: string) => { m.set(x, v); } };
   const P = { low: 200, high: 600, fair_low: 500, fair_high: 1200, model: "gemini-3.1-flash-lite", primary: true };
