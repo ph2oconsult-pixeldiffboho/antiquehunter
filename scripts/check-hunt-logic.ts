@@ -2088,6 +2088,9 @@ await acheck("range store clear: admin token required (constant time), refused w
   const ok = await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}`); assert.deepEqual([ok.status, ok.body.deleted], [200, true]); assert.equal(db.size, 0);
   assert.equal((await call({ RANGE_ADMIN_TOKEN: T }, `Bearer ${T}`, JSON.stringify({ piece_key: "abcd1234" }), "DELETE")).body.deleted, false, "already gone");
   assert.equal((await handleRangeClear({ method: "POST", headers: { authorization: `Bearer ${T}` }, body: { piece_key: "abcd1234" } }, { env: { RANGE_ADMIN_TOKEN: T }, redis: null })).status, 503, "no store");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: `${T}\n` }, `Bearer ${T}`, { piece_key: "00000000" })).status, 200, "pasted trailing newline in the env value");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: `  "${T}" ` }, `Bearer ${T}`, { piece_key: "00000000" })).status, 200, "quoted env value");
+  assert.equal((await call({ RANGE_ADMIN_TOKEN: `"${"z".repeat(10)}"` }, `Bearer ${"z".repeat(10)}`)).status, 503, "length checked after normalising");
   assert.equal(tokenMatches(T, T), true); assert.equal(tokenMatches("", T), false); assert.equal(tokenMatches(T, undefined), false);
   const src = readFileSync("src/services/rangeAdmin.ts", "utf8"); assert.match(src, /timingSafeEqual/);
   assert.ok(!/RANGE_ADMIN_TOKEN\s*=\s*["'][^"']/.test(readFileSync("src/services/rangeAdmin.ts", "utf8") + readFileSync("api/range-store/clear.ts", "utf8")), "no token in the repo");
