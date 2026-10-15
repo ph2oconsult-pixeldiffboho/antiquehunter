@@ -706,6 +706,10 @@
     "remove": "Supprimer",
     "reset": "Réinitialiser la fourchette enregistrée",
     "done": "Fourchette effacée : la prochaine estimation de cette pièce en enregistrera une nouvelle.",
-    "error": "Impossible d'effacer la fourchette (vérifiez le jeton admin)."
+    "error": "Impossible d'effacer la fourchette (vérifiez le jeton admin).",
+    "no_key": "Réinitialiser la fourchette : indisponible pour cette estimation (antérieure aux fourchettes partagées, issue d'un lien de lot ou d'une relance de la checklist).",
+    "saved": "Jeton admin enregistré sur cet appareil. « Réinitialiser la fourchette enregistrée » apparaît à la fin de chaque nouvelle estimation.",
+    "removed": "Jeton admin supprimé de cet appareil.",
+    "active": "Un jeton admin est enregistré sur cet appareil."
   }
 }

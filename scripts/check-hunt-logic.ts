@@ -1855,6 +1855,13 @@ check("motivation verdict overrides a (saved) Need More Evidence above the walk-
   assert.ok(!/<EvidenceStep/.test(ui), "no blocking evidence step");
   for (const f of ["en", "fr"]) { const e = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")).evidence; for (const a of ["underside_back", "drawer_joints", "hardware_mounts", "seat_frame_webbing", "stamp_label"]) assert.ok(e.tips[a], f + a); assert.ok(e.tips_title); }
 });
+check("reset saved range: shown at the end of the result for admins, explained when the appraisal has no piece key", () => {
+  const v = readFileSync("src/components/AnalysisView.tsx", "utf8");
+  assert.ok(v.indexOf("<ResetRangeButton") > v.indexOf("Market Insight Card") && v.indexOf("<ResetRangeButton") < v.indexOf("13. Feedback System"), "near the end of the page");
+  const r = readFileSync("src/components/RangeAdmin.tsx", "utf8");
+  assert.match(r, /if \(!token\) return null;/); assert.match(r, /data-testid="reset-range-unavailable"/);
+  for (const f of ["en", "fr"]) { const j = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")).range_admin; assert.ok(j.no_key && j.saved && j.removed && j.active, f); }
+});
 const acheck = async (name: string, fn: () => Promise<void>) => { await fn(); passed++; console.log("ok -", name); };
 check("fitWithin keeps aspect, never upscales", () => {
   assert.deepEqual(fitWithin(4032, 3024, 1600), { width: 1600, height: 1200 });
