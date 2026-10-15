@@ -10,14 +10,17 @@ export const RangeAdminToken: React.FC = () => {
   const { t } = useTranslation();
   const [val, setVal] = useState(readToken());
   const [saved, setSaved] = useState(!!readToken());
+  const [flash, setFlash] = useState(false);
   return (
     <div className="space-y-2" data-testid="range-admin-token">
       <label className="text-[10px] uppercase tracking-widest font-bold text-muted">{t('range_admin.token_label')}</label>
       <input type="password" autoComplete="off" value={val} onChange={(e) => setVal(e.target.value)} className="w-full p-3 bg-paper border border-border-custom rounded-xl text-sm" />
       <div className="flex gap-2">
-        <button className="px-4 py-2 text-xs bg-ink text-paper rounded-full" onClick={() => { try { if (val.trim()) localStorage.setItem(ADMIN_TOKEN_KEY, val.trim()); else localStorage.removeItem(ADMIN_TOKEN_KEY); } catch { /* ignore */ } setSaved(!!val.trim()); }}>{t('range_admin.save')}</button>
+        <button className="px-4 py-2 text-xs bg-ink text-paper rounded-full" onClick={() => { try { if (val.trim()) localStorage.setItem(ADMIN_TOKEN_KEY, val.trim()); else localStorage.removeItem(ADMIN_TOKEN_KEY); } catch { /* ignore */ } setSaved(!!val.trim()); setFlash(true); }}>{t('range_admin.save')}</button>
         {saved && <button className="px-4 py-2 text-xs border border-border-custom rounded-full" onClick={() => { try { localStorage.removeItem(ADMIN_TOKEN_KEY); } catch { /* ignore */ } setVal(''); setSaved(false); }}>{t('range_admin.remove')}</button>}
       </div>
+      {flash && <p className="text-[11px] text-muted" role="status">{saved ? t('range_admin.saved') : t('range_admin.removed')}</p>}
+      {saved && !flash && <p className="text-[11px] text-muted">{t('range_admin.active')}</p>}
     </div>
   );
 };
@@ -27,7 +30,9 @@ export const ResetRangeButton: React.FC<{ pieceKey?: string }> = ({ pieceKey }) 
   const { t } = useTranslation();
   const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
   const token = readToken();
-  if (!token || !pieceKey) return null;
+  if (!token) return null;
+  // Older appraisals, lot links and checklist re-runs have no shared range: say so instead of showing nothing
+  if (!pieceKey) return <p data-testid="reset-range-unavailable" className="text-center text-[11px] text-muted">{t('range_admin.no_key')}</p>;
   const run = async () => {
     setState('busy');
     try {
