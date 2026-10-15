@@ -10,11 +10,24 @@ export interface RangeStore { get(k: string): string | null; set(k: string, v: s
 export const RANGE_TTL_MS = 30 * 24 * 3600 * 1000;
 const PREFIX = 'ah_range_v1:';
 
-/** FNV-1a 32-bit over the normalised piece inputs (images: length + sampled characters, so large photos stay cheap). */
+/** Key version: v2 drops category and location (they made the same piece hash differently across devices). Old v1
+ *  entries are simply never looked up again and expire (device 30 days, shared store 90 days). */
+export const PIECE_KEY_VERSION = 'v2';
+/** Text as the piece is described: case, accents, punctuation and whitespace do not matter. */
+export const normPieceText = (s?: string) => String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/**
+ * FNV-1a 32-bit over what describes the piece and what changes its price figures:
+ *  - the description text (normalised) and the photos (length + sampled characters, so large photos stay cheap);
+ *  - the currency (the stored figures are in it).
+ * Not in the key: the category dropdown (same piece whether it is set to Furniture or left on Unknown), the typed
+ * location (free text, and the app's range is an auction-level range, not a regional one), the venue, the asking
+ * price, motivation and budget (the app derives those from the range). Lot links never use the store.
+ */
 export const pieceKey = (i: { text?: string; images?: string[]; category?: string; currency?: string; location?: string; lotUrl?: string }): string => {
-  const norm = (s?: string) => String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
   const img = (i.images || []).map(x => { const s = String(x || ''); let h = s.length.toString(36); for (let k = 0; k < s.length; k += Math.max(1, Math.floor(s.length / 64))) h += s[k]; return h; }).join('|');
-  const src = [norm(i.text), img, norm(i.category), norm(i.currency), norm(i.location), norm(i.lotUrl)].join('\u0001');
+  const src = [PIECE_KEY_VERSION, normPieceText(i.text), img, String(i.currency || '').trim().toUpperCase()].join('\u0001');
   let h = 0x811c9dc5;
   for (let k = 0; k < src.length; k++) { h ^= src.charCodeAt(k); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, '0');
