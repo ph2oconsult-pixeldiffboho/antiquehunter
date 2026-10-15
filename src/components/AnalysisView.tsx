@@ -967,7 +967,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </section>
       )}
 
-      <ResetRangeButton pieceKey={currentItem.range_source?.key} />
       <OfferPlan md={currentItem.motivation_decision} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
 
       {/* 3c. Maker attribution + verified auction comparables (public results; the anchored range itself is in the price card) */}
@@ -1509,6 +1508,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         )}
       </div>
     </div>
+
+    {/* Admin only (token set in Settings): reset this piece's shared range, at the end of the page */}
+    <ResetRangeButton pieceKey={currentItem.range_source?.key} />
 
     {/* 13. Feedback System */}
       {!showPaywall && (

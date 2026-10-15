@@ -706,6 +706,10 @@
     "remove": "Remove",
     "reset": "Reset saved price range",
     "done": "Saved range cleared: the next appraisal of this piece sets a new one.",
-    "error": "Could not clear the saved range (check the admin token)."
+    "error": "Could not clear the saved range (check the admin token).",
+    "no_key": "Reset saved price range: not available for this appraisal (made before shared ranges, from a lot link, or a checklist re-run).",
+    "saved": "Admin token saved on this device. \"Reset saved price range\" now shows at the end of each new appraisal.",
+    "removed": "Admin token removed from this device.",
+    "active": "Admin token is set on this device."
   }
 }

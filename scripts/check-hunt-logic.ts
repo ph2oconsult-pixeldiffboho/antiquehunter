@@ -1816,6 +1816,13 @@ check("stable range: same piece -> same key (venue, price, motivation not in it)
   const k = pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "EUR" });
   assert.equal(k, pieceKey({ text: "  louis philippe  WALNUT commode ", category: "furniture", currency: "EUR" }));
   assert.notEqual(k, pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "GBP" }));
+  // v2: one key per piece across devices (the mobile run left the category on Unknown: 6407b3d2 vs e19ea8ce in v1)
+  for (const o of [{ category: "unknown" }, { category: "furniture", location: "Paris" }, { location: "  paris, France " }, { currency: "eur" }, { lotUrl: "" }])
+    assert.equal(pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "EUR", ...o }), k, JSON.stringify(o));
+  assert.equal(pieceKey({ text: "Louis-Philippe walnut commode.", currency: "EUR" }), k, "punctuation");
+  assert.equal(pieceKey({ text: "LOUIS PHILIPPE  walnut\ncommode", currency: "EUR" }), k, "case / whitespace");
+  assert.notEqual(pieceKey({ text: "Louis Philippe mahogany commode", currency: "EUR" }), k, "a different piece");
+  assert.notEqual(k, "e19ea8ce", "v1 keys are not reused (they expire)");
   assert.notEqual(k, pieceKey({ text: "Louis Philippe walnut commode", category: "furniture", currency: "EUR", images: ["data:image/jpeg;base64,AAAA"] }));
   const m = new Map<string, string>(); const store = { get: (x: string) => m.get(x) ?? null, set: (x: string, v: string) => { m.set(x, v); } };
   const P = { low: 200, high: 600, fair_low: 500, fair_high: 1200, model: "gemini-3.1-flash-lite", primary: true };
@@ -1854,6 +1861,13 @@ check("motivation verdict overrides a (saved) Need More Evidence above the walk-
   assert.match(ui, /\.slice\(0, 2\)\.map\(\(a\) => \(\s*<li key=\{a\} className="text-sm text-ink">• \{t\(`evidence\.tips\.\$\{a\}`\)\}/, "at most two check-before-you-pay tips");
   assert.ok(!/<EvidenceStep/.test(ui), "no blocking evidence step");
   for (const f of ["en", "fr"]) { const e = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")).evidence; for (const a of ["underside_back", "drawer_joints", "hardware_mounts", "seat_frame_webbing", "stamp_label"]) assert.ok(e.tips[a], f + a); assert.ok(e.tips_title); }
+});
+check("reset saved range: shown at the end of the result for admins, explained when the appraisal has no piece key", () => {
+  const v = readFileSync("src/components/AnalysisView.tsx", "utf8");
+  assert.ok(v.indexOf("<ResetRangeButton") > v.indexOf("Market Insight Card") && v.indexOf("<ResetRangeButton") < v.indexOf("13. Feedback System"), "near the end of the page");
+  const r = readFileSync("src/components/RangeAdmin.tsx", "utf8");
+  assert.match(r, /if \(!token\) return null;/); assert.match(r, /data-testid="reset-range-unavailable"/);
+  for (const f of ["en", "fr"]) { const j = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")).range_admin; assert.ok(j.no_key && j.saved && j.removed && j.active, f); }
 });
 const acheck = async (name: string, fn: () => Promise<void>) => { await fn(); passed++; console.log("ok -", name); };
 check("fitWithin keeps aspect, never upscales", () => {
