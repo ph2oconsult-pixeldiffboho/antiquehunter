@@ -2,6 +2,7 @@
 // Run: npx tsx scripts/check-hunt-logic.ts
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller, needEvidenceWalkAway } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
+import { calibrateRange } from "../src/services/thinEvidence";
 import { handleRangeClear, tokenMatches } from "../src/services/rangeAdmin.ts";
 import { redisEnv, upstashClient, resolveSharedRange, RANGE_STORE_TIMEOUT_MS } from "../src/services/rangeStore.ts";
 import { pieceKey, stableRange, RANGE_TTL_MS } from "../src/services/priceCache.ts";
@@ -2094,6 +2095,36 @@ await acheck("range store clear: admin token required (constant time), refused w
   assert.equal(tokenMatches(T, T), true); assert.equal(tokenMatches("", T), false); assert.equal(tokenMatches(T, undefined), false);
   const src = readFileSync("src/services/rangeAdmin.ts", "utf8"); assert.match(src, /timingSafeEqual/);
   assert.ok(!/RANGE_ADMIN_TOKEN\s*=\s*["'][^"']/.test(readFileSync("src/services/rangeAdmin.ts", "utf8") + readFileSync("api/range-store/clear.ts", "utf8")), "no token in the repo");
+});
+
+check("cheap-piece calibration: style / cheap-material wording lowers, thin evidence opens the low; stamped, comps, confirmed and photo-material exempt; walk-away follows", () => {
+  const base = { hasPhotos: false, periodCertainty: "probable_period", confidence: "very_low", makerStatus: null };
+  const style = calibrateRange({ ...base, low: 250, high: 800, text: "Commode dans le style Louis XVI en noyer. Début du XIXème siècle. Accidents." });
+  assert.deepEqual(style.factors, ["style_wording", "thin_evidence_low"]); assert.equal(style.high, 640); assert.equal(style.low, 130);
+  assert.deepEqual(calibrateRange({ ...base, low: 250, high: 800, text: "Commode d'époque Louis XV de style rocaille" }).factors, ["thin_evidence_low"], "a period claim beats the style word");
+  assert.equal(calibrateRange({ ...base, low: 200, high: 600, text: "Miroir en bois et stuc doré" }).high, 360);
+  assert.equal(calibrateRange({ ...base, hasPhotos: true, low: 200, high: 600, text: "Miroir en bois et stuc doré" }).high, 600, "photos: the model sees the material");
+  for (const x of [{ makerStatus: "stamped_stated" }, { compsAnchored: true }]) assert.equal(calibrateRange({ ...base, ...x, low: 250, high: 800, text: "commode de style Louis XVI" }).factors.length, 0, JSON.stringify(x));
+  const strong = calibrateRange({ ...base, periodCertainty: "confirmed_period", low: 1500, high: 3500, text: "Commode d'époque Louis XV en bois de violette" });
+  assert.equal(strong.factors.length, 0, "confirmed period: expensive piece untouched");
+  const thin = calibrateRange({ ...base, low: 1200, high: 2800, text: "Commode galbée en bois de violette" });
+  assert.equal(thin.high, 2800, "thin evidence never lowers the high (walk-away)"); assert.equal(thin.low, 560);
+  // wired into post-processing: displayed range, walk-away and prose agree
+  const raw = () => ({ items: [{ item_summary: { title: "Louis XVI style walnut commode", likely_period: "19th c.", likely_style: "Louis XVI style", value_tier: "B", snap_judgement: "", confidence: "low",
+    confidence_breakdown: { evidence_quality: 10, identification_certainty: 12, risk_factors: 15 }, confidence_reason: "", period_certainty: "later_style_or_revival", reproduction_risk: false, construction_evidence: "none shown" },
+    buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 250, estimated_market_range_high: 800, fair_price_low: 600, fair_price_high: 1600, pricing_reasoning: "Typical hammer is €250–€800 for this. Style pieces sell steadily." },
+    negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
+  const ctx = { query: "Commode dans le style Louis XVI en noyer, accidents", hasPhotos: false, askingPrice: 500, isAuction: true, premiumPct: 27, targetCurrency: "EUR", currencySymbol: "€", language: "fr", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture" };
+  const a: any = postProcessAppraisal(raw(), ctx)[0];
+  assert.equal(a.price_guidance.estimated_market_range_high, 640); assert.ok(a.price_guidance.estimated_market_range_low <= 130);
+  assert.equal(a.walk_away_threshold.hammer, 640, "walk-away follows the calibrated high");
+  assert.ok(!/€|800/.test(a.price_guidance.pricing_reasoning) && /Style pieces/.test(a.price_guidance.pricing_reasoning), a.price_guidance.pricing_reasoning);
+  assert.deepEqual(a.price_guidance.calibration.factors, ["style_wording", "thin_evidence_low"]);
+  assert.ok(a.buy_decision.price_basis && a.buy_decision.price_basis !== "need_evidence", "decisive verdict");
+  for (const v of ["Market/Fair", "Antique Shop", "Private Seller"]) {
+    const d: any = postProcessAppraisal(raw(), { ...ctx, isAuction: false, premiumPct: 0, sellerType: v })[0];
+    assert.ok(d.price_guidance.estimated_market_range_high === 640 && d.buy_decision.price_basis !== "need_evidence", v);
+  }
 });
 console.log(`
 ${passed} checks passed`);

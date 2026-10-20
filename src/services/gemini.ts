@@ -12,6 +12,7 @@ import { lotFactsPrompt, type LotFacts } from "./lotFacts";
 import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
+import { calibrateRange } from "./thinEvidence";
 import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
@@ -651,6 +652,25 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       pgA.fair_price_low = r((Number(pgA.fair_price_low) || lo) * f);
       pgA.fair_price_high = r((Number(pgA.fair_price_high) || hi) * f);
       if (Number(pgA.good_buy_below) > 0) pgA.good_buy_below = r(Number(pgA.good_buy_below) * f);
+    }
+    // Cheap-piece calibration (thinEvidence.ts): style / cheap-material wording lowers the band, thin evidence opens the
+    // low end. Code-computed; skipped on comparables-anchored ranges and checklist re-runs. Model prose that quotes the
+    // old figures is dropped so the text never contradicts the displayed range.
+    if (!anchor.applied && !checkAnswers) {
+      const lo0 = Number(pgA.estimated_market_range_low) || 0, hi0 = Number(pgA.estimated_market_range_high) || 0;
+      const cal = calibrateRange({ low: lo0, high: hi0, hasPhotos, text: query, periodCertainty: item.item_summary.period_certainty,
+        confidence: confLabel, makerStatus: maker?.status || null, compsAnchored: anchor.applied });
+      if (cal.factors.length) {
+        pgA.estimated_market_range_low = cal.low; pgA.estimated_market_range_high = cal.high;
+        if (cal.factor !== 1) {
+          if (Number(pgA.fair_price_low) > 0) pgA.fair_price_low = Math.round(Number(pgA.fair_price_low) * cal.factor);
+          if (Number(pgA.fair_price_high) > 0) pgA.fair_price_high = Math.round(Number(pgA.fair_price_high) * cal.factor);
+        }
+        if (Number(pgA.good_buy_below) > 0) pgA.good_buy_below = Math.min(Number(pgA.good_buy_below) * cal.factor, (cal.low + cal.high) / 2);
+        const pr = String(pgA.pricing_reasoning || '');
+        if (mentionsPrice(pr)) pgA.pricing_reasoning = pr.split(/(?<=[.!?])\s+/).filter(x => !mentionsPrice(x)).join(' ');
+        pgA.calibration = { factors: cal.factors, model_low: lo0, model_high: hi0 };
+      }
     }
     if (maker && (maker.status === 'stamped_confirmed' || maker.status === 'stamped_stated' || maker.status === 'stamp_in_photo'))
       item.item_summary.title = String(item.item_summary.title || '').replace(/,?\s*\(?\s*attributed\s+to\s+[^),]*\)?/i, ` (stamped ${maker.name})`).replace(/,?\s*\(?\s*attribu[ée]e?s?\s+[àa]\s+[^),]*\)?/i, ` (estampillé ${maker.name})`).replace(/\s{2,}/g, ' ').trim();
