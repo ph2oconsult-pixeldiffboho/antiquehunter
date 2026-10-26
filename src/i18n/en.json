@@ -711,5 +711,13 @@
     "saved": "Admin token saved on this device. \"Reset saved price range\" now shows at the end of each new appraisal.",
     "removed": "Admin token removed from this device.",
     "active": "Admin token is set on this device."
+  },
+  "sold_comps": {
+    "title": "Comparable sales",
+    "anchored": "Range computed from {{n}} comparable sales of the same type, period/style and materials (median {{median}} hammer).",
+    "capped": "Stamp with no verified maker results: range capped from {{n}} comparable sales of the type (median {{median}} hammer).",
+    "hammer": "hammer (fees stripped)",
+    "fees": "buyer's fees {{pct}}%",
+    "source_note": "Real sold lots (Drouot, Auctionet; {{pool}} results), matched by type, period/style, materials and market. The app computes the range from them; the appraiser only writes the notes."
   }
 }

@@ -45,3 +45,35 @@ export const MakerAndComparables: React.FC<{ item: any }> = ({ item }) => {
     </section>
   );
 };
+
+/** The sold comparables behind a range with no verified maker anchor (Drouot / Auctionet results, fees stripped). */
+export const SoldComparables: React.FC<{ item: any }> = ({ item }) => {
+  const { t, i18n } = useTranslation();
+  const sc = item?.sold_comps;
+  if (!sc) return null;
+  const list: any[] = sc.list || [];
+  const money = (n: number) => { try { return new Intl.NumberFormat(i18n.language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
+  const date = (d?: string) => { if (!d) return '—'; const x = new Date(d); return isNaN(x.getTime()) ? d : x.toLocaleDateString(i18n.language || 'en', { year: 'numeric', month: 'short', day: 'numeric' }); };
+  const headline = sc.mode === 'anchored' ? t('sold_comps.anchored', { n: sc.n, median: money(sc.median_hammer_eur || 0) })
+    : sc.mode === 'capped' ? t('sold_comps.capped', { n: sc.n, median: money(sc.median_hammer_eur || 0) })
+    : null;
+  return (
+    <section data-testid="sold-comps" className="p-6 bg-white border border-border-custom rounded-[32px] space-y-4 shadow-sm">
+      <div className="flex items-center gap-2"><Gavel className="w-5 h-5 text-gold" /><h3 className="serif text-2xl font-normal">{t('sold_comps.title')}</h3></div>
+      {headline && <p className="text-sm text-ink" data-testid="sold-comps-anchor">{headline}</p>}
+      {sc.note && <p data-testid="sold-comps-note" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl p-3">{sc.note}</p>}
+      {list.length > 0 && (
+        <ul className="space-y-3">
+          {list.map(c => (
+            <li key={c.url} className="p-3 rounded-2xl border border-border-custom">
+              <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-sm text-ink font-medium hover:underline inline-flex items-start gap-1">{String(c.title || '').slice(0, 140)}{String(c.title || '').length > 140 ? '…' : ''}<ExternalLink className="w-3 h-3 mt-1 shrink-0" /></a>
+              <p className="text-[11px] text-muted mt-1">{[c.house, c.city].filter(Boolean).join(', ') || c.source} · {date(c.date)}{c.pieces > 1 ? ` · ${t('comps.pieces', { count: c.pieces })}` : ''}</p>
+              <p className="text-xs text-ink mt-1"><span className="font-bold">{money(c.hammer_eur)}</span> {t('sold_comps.hammer')}{c.fee_pct != null ? ` · ${t('sold_comps.fees', { pct: c.fee_pct })}` : ''}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-[10px] text-muted">{t('sold_comps.source_note', { pool: sc.pool })}</p>
+    </section>
+  );
+};

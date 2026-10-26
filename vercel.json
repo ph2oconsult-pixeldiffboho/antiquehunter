@@ -14,6 +14,10 @@
     },
     "api/comps.ts": {
       "maxDuration": 60
+    },
+    "api/sold-comps.ts": {
+      "maxDuration": 10,
+      "includeFiles": "src/data/soldComps.json"
     }
   }
 }

@@ -11,6 +11,8 @@ import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services
 import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS, CALL_TIMEOUT_MS, TOTAL_BUDGET_MS, callTimeoutFor } from "../src/services/appraiseHandler.ts";
 import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
 import { postProcessAppraisal } from "../src/services/gemini.ts";
+import { matchSoldComps, anchorOnSoldComps, pieceFeatures, MIN_ANCHOR_COMPS } from "../src/services/soldComps.ts";
+import { handleSoldCompsRequest, soldPool } from "../src/services/soldCompsHandler.ts";
 import { existsSync, readFileSync } from "node:fs";
 import {
   allowedDomainsFor, cleanText, failsPeriodRule, interencheresLotId, isAllowedHost, isGenericUrl, isSpecificListingUrl,
@@ -2125,6 +2127,53 @@ check("cheap-piece calibration: style / cheap-material wording lowers, thin evid
     const d: any = postProcessAppraisal(raw(), { ...ctx, isAuction: false, premiumPct: 0, sellerType: v })[0];
     assert.ok(d.price_guidance.estimated_market_range_high === 640 && d.buy_decision.price_basis !== "need_evidence", v);
   }
+});
+check("sold comparables: matched by type/period/material, self excluded, range in code, stamped capped, never Need More Evidence", () => {
+  const pool = soldPool();
+  assert.ok(pool.length > 3000, "pool loaded");
+  assert.ok(pool.every(l => l.u.startsWith("https://") && l.h > 0), "every comp is sourced with a hammer");
+  const SEALED = "../antique-hunter-benchmark/comparables/exclude_test_lots.json";
+  const sealed = existsSync(SEALED) ? JSON.parse(readFileSync(SEALED, "utf8")) : {};
+  if (Array.isArray(sealed?.ids)) for (const id of sealed.ids) assert.ok(!pool.some(l => l.id === String(id)), `sealed ${id} excluded`);
+  const f = pieceFeatures("Commode d'époque Louis XV en noyer, trois tiroirs, XVIIIe siècle");
+  assert.equal(f.type, "commode"); assert.deepEqual(f.periods, ["louis_xv"]); assert.ok(f.materials.includes("walnut")); assert.equal(f.styleOnly, false);
+  assert.equal(pieceFeatures("Commode de style Louis XVI").styleOnly, true);
+  assert.equal(pieceFeatures("Paire de fauteuils cabriolet").pieces, 2);
+  const lot = pool.find(l => /commode/i.test(l.t) && l.rg === "FR")!;
+  const self = matchSoldComps(pool, lot.t, { lotUrl: lot.u }).comps;
+  assert.ok(!self.some(c => c.u === lot.u), "the lot itself is never its own comparable");
+  const mk = (h: number[]) => h.map((x, i) => ({ id: String(i), u: `https://x/${i}`, t: "commode", h: x, d: "2026-09-10", src: "drouot", rg: "FR", score: 5, matched: [], pieces: 1, perPieceH: x }));
+  const a = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e });
+  assert.equal(a.mode, "capped"); assert.equal(a.high, 1800, `unstamped capped at 3x P75: ${a.low}-${a.high}`);
+  const nm = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 0, modelHigh: 0, eurTo: e => e });
+  assert.equal(nm.mode, "anchored"); assert.ok(nm.low <= 400 && nm.high >= 600 && nm.high <= 700, `${nm.low}-${nm.high}`);
+  const d = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: false, isAuction: false, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e });
+  assert.ok(d.high > a.high, "shop/dealer basis sits above the hammer");
+  const out = anchorOnSoldComps(mk([300, 400, 500, 600, 700, 90000]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 0, modelHigh: 0, eurTo: e => e });
+  assert.ok(out.high < 1000 && out.n === 5, "an outlier never moves the range");
+  const st = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: true, isAuction: true, premiumPct: 27, modelLow: 4000, modelHigh: 8000, eurTo: e => e });
+  assert.equal(st.mode, "capped"); assert.ok(st.high <= 1800, `stamp cap ${st.high}`);
+  assert.equal(anchorOnSoldComps(mk([300, 400]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e }).mode, "too_few");
+  assert.equal(MIN_ANCHOR_COMPS, 4);
+  const raw = () => ({ items: [{ item_summary: { title: "Louis XV walnut commode", likely_period: "Louis XV period", likely_style: "Louis XV", value_tier: "B", snap_judgement: "", confidence: "low",
+    confidence_breakdown: { evidence_quality: 10, identification_certainty: 12, risk_factors: 15 }, confidence_reason: "", period_certainty: "uncertain", reproduction_risk: false, construction_evidence: "none shown" },
+    buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 2000, estimated_market_range_high: 5000, fair_price_low: 3000, fair_price_high: 8000, pricing_reasoning: "Solid provincial piece." },
+    negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
+  const ctx: any = { query: "Commode Louis XV en noyer", hasPhotos: false, askingPrice: 900, isAuction: true, premiumPct: 27, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture",
+    soldComps: { ok: true, pool: 5, comps: mk([300, 400, 500, 600, 700]) } };
+  const r: any = postProcessAppraisal(raw(), ctx)[0];
+  assert.equal(r.price_guidance.estimated_market_range_high, a.high); assert.equal(r.walk_away_threshold.hammer, a.high, "walk-away follows the comps");
+  assert.equal(r.sold_comps.mode, "capped"); assert.equal(r.sold_comps.list.length, 5); assert.ok(r.sold_comps.list[0].url.startsWith("https://"));
+  assert.ok(/5 comparable sales/.test(r.price_guidance.pricing_reasoning));
+  assert.notEqual(r.buy_decision.price_basis, "need_evidence");
+  const few: any = postProcessAppraisal(raw(), { ...ctx, soldComps: { ok: true, pool: 2, comps: mk([300, 400]) } })[0];
+  assert.equal(few.sold_comps.mode, "too_few"); assert.ok(/Low confidence/.test(few.sold_comps.note)); assert.notEqual(few.buy_decision.price_basis, "need_evidence");
+  assert.ok(!/need more evidence/i.test(JSON.stringify(few.price_guidance)));
+  const none: any = postProcessAppraisal(raw(), ctx.soldComps && { ...ctx, soldComps: undefined })[0];
+  assert.equal(none.sold_comps, null, "no lookup -> no section");
+  const h = handleSoldCompsRequest({ text: "Commode d'époque Louis XV en noyer" });
+  assert.equal(h.status, 200); assert.ok(h.body.comps.length >= 1 && h.body.comps.every(c => c.score >= 4));
+  assert.equal(handleSoldCompsRequest({}).status, 400);
 });
 console.log(`
 ${passed} checks passed`);

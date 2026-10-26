@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import { handleHuntRequest } from "./src/services/huntHandler.ts";
 import { fetchLotFacts } from "./src/services/lotFetch.ts";
 import { handleCompsRequest } from "./src/services/compsSearch.ts";
+import { handleSoldCompsRequest } from "./src/services/soldCompsHandler.ts";
 import { handleAppraiseRequest } from "./src/services/appraiseHandler.ts";
 import { handleRangeClear } from "./src/services/rangeAdmin.ts";
 
@@ -30,6 +31,12 @@ async function startServer() {
       .catch((e: any) => ({ ok: false, url: String(req.body?.url || ""), site: "other", imageUrls: [], error: String(e?.message || e).slice(0, 120) }));
     res.setHeader("Cache-Control", "no-store");
     res.json(facts);
+  });
+
+  app.post("/api/sold-comps", (req, res) => {
+    const { status, body } = handleSoldCompsRequest(req.body);
+    res.setHeader("Cache-Control", "no-store");
+    res.status(status).json(body);
   });
 
   app.post("/api/comps", async (req, res) => {
