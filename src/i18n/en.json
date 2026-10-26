@@ -718,6 +718,6 @@
     "capped": "Stamp with no verified maker results: range capped from {{n}} comparable sales of the type (median {{median}} hammer).",
     "hammer": "hammer (fees stripped)",
     "fees": "buyer's fees {{pct}}%",
-    "source_note": "Real sold lots (Drouot, Auctionet; {{pool}} results), matched by type, period/style, materials and market. The app computes the range from them; the appraiser only writes the notes."
+    "source_note": "Real sold lots (Drouot, Auctionet; {{pool}} results, fees stripped), matched by type, period/style, materials, size and market. The app checks and caps the range against them in code; the appraiser only writes the notes."
   }
 }
