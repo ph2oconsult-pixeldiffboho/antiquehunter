@@ -669,7 +669,10 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const sold = soldComps === undefined || anchor.applied ? null : anchorOnSoldComps(soldComps?.ok ? soldComps.comps : [], {
       pieces, stamped: stampedEarly, isAuction, premiumPct, eurTo: toTarget,
       modelLow: Number(pgA.estimated_market_range_low) || 0, modelHigh: Number(pgA.estimated_market_range_high) || 0 });
-    const soldApplied = !!sold && (sold.mode === 'anchored' || sold.mode === 'capped');
+    // Unstamped cap (comps vs the appraiser's range): applied after the cheap-piece calibration, so the code-lowered
+    // floor stays; it only ever lowers the high. Stamped cap / comps-only anchoring replace the range up front.
+    const soldCapLate = !!sold && sold.mode === 'capped' && !stampedEarly;
+    const soldApplied = !!sold && (sold.mode === 'anchored' || sold.mode === 'capped') && !soldCapLate;
     const soldModel = { low: Number(pgA.estimated_market_range_low) || 0, high: Number(pgA.estimated_market_range_high) || 0 };
     if (sold && soldApplied) {
       pgA.estimated_market_range_low = sold.low;
@@ -717,6 +720,13 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         if (mentionsPrice(pr)) pgA.pricing_reasoning = pr.split(/(?<=[.!?])\s+/).filter(x => !mentionsPrice(x)).join(' ');
         pgA.calibration = { factors: cal.factors, model_low: lo0, model_high: hi0 };
       }
+    }
+    if (sold && soldCapLate && Number(pgA.estimated_market_range_high) > sold.high) {
+      const hi = sold.high, lo = Math.min(Number(pgA.estimated_market_range_low) || 0, hi);
+      pgA.estimated_market_range_high = hi; pgA.estimated_market_range_low = lo;
+      if (Number(pgA.fair_price_high) > hi * 1.6) pgA.fair_price_high = Math.round(hi * 1.6);
+      if (Number(pgA.fair_price_low) > Number(pgA.fair_price_high)) pgA.fair_price_low = Math.round(lo * 1.3);
+      if (Number(pgA.good_buy_below) > hi) pgA.good_buy_below = Math.round((lo + hi) / 2);
     }
     if (maker && (maker.status === 'stamped_confirmed' || maker.status === 'stamped_stated' || maker.status === 'stamp_in_photo'))
       item.item_summary.title = String(item.item_summary.title || '').replace(/,?\s*\(?\s*attributed\s+to\s+[^),]*\)?/i, ` (stamped ${maker.name})`).replace(/,?\s*\(?\s*attribu[ée]e?s?\s+[àa]\s+[^),]*\)?/i, ` (estampillé ${maker.name})`).replace(/\s{2,}/g, ' ').trim();

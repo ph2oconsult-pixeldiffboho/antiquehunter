@@ -2142,12 +2142,17 @@ check("sold comparables: matched by type/period/material, self excluded, range i
   const lot = pool.find(l => /commode/i.test(l.t) && l.rg === "FR")!;
   const self = matchSoldComps(pool, lot.t, { lotUrl: lot.u }).comps;
   assert.ok(!self.some(c => c.u === lot.u), "the lot itself is never its own comparable");
-  const mk = (h: number[]) => h.map((x, i) => ({ id: String(i), u: `https://x/${i}`, t: "commode", h: x, d: "2026-09-10", src: "drouot", rg: "FR", score: 5, matched: [], pieces: 1, perPieceH: x }));
-  const a = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e });
-  assert.equal(a.mode, "capped"); assert.equal(a.high, 1800, `unstamped capped at 3x P75: ${a.low}-${a.high}`);
+  const mk = (h: number[]) => h.map((x, i) => ({ id: String(i), u: `https://x/${i}`, t: "commode", h: x, d: "2026-09-10", src: "drouot", rg: "FR", score: 5, matched: ["type", "period"], pieces: 1, perPieceH: x }));
+  const SIX = [300, 400, 450, 500, 600, 700];
+  const a = anchorOnSoldComps(mk(SIX), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e });
+  assert.equal(a.mode, "capped"); assert.ok(a.high >= 2000 && a.high <= 2800 && a.low <= a.high, `unstamped capped at 4x P75 of close comps: ${a.low}-${a.high}`);
+  const loose = mk(SIX).map(c => ({ ...c, matched: ["type"] }));
+  assert.equal(anchorOnSoldComps(loose, { stamped: false, isAuction: true, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e }).mode, "too_few", "no cap from comps without a period/century match");
+  const wide = mk([200, 250, 300, 900, 1000, 1100]);
+  assert.equal(anchorOnSoldComps(wide, { stamped: false, isAuction: true, premiumPct: 27, modelLow: 5000, modelHigh: 9000, eurTo: e => e }).note, "not_close", "dispersed comps never cap");
   const nm = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 0, modelHigh: 0, eurTo: e => e });
   assert.equal(nm.mode, "anchored"); assert.ok(nm.low <= 400 && nm.high >= 600 && nm.high <= 700, `${nm.low}-${nm.high}`);
-  const d = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: false, isAuction: false, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e });
+  const d = anchorOnSoldComps(mk(SIX), { stamped: false, isAuction: false, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e });
   assert.ok(d.high > a.high, "shop/dealer basis sits above the hammer");
   const out = anchorOnSoldComps(mk([300, 400, 500, 600, 700, 90000]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 0, modelHigh: 0, eurTo: e => e });
   assert.ok(out.high < 1000 && out.n === 5, "an outlier never moves the range");
@@ -2160,11 +2165,11 @@ check("sold comparables: matched by type/period/material, self excluded, range i
     buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 2000, estimated_market_range_high: 5000, fair_price_low: 3000, fair_price_high: 8000, pricing_reasoning: "Solid provincial piece." },
     negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
   const ctx: any = { query: "Commode Louis XV en noyer", hasPhotos: false, askingPrice: 900, isAuction: true, premiumPct: 27, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture",
-    soldComps: { ok: true, pool: 5, comps: mk([300, 400, 500, 600, 700]) } };
+    soldComps: { ok: true, pool: 6, comps: mk(SIX) } };
   const r: any = postProcessAppraisal(raw(), ctx)[0];
-  assert.equal(r.price_guidance.estimated_market_range_high, a.high); assert.equal(r.walk_away_threshold.hammer, a.high, "walk-away follows the comps");
-  assert.equal(r.sold_comps.mode, "capped"); assert.equal(r.sold_comps.list.length, 5); assert.ok(r.sold_comps.list[0].url.startsWith("https://"));
-  assert.ok(/5 comparable sales/.test(r.price_guidance.pricing_reasoning));
+  assert.ok(r.price_guidance.estimated_market_range_high <= a.high, `${r.price_guidance.estimated_market_range_high}`); assert.equal(r.walk_away_threshold.hammer, r.price_guidance.estimated_market_range_high, "walk-away follows the capped range");
+  assert.equal(r.sold_comps.mode, "capped"); assert.equal(r.sold_comps.list.length, 6); assert.ok(r.sold_comps.list[0].url.startsWith("https://"));
+  assert.ok(/6 comparable sales/.test(r.price_guidance.pricing_reasoning), r.price_guidance.pricing_reasoning);
   assert.notEqual(r.buy_decision.price_basis, "need_evidence");
   const few: any = postProcessAppraisal(raw(), { ...ctx, soldComps: { ok: true, pool: 2, comps: mk([300, 400]) } })[0];
   assert.equal(few.sold_comps.mode, "too_few"); assert.ok(/Low confidence/.test(few.sold_comps.note)); assert.notEqual(few.buy_decision.price_basis, "need_evidence");

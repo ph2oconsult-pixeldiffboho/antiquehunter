@@ -141,6 +141,13 @@ const round = (x: number) => x >= 10000 ? Math.round(x / 500) * 500 : x >= 1000 
 export const MIN_ANCHOR_COMPS = 4;
 /** A stamped piece with no verified maker results: the market for the type caps the range at this multiple of the comps' upper quartile. */
 export const STAMP_CAP_MULT = 3;
+/**
+ * Unstamped cap gate (cross-validated on the dev set, see PR #50): cap only on close matches (type + region + period or
+ * century [+ material]), enough of them, not too dispersed, not wildly cheaper than the appraiser's low (a description
+ * match cannot see quality), and never pull the high below a share of the appraiser's high.
+ */
+const NON_MAT = new Set(['type', 'period', 'period_piece', 'later_style', 'century', 'regional', 'size']);
+export const SOLD_CFG = { needMat: false, minClose: 6, maxDisp: 3, skipRatio: 0, capMult: 4, minHighShare: 0 };
 /** Blend: weight of the comparables = n / (n + BLEND_K), at most BLEND_MAX, scaled down when their P75/P25 exceeds BLEND_DISP. */
 export const BLEND_K = 6;
 export const BLEND_MAX = 0.6;
@@ -175,7 +182,19 @@ export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamp
   const hi = o.eurTo(Math.max(quantile(vals, 0.75), med * 1.2));
   // Unstamped with an appraiser range: same cap rule as a stamp (measured: blending the noisy comps median in lowered
   // calibration and walk-away safety on the dev set; capping keeps the harmful-high gain). No model range: comps alone.
-  if (o.stamped || o.modelHigh > 0) {
+  if (!o.stamped && o.modelHigh > 0) {
+    const close = comps.filter(c => (c.matched.includes('period') || c.matched.includes('century')) && (!SOLD_CFG.needMat || c.matched.some(m => !NON_MAT.has(m))));
+    const cv = close.map(c => c.perPieceH * n * fee(c));
+    const disp = cv.length ? quantile(cv, 0.75) / Math.max(1, quantile(cv, 0.25)) : Infinity;
+    const cmed = cv.length ? o.eurTo(quantile(cv, 0.5)) : 0;
+    if (close.length < SOLD_CFG.minClose || disp > SOLD_CFG.maxDisp || (SOLD_CFG.skipRatio > 0 && cmed * SOLD_CFG.skipRatio < o.modelLow))
+      return { ...base, ...(close.length < SOLD_CFG.minClose ? { n: close.length, used: close } : {}), medianHammerEur, mode: close.length < SOLD_CFG.minClose ? 'too_few' : 'none', note: close.length < SOLD_CFG.minClose ? 'too_few' : 'not_close' };
+    const cap = Math.max(o.eurTo(quantile(cv, 0.75) * SOLD_CFG.capMult), o.modelHigh * SOLD_CFG.minHighShare);
+    if (!(o.modelHigh > cap)) return { ...base, medianHammerEur, mode: 'none', note: 'within_cap' };
+    const high = round(cap);
+    return { ...base, low: Math.min(round(o.modelLow), high), high, medianHammerEur, n: close.length, used: close, mode: 'capped', note: 'type_capped' };
+  }
+  if (o.stamped) {
     const cap = o.eurTo(quantile(vals, 0.75) * STAMP_CAP_MULT);
     if (!(o.modelHigh > cap)) return { ...base, medianHammerEur, mode: 'none', note: 'within_cap' };
     const high = round(cap);
@@ -214,6 +233,7 @@ export const soldCompsProse = (a: SoldAnchor, o: { language: string; isAuction: 
              : `Stamp with no verified results for this maker: range capped at ${STAMP_CAP_MULT}× the upper quartile of ${a.n} comparable sales of the type (median ${med} hammer).`,
     note: fr ? `Confiance limitée : la valeur d'une estampille mineure dépend de la qualité ; vérifiez-la.` : `Limited confidence: a minor maker's stamp is worth what the quality supports; check it.`,
   };
+  if (a.note === 'not_close') return { lead: '', note: fr ? `${a.n} ventes du type listées pour référence (médiane ${med} au marteau) : trop disparates ou d'une autre gamme pour fixer la fourchette, qui reste l'estimation de l'expert.` : `${a.n} sales of the type listed for reference (median ${med} hammer): too varied or a different quality tier to set the range, which stays the appraiser's estimate.` };
   if (a.note === 'within_cap') return { lead: '', note: fr ? `Fourchette cohérente avec ${a.n} ventes comparables du type (médiane ${med} au marteau).` : `Range consistent with ${a.n} comparable sales of the type (median ${med} hammer).` };
   const few = a.mode === 'too_few' && a.n > 0;
   const note = few
