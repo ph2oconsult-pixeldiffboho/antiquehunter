@@ -397,5 +397,13 @@
     "unverified": "未验证",
     "unverified_desc": "该网站阻止自动检查，因此价格、拍卖日期和是否在售均来自搜索结果，未经确认——请打开链接核实。",
     "checked_summary": "链接检查：{{verified}} 个已验证，{{unverified}} 个未验证，{{dropped}} 个已移除（失效、已结束、通用页面或不符合筛选）。"
+  },
+  "sold_comps": {
+    "title": "Comparable sales",
+    "anchored": "Range computed from {{n}} comparable sales of the same type, period/style and materials (median {{median}} hammer).",
+    "capped": "Stamp with no verified maker results: range capped from {{n}} comparable sales of the type (median {{median}} hammer).",
+    "hammer": "hammer (fees stripped)",
+    "fees": "buyer's fees {{pct}}%",
+    "source_note": "Real sold lots (Drouot, Auctionet; {{pool}} results, fees stripped), matched by type, period/style, materials, size and market. The app checks and caps the range against them in code; the appraiser only writes the notes."
   }
 }

@@ -711,5 +711,13 @@
     "saved": "Jeton admin enregistré sur cet appareil. « Réinitialiser la fourchette enregistrée » apparaît à la fin de chaque nouvelle estimation.",
     "removed": "Jeton admin supprimé de cet appareil.",
     "active": "Un jeton admin est enregistré sur cet appareil."
+  },
+  "sold_comps": {
+    "title": "Ventes comparables",
+    "anchored": "Fourchette calculée sur {{n}} ventes comparables de même type, époque/style et matériaux (médiane {{median}} au marteau).",
+    "capped": "Estampille sans résultats vérifiés pour ce maître : fourchette plafonnée d'après {{n}} ventes comparables du type (médiane {{median}} au marteau).",
+    "hammer": "au marteau (frais retirés)",
+    "fees": "frais acheteur {{pct}} %",
+    "source_note": "Lots réellement vendus (Drouot, Auctionet ; {{pool}} résultats, frais retirés), rapprochés par type, époque/style, matériaux, taille et marché. L'application vérifie et plafonne la fourchette avec eux, en code ; l'expert ne rédige que les commentaires."
   }
 }

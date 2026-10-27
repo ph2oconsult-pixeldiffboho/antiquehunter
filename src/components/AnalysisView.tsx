@@ -15,7 +15,7 @@ import { allInCost, basisFromScore, clampToBand, reasonKeyFor, type PriceBasis }
 import { BeforeYouBuy } from './BeforeYouBuy';
 import { Negotiate } from './Negotiate';
 import { FieldNotesForPiece } from './fieldNotes/FieldNotesForPiece';
-import { MakerAndComparables } from './Comparables';
+import { MakerAndComparables, SoldComparables } from './Comparables';
 import type { CheckAnswers } from '../services/checklist';
 
 interface AnalysisViewProps {
@@ -971,6 +971,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 3c. Maker attribution + verified auction comparables (public results; the anchored range itself is in the price card) */}
       <MakerAndComparables item={currentItem} />
+      <SoldComparables item={currentItem} />
 
       {/* 3d. Before you buy: what to check and confirm for this piece (answers re-run the appraisal) */}
       {currentItem.checklist?.items?.length > 0 && (

@@ -13,6 +13,7 @@ import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
 import { calibrateRange } from "./thinEvidence";
+import { anchorOnSoldComps, soldCompsProse, type SoldCompsResponse } from "./soldComps";
 import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
@@ -37,6 +38,10 @@ export interface AppraisalExtra {
   /** The range the checklist was shown with (checklist.base of the previous result): a re-run with answers adjusts THAT range
    *  instead of letting a fresh model call move it, unless the answers change the stamp basis */
   previousBase?: ChecklistBase | null;
+  /** Sold comparables already fetched (harness); undefined = fetch from /api/sold-comps */
+  soldComps?: SoldCompsResponse | null;
+  /** Injectable for tests; default POST /api/sold-comps */
+  fetchSoldComps?: (req: SoldCompsRequest) => Promise<SoldCompsResponse | null>;
   /** Injectable for tests; default POST /api/comps */
   fetchComps?: (req: { maker: string; piece?: string; material?: string; pieces: number; language: string }) => Promise<CompsResponse | null>;
 }
@@ -52,6 +57,20 @@ export const fetchCompsFromApi = async (req: { maker: string; piece?: string; ma
     if (!res.ok) return null;
     const j = await res.json();
     return j && Array.isArray(j.comparables) ? j as CompsResponse : null;
+  } catch { return null; } finally { clearTimeout(timer); }
+};
+
+export interface SoldCompsRequest { text: string; lotUrl?: string; region?: 'NORDIC' }
+export const SOLD_COMPS_CLIENT_TIMEOUT_MS = 10_000;
+/** POST /api/sold-comps (server: matching against the bundled sold-lot results). null on any failure. */
+export const fetchSoldCompsFromApi = async (req: SoldCompsRequest): Promise<SoldCompsResponse | null> => {
+  const c = new AbortController();
+  const timer = setTimeout(() => c.abort(), SOLD_COMPS_CLIENT_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/sold-comps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req), signal: c.signal });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return j && Array.isArray(j.comps) ? j as SoldCompsResponse : null;
   } catch { return null; } finally { clearTimeout(timer); }
 };
 
@@ -508,8 +527,17 @@ ${getGlossaryPrompt(language)}`;
     const m = combineMakerStatus(null, result?.items?.[0]?.item_summary?.maker);
     if (m) compsP = getComps(compsRequestFor(m, `${query} ${result.items[0].item_summary.title || ''}`, category, language)).catch(() => null);
   }
-  const comps = compsP ? await compsP : undefined;
+  // Sold comparables (Drouot / Auctionet results) for pieces with no verified maker anchor: matched server-side on the
+  // buyer's text plus the model's title, style and period words; the range itself is computed in postProcessAppraisal
+  const is0 = result?.items?.[0]?.item_summary || {};
+  const soldP: Promise<SoldCompsResponse | null> = extra.soldComps !== undefined ? Promise.resolve(extra.soldComps)
+    : (extra.fetchSoldComps || fetchSoldCompsFromApi)({
+        text: `${query} ${is0.title || ''} ${is0.likely_style || ''} ${is0.likely_period || ''}`.slice(0, 4000), lotUrl: lotUrl || undefined,
+        region: targetCurrency === 'SEK' || /auctionet\.com/.test(String(lotUrl || '')) ? 'NORDIC' : undefined,
+      }).catch(() => null);
+  const [comps, soldComps] = await Promise.all([compsP ? compsP : Promise.resolve(undefined), soldP]);
   return postProcessAppraisal(result, {
+    soldComps,
     query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
     lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers: extra.checkAnswers, previousBase: extra.previousBase, motivation: extra.motivation, budget: extra.budget,
   });
@@ -522,6 +550,8 @@ export interface PostProcessContext {
   category?: string;
   /** Verified auction comparables (null = lookup failed; undefined = not looked up) */
   comps?: CompsResponse | null;
+  /** Sold comparables from /api/sold-comps (null = lookup failed; undefined = not looked up) */
+  soldComps?: SoldCompsResponse | null;
   checkAnswers?: CheckAnswers;
   previousBase?: ChecklistBase | null;
 }
@@ -531,7 +561,7 @@ export interface PostProcessContext {
  * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
  */
 export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
-  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers, previousBase } = ctx;
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, soldComps, checkAnswers, previousBase } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
@@ -632,11 +662,30 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       pgA.fair_price_low = Math.round(anchor.low * 1.3);
       pgA.fair_price_high = Math.round(anchor.high * 1.6);
     }
+    // No verified maker anchor: the sold comparables (same type, period/style, materials, market) set the range in code
+    // (unstamped: anchored on them; stamped without maker results: capped at a multiple of them). Model figures stay
+    // only when there are too few comparables, with a confidence note.
+    const stampedEarly = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
+    const sold = soldComps === undefined || anchor.applied ? null : anchorOnSoldComps(soldComps?.ok ? soldComps.comps : [], {
+      pieces, stamped: stampedEarly, isAuction, premiumPct, eurTo: toTarget,
+      modelLow: Number(pgA.estimated_market_range_low) || 0, modelHigh: Number(pgA.estimated_market_range_high) || 0 });
+    // Unstamped cap (comps vs the appraiser's range): applied after the cheap-piece calibration, so the code-lowered
+    // floor stays; it only ever lowers the high. Stamped cap / comps-only anchoring replace the range up front.
+    const soldCapLate = !!sold && sold.mode === 'capped' && !stampedEarly;
+    const soldApplied = !!sold && (sold.mode === 'anchored' || sold.mode === 'capped') && !soldCapLate;
+    const soldModel = { low: Number(pgA.estimated_market_range_low) || 0, high: Number(pgA.estimated_market_range_high) || 0 };
+    if (sold && soldApplied) {
+      pgA.estimated_market_range_low = sold.low;
+      pgA.estimated_market_range_high = sold.high;
+      pgA.fair_price_low = Math.round(sold.low * 1.3);
+      pgA.fair_price_high = Math.round(sold.high * 1.6);
+      if (Number(pgA.good_buy_below) > sold.high) pgA.good_buy_below = Math.round((sold.low + sold.high) / 2);
+    }
     // A re-run with answers starts from the range the checklist was shown with (the model's new numbers would otherwise
     // move it at random), unless the answers changed the stamp basis or verified comparables now anchor it
     const stampedNow = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
     const stampedBefore = ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(String(previousBase?.maker_status));
-    if (checkAnswers && previousBase && previousBase.low > 0 && previousBase.high >= previousBase.low && !anchor.applied && stampedNow === stampedBefore) {
+    if (checkAnswers && previousBase && previousBase.low > 0 && previousBase.high >= previousBase.low && !anchor.applied && !soldApplied && stampedNow === stampedBefore) {
       pgA.estimated_market_range_low = previousBase.low; pgA.estimated_market_range_high = previousBase.high;
       pgA.fair_price_low = previousBase.fair_low; pgA.fair_price_high = previousBase.fair_high;
     }
@@ -656,7 +705,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // Cheap-piece calibration (thinEvidence.ts): style / cheap-material wording lowers the band, thin evidence opens the
     // low end. Code-computed; skipped on comparables-anchored ranges and checklist re-runs. Model prose that quotes the
     // old figures is dropped so the text never contradicts the displayed range.
-    if (!anchor.applied && !checkAnswers) {
+    if (!anchor.applied && !soldApplied && !checkAnswers) {
       const lo0 = Number(pgA.estimated_market_range_low) || 0, hi0 = Number(pgA.estimated_market_range_high) || 0;
       const cal = calibrateRange({ low: lo0, high: hi0, hasPhotos, text: query, periodCertainty: item.item_summary.period_certainty,
         confidence: confLabel, makerStatus: maker?.status || null, compsAnchored: anchor.applied });
@@ -671,6 +720,13 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         if (mentionsPrice(pr)) pgA.pricing_reasoning = pr.split(/(?<=[.!?])\s+/).filter(x => !mentionsPrice(x)).join(' ');
         pgA.calibration = { factors: cal.factors, model_low: lo0, model_high: hi0 };
       }
+    }
+    if (sold && soldCapLate && Number(pgA.estimated_market_range_high) > sold.high) {
+      const hi = sold.high, lo = Math.min(Number(pgA.estimated_market_range_low) || 0, hi);
+      pgA.estimated_market_range_high = hi; pgA.estimated_market_range_low = lo;
+      if (Number(pgA.fair_price_high) > hi * 1.6) pgA.fair_price_high = Math.round(hi * 1.6);
+      if (Number(pgA.fair_price_low) > Number(pgA.fair_price_high)) pgA.fair_price_low = Math.round(lo * 1.3);
+      if (Number(pgA.good_buy_below) > hi) pgA.good_buy_below = Math.round((lo + hi) / 2);
     }
     if (maker && (maker.status === 'stamped_confirmed' || maker.status === 'stamped_stated' || maker.status === 'stamp_in_photo'))
       item.item_summary.title = String(item.item_summary.title || '').replace(/,?\s*\(?\s*attributed\s+to\s+[^),]*\)?/i, ` (stamped ${maker.name})`).replace(/,?\s*\(?\s*attribu[ée]e?s?\s+[àa]\s+[^),]*\)?/i, ` (estampillé ${maker.name})`).replace(/\s{2,}/g, ' ').trim();
@@ -783,7 +839,8 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       riskPenalty: Number(s.risk_penalty) || 0,
       itemScore: calculatedScore,
       valueTier: item.item_summary.value_tier,
-      needsEvidence: evidence.required,
+      // Sold comparables looked up (no maker anchor): always a decisive verdict; thin evidence is a confidence note
+      needsEvidence: evidence.required && !sold,
       bands,
     });
     const allIn = decision.effectivePrice;
@@ -848,7 +905,9 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       premium_pct: premiumPct,
     };
     item.walk_away_if = sanitizeWalkAwayIf(item.walk_away_if);
-    if (evidence.required) item.price_guidance = { ...item.price_guidance, provisional: true };
+    if (evidence.required && !sold) item.price_guidance = { ...item.price_guidance, provisional: true };
+    const soldNote = sold ? soldCompsProse(sold, { language, isAuction, model: soldModel, stamped: stampedEarly, evidenceThin: evidence.required, fmt: (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } } }) : null;
+    if (soldNote) item.price_guidance = { ...item.price_guidance, pricing_reasoning: `${soldNote.lead} ${item.price_guidance.pricing_reasoning || ''}`.trim() };
     if (anchor.applied) {
       const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
       item.price_guidance = { ...item.price_guidance, pricing_reasoning: `Anchored on ${anchor.used.length} verified auction results for ${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}). ${item.price_guidance.pricing_reasoning || ''}`.trim() };
@@ -873,6 +932,11 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       negotiation_plan: negotiationPlan,
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
+      sold_comps: sold ? {
+        mode: soldComps === null || soldComps?.ok === false ? 'error' : sold.mode, n: sold.n, basis: sold.basis, median_hammer_eur: sold.medianHammerEur || null,
+        model_low: soldModel.low, model_high: soldModel.high, note: soldNote?.note || null, pool: soldComps?.pool || 0,
+        list: sold.used.map(c => ({ url: c.u, title: c.t, hammer_eur: c.h, fee_pct: c.f ?? null, date: c.d, house: c.house || null, city: c.city || null, source: c.src, pieces: c.pieces, matched: c.matched })),
+      } : null,
       comparables: {
         status: comps === undefined ? (maker ? 'not_searched' : 'no_maker') : comps === null || comps.ok === false ? 'error' : compList.length === 0 ? 'none_verified' : anchor.applied ? 'anchored' : 'shown',
         reason: anchor.reason, group: anchor.group, pieces: anchor.pieces, per_piece_median_eur: anchor.perPieceMedianEur || null, basis: anchor.basis,
