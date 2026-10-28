@@ -24,8 +24,10 @@ export const OfferPlan: React.FC<{ md?: MotivationDecision | null; currency?: st
     else if (p.cash_capped) items.push(t('offer.cash_capped'));
     items.push(t('offer.best_final', { amount: m(p.best_and_final) }));
   }
-  if (p.over_walk_away) items.push(t('offer.stretch', { amount: m(p.over_walk_away), walkAway: m(md.walkAway), pct: p.premium_cap_pct, budget: m(md.budget) }));
-  else items.push(t(p.venue === 'auction' ? 'offer.never_above_auction' : 'offer.never_above', { walkAway: m(md.walkAway) }));
+  if (p.over_walk_away) {
+    items.push(t('offer.stretch', { amount: m(p.over_walk_away), walkAway: m(md.walkAway), pct: p.premium_cap_pct, budget: m(md.budget) }));
+    items.push(t(p.venue === 'auction' ? 'offer.never_above_max_auction' : 'offer.never_above_max', { max: m(p.venue === 'auction' ? p.max_hammer : p.best_and_final) }));
+  } else items.push(t(p.venue === 'auction' ? 'offer.never_above_auction' : 'offer.never_above', { walkAway: m(md.walkAway) }));
   if (md.budget) items.push(md.overBudget ? t('offer.budget_over', { budget: m(md.budget), gap: m(md.budgetGap) }) : t('offer.budget_ok', { budget: m(md.budget) }));
   return (
     <section data-testid="offer-plan" data-venue={p.venue} className="p-6 bg-white border border-border-custom rounded-[32px] space-y-4 shadow-sm">

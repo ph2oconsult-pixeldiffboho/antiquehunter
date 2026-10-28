@@ -687,7 +687,10 @@
     "reason_premium": "{{price}} is {{gap}} over fair value (walk-away {{walkAway}}), within your budget of {{budget}}. It fills a gap in your collection, so paying a premium can make sense: know that you are paying {{gap}} more than it's worth.",
     "reason_over_budget": "{{outlay}} is {{budgetGap}} over your budget of {{budget}}.",
     "within_budget": "Within your budget of {{budget}}.",
-    "evidence_thin": "Confidence is lower: the period isn't confirmed, so check the points below before you pay."
+    "evidence_thin": "Confidence is lower: the period isn't confirmed, so check the points below before you pay.",
+    "verdict_over_max_bid": "Above your max bid",
+    "reason_over_max_bid": "{{price}} hammer is above your max bid ({{maxBid}} hammer; walk-away {{walkAway}}). Bid up to your max bid, no higher.",
+    "reason_walk_away_far": "{{price}} is {{gap}} above the walk-away ({{walkAway}}): more than {{pct}}% over the most you should pay, too far to negotiate. Walk away."
   },
   "offer": {
     "title": "Offer plan",
@@ -702,7 +705,9 @@
     "never_above_auction": "Don't bid above the walk-away ({{walkAway}} hammer).",
     "stretch": "Because it fills a gap and your budget allows, this goes {{amount}} above the walk-away ({{walkAway}}): a premium of at most {{pct}}%, never over your budget ({{budget}}).",
     "budget_ok": "Within your budget of {{budget}}.",
-    "budget_over": "The asking price is {{gap}} over your budget of {{budget}}: the offers stay within it."
+    "budget_over": "The asking price is {{gap}} over your budget of {{budget}}: the offers stay within it.",
+    "never_above_max_auction": "Don't bid above your max bid ({{max}} hammer).",
+    "never_above_max": "Don't go above {{max}}."
   },
   "range_admin": {
     "token_label": "Admin token (shared price ranges)",

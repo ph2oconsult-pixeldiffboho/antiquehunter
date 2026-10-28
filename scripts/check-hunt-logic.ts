@@ -1743,7 +1743,7 @@ check("motivation: above the walk-away the verdict follows motivation and budget
   assert.equal(v("Market/Fair").verdict, "negotiate", "no motivation -> the I'd like it behaviour");
   assert.equal(v("Market/Fair", "browsing").verdict, "walk_away");
   const wl = v("Market/Fair", "would_like"); assert.equal(wl.verdict, "negotiate"); assert.equal(wl.gap, 350);
-  const fg = v("Market/Fair", "fills_gap", 1500); assert.equal(fg.verdict, "premium"); assert.equal(fg.gap, 350);
+  const fg = v("Market/Fair", "fills_gap", 1500); assert.equal(fg.verdict, "negotiate", "1,250 is over the stretch-capped best-and-final (1,000): negotiate, not premium (rt5)"); assert.equal(v("Market/Fair", "fills_gap", 1500, 1000).verdict, "premium"); assert.equal(fg.gap, 350);
   assert.equal(v("Market/Fair", "fills_gap").verdict, "negotiate", "fills a gap without a budget -> negotiate");
   for (const m of ["browsing", "would_like", "fills_gap"]) assert.equal(v("Private Seller", m, 1000).verdict, "over_budget", m);
   assert.equal(v("Antique Shop", "would_like", 1000, 1250, 1800).verdict, "over_budget", "over budget flagged even below the walk-away");
@@ -1867,7 +1867,7 @@ check("motivation verdict overrides a (saved) Need More Evidence above the walk-
   for (const st of ["Private Seller", "Market/Fair"]) {
     assert.deepEqual(o(st, "browsing", 1500), ["walk_away", true]);
     assert.deepEqual(o(st, "would_like", 1500), ["negotiate", true]);
-    assert.deepEqual(o(st, "fills_gap", 1500), ["premium", true]);
+    assert.deepEqual(o(st, "fills_gap", 1500), ["negotiate", true], "over the stretch cap"); assert.deepEqual(o(st, "fills_gap", 1500, 1000), ["premium", true]);
     assert.deepEqual(o(st, "would_like", 1000), ["over_budget", true]);
     assert.deepEqual(o(st), ["negotiate", true], "no motivation: I'd like it");
     assert.deepEqual(o(st, undefined, 1000), ["over_budget", true], "budget only: over budget");
@@ -2216,4 +2216,32 @@ check("rt4: comps types (dresser / confiturier split, mirrors exclude dressing t
   const fr = JSON.parse(readFileSync("src/i18n/fr.json", "utf8"));
   assert.ok(fr.home.sourcing_badge && fr.hunter.live_badge && fr.negotiate.walk_note_stretch);
   assert.ok(!/>\s*(AI Sourcing Portal|Find Me an Antique)\s*</.test(readFileSync("src/components/Home.tsx", "utf8") + readFileSync("src/components/AntiqueHunter.tsx", "utf8")), "home strings go through i18n");
+});
+
+check("rt5: Gustavian comps, stamp path only when described, far-over walk away, auction verdict = stretch-capped max bid", () => {
+  const g = pieceFeatures("Commode gustavienne suédoise, peinte en gris, trois tiroirs, fin XVIIIe siècle, L 110 cm.");
+  assert.equal(g.region, "NORDIC"); assert.deepEqual(g.periods, ["gustavian"]);
+  assert.ok(!pieceFeatures("Commode Louis XVI en noyer").periods.includes("gustavian"));
+  const lot = (t: string, rg = "NORDIC") => ({ id: t, u: "u" + t, t, h: 500, d: "2025-01-01", src: "Auctionet", rg });
+  const pool = [lot("BYRÅ, gustaviansk, 1700-tal. Tre lådor. Bredd 110 cm."), lot("A Louis XVI walnut and marquetry inlaid commode, 18th century, 110 cm"), lot("BYRÅ, Gustaviansk stil, 1900-tal. Tre lådor, 110 cm.")];
+  const m = matchSoldComps(pool as any, "Swedish Gustavian chest of drawers, painted, late 18th century, 110 cm wide.").comps.map(c => c.t);
+  assert.ok(m[0].startsWith("BYRÅ, gustaviansk, 1700"), "period Gustavian matches");
+  assert.ok(!m.some(t => /Louis XVI/.test(t)), "a French Louis XVI commode is not a Gustavian comp");
+  assert.ok(!m.some(t => /1900-tal/.test(t)), "a 20th-century piece is not a comp for an 18th-century one");
+  assert.equal(combineMakerStatus(null, { name: "P. Bellangé", status: "stamped_stated" }, { text: "Commode gustavienne, XVIIIe", hasPhotos: false })?.status, "mentioned");
+  assert.equal(combineMakerStatus(null, { name: "P. Bellangé", status: "stamped_stated" }, { text: "Commode estampillée Bellangé", hasPhotos: false })?.status, "stamped_stated");
+  assert.equal(combineMakerStatus(null, { name: "P. Bellangé", status: "stamp_visible_in_photo" }, { text: "Commode", hasPhotos: false })?.status, "mentioned");
+  const it = (sellerType: string, motivation: string | undefined, budget: number | undefined, price: number, walk: number) => applyVenueGuidance({
+    seller_context: { sellerType, isAuction: sellerType === "Auction", buyerPremiumRate: sellerType === "Auction" ? 25 : 0, askingPrice: price, motivation, budget },
+    price_guidance: { estimated_market_range_low: walk / 3, estimated_market_range_high: walk, good_buy_below: walk * 0.7, currency: "EUR" },
+    negotiation_strategy: { walk_away_price: walk }, walk_away_threshold: { hammer: walk, premium_pct: 25 },
+    buy_decision: { price_basis: "overpriced", score: 30, effective_price: sellerType === "Auction" ? Math.round(price * 1.25) : price, compare_price: price },
+  });
+  const far = motivationDecision(it("Dealer", "would_like", undefined, 4500, 1760))!; assert.equal(far.verdict, "walk_away"); assert.ok(far.farOver);
+  assert.equal(motivationDecision(it("Dealer", "would_like", undefined, 2400, 1800))!.verdict, "negotiate", "1.33× over stays negotiate");
+  const oak = motivationDecision(it("Auction", "fills_gap", 1200, 600, 450))!;
+  assert.equal(oak.plan!.max_hammer, 510); assert.equal(oak.verdict, "over_max_bid");
+  assert.equal(motivationDecision(it("Auction", "fills_gap", 1200, 500, 450))!.verdict, "premium", "within the stretch-capped max bid");
+  const en = JSON.parse(readFileSync("src/i18n/en.json", "utf8")), fr = JSON.parse(readFileSync("src/i18n/fr.json", "utf8"));
+  for (const j of [en, fr]) assert.ok(j.offer.never_above_max_auction && j.motivation.verdict_over_max_bid && j.motivation.reason_walk_away_far);
 });
