@@ -687,7 +687,10 @@
     "reason_premium": "{{price}} dépasse de {{gap}} sa juste valeur (plafond {{walkAway}}), dans votre budget de {{budget}}. Elle complète votre collection, une prime peut se justifier : sachez que vous payez {{gap}} de plus que sa valeur.",
     "reason_over_budget": "{{outlay}} dépasse de {{budgetGap}} votre budget de {{budget}}.",
     "within_budget": "Dans votre budget de {{budget}}.",
-    "evidence_thin": "Confiance plus faible : l'époque n'est pas confirmée, vérifiez les points ci-dessous avant de payer."
+    "evidence_thin": "Confiance plus faible : l'époque n'est pas confirmée, vérifiez les points ci-dessous avant de payer.",
+    "verdict_over_max_bid": "Au-dessus de votre enchère max",
+    "reason_over_max_bid": "{{price}} au marteau dépasse votre enchère maximale ({{maxBid}} au marteau). Enchérissez jusqu'à votre maximum, pas au-delà.",
+    "reason_walk_away_far": "{{price}} dépasse de {{gap}} le prix plafond ({{walkAway}}) : plus de {{pct}} % au-dessus de ce qu'il faut payer, trop loin pour négocier. Passez votre chemin."
   },
   "offer": {
     "title": "Plan d'offre",
@@ -702,7 +705,9 @@
     "never_above_auction": "N'enchérissez pas au-delà de votre plafond ({{walkAway}} au marteau).",
     "stretch": "Comme elle complète votre collection et que votre budget le permet, on monte de {{amount}} au-dessus du plafond ({{walkAway}}) : une prime de {{pct}} % au plus, jamais au-delà de votre budget ({{budget}}).",
     "budget_ok": "Dans votre budget de {{budget}}.",
-    "budget_over": "Le prix demandé dépasse votre budget de {{gap}} ({{budget}}) : les offres restent dans votre budget."
+    "budget_over": "Le prix demandé dépasse votre budget de {{gap}} ({{budget}}) : les offres restent dans votre budget.",
+    "never_above_max_auction": "N'enchérissez pas au-delà de votre enchère maximale ({{max}} au marteau).",
+    "never_above_max": "Ne dépassez pas {{max}}."
   },
   "range_admin": {
     "token_label": "Jeton admin (fourchettes partagées)",

@@ -12,6 +12,9 @@ export const GAP_PREMIUM_PCT = 15;
 export const BROWSING_FACTOR = 0.9;
 /** Cash price: this much below the best-and-final (cash is a lever, not a second ceiling). */
 export const CASH_DISCOUNT = 0.08;
+/** An ask more than this multiple of the most the buyer should pay (walk-away, or the stretch-capped ceiling for
+ *  "fills a gap") is too far to negotiate: Walk Away, whatever the motivation. */
+export const FAR_OVER_FACTOR = 1.5;
 
 export const parseMotivation = (m: unknown): Motivation | undefined => MOTIVATIONS.includes(m as Motivation) ? m as Motivation : undefined;
 export const parseBudget = (b: unknown): number | undefined => { const n = Number(b); return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined; };
@@ -19,7 +22,7 @@ export const parseBudget = (b: unknown): number | undefined => { const n = Numbe
 const nice = (x: number) => x <= 0 ? 0 : x < 1000 ? Math.round(x / 10) * 10 : x < 10000 ? Math.round(x / 50) * 50 : Math.round(x / 100) * 100;
 const niceDown = (x: number) => x <= 0 ? 0 : x < 1000 ? Math.floor(x / 10) * 10 : x < 10000 ? Math.floor(x / 50) * 50 : Math.floor(x / 100) * 100;
 
-export type MotivationVerdict = 'unchanged' | 'walk_away' | 'negotiate' | 'premium' | 'over_budget';
+export type MotivationVerdict = 'unchanged' | 'walk_away' | 'negotiate' | 'premium' | 'over_budget' | 'over_max_bid';
 export interface OfferPlan {
   venue: 'dealer' | 'private' | 'market' | 'auction';
   opening_offer?: number;
@@ -38,6 +41,8 @@ export interface MotivationDecision {
   over: boolean;           // price above the walk-away
   gap: number;             // price - walk-away (when over)
   verdict: MotivationVerdict;
+  farOver: boolean;        // ask more than FAR_OVER_FACTOR × the ceiling: walk away
+  ceiling: number;         // the most to pay (hammer at auction): the plan's max bid / best-and-final, else the walk-away
   overBudget: boolean; budgetGap: number;
   plan: OfferPlan | null;
 }
@@ -73,12 +78,6 @@ export const motivationDecision = (item: Record<string, any> | null | undefined)
   const gap = over ? price - walkAway : 0;
   const overBudget = !!budgetEur && outlay > budgetEur;
   const budgetGap = overBudget ? outlay - budgetEur! : 0;
-  let verdict: MotivationVerdict = 'unchanged';
-  if (overBudget) verdict = 'over_budget';
-  else if (over && effMotivation === 'browsing') verdict = 'walk_away';
-  else if (over && effMotivation === 'would_like') verdict = 'negotiate';
-  else if (over && effMotivation === 'fills_gap') verdict = budgetEur ? 'premium' : 'negotiate';
-
   const fairValue = Math.min(walkAway, Number(pg.good_buy_below) || walkAway);
   // auctions always get the plan (max bid as hammer + all-in), whatever the estimate
   const needPlan = isAuction || price > fairValue || over;
@@ -109,6 +108,21 @@ export const motivationDecision = (item: Record<string, any> | null | undefined)
         over_walk_away: best > walkAway ? best - walkAway : 0, premium_cap_pct: GAP_PREMIUM_PCT };
     }
   }
-  return { motivation, budget, price, outlay, walkAway, walkAwayAllIn: isAuction ? Math.round(walkAway * (1 + premiumPct / 100)) : undefined,
-    over, gap, verdict, overBudget, budgetGap, plan };
+  // The verdict uses the same stretch-capped ceiling as the plan, so the two never disagree
+  const stretchOk = effMotivation === 'fills_gap' && !!budgetEur;
+  const ceilingPay = plan ? (isAuction ? plan.max_hammer! : Math.max(plan.best_and_final!, effMotivation === 'browsing' ? 0 : walkAway)) : walkAway;
+  const reach = Math.max(walkAway, stretchOk ? ceilingPay : walkAway);
+  const farOver = over && price > reach * FAR_OVER_FACTOR;
+  let verdict: MotivationVerdict = 'unchanged';
+  if (overBudget) verdict = 'over_budget';
+  else if (farOver) verdict = 'walk_away';
+  else if (over && effMotivation === 'browsing') verdict = 'walk_away';
+  else if (over && effMotivation === 'would_like') verdict = 'negotiate';
+  else if (over && effMotivation === 'fills_gap') {
+    if (!budgetEur) verdict = 'negotiate';
+    else if (price <= ceilingPay) verdict = 'premium';
+    else verdict = isAuction ? 'over_max_bid' : 'negotiate';
+  }
+  return { motivation, budget, price, outlay, farOver, ceiling: ceilingPay, verdict, walkAway, walkAwayAllIn: isAuction ? Math.round(walkAway * (1 + premiumPct / 100)) : undefined,
+    over, gap, overBudget, budgetGap, plan };
 };

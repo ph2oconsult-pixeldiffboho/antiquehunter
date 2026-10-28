@@ -1,7 +1,7 @@
 import { sanitizeWalkAwayIf } from '../services/gemini';
 import React, { useState, useEffect, useMemo } from 'react';
 import { applyVenueGuidance, needEvidenceWalkAway } from '../services/venueGuidance';
-import { motivationDecision, overridesNeedEvidence } from '../services/motivation';
+import { motivationDecision, FAR_OVER_FACTOR, overridesNeedEvidence } from '../services/motivation';
 import { OfferPlan } from './OfferPlan';
 import { ResetRangeButton } from './RangeAdmin';
 import { alignWithOfferPlan } from '../services/negotiation';
@@ -384,7 +384,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
     const md = motivationDecision(rawItem);
     if (md && !['high_risk', 'no_price'].includes(basis)) {
       const cur = pg.currency;
-      const a = { gap: formatMoney(md.gap, cur), walkAway: formatMoney(md.walkAway, cur), price: formatMoney(md.price, cur), budget: formatMoney(md.budget || 0, cur), budgetGap: formatMoney(md.budgetGap, cur), outlay: formatMoney(md.outlay, cur) };
+      const a = { gap: formatMoney(md.gap, cur), walkAway: formatMoney(md.walkAway, cur), price: formatMoney(md.price, cur), budget: formatMoney(md.budget || 0, cur), budgetGap: formatMoney(md.budgetGap, cur), outlay: formatMoney(md.outlay, cur), maxBid: formatMoney(md.ceiling, cur), pct: Math.round((FAR_OVER_FACTOR - 1) * 100) };
       if (md.verdict !== 'unchanged') {
         // Need More Evidence keeps its label (no buy verdict until the period is known); the motivation line is added
         // Above the walk-away (or over budget) with a motivation given, the motivation verdict wins over Need More
@@ -393,10 +393,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         if (basis !== 'need_evidence' || overNme) label = t(`motivation.verdict_${md.verdict}`);
         // negotiate / premium replace the price sentence (it says "walk away", which contradicts them); the venue note stays
         // over budget: the budget line replaces the old price sentence ("no margin at this price" was redundant)
-        const replace = (basis !== 'need_evidence' || overNme) && (md.verdict === 'negotiate' || md.verdict === 'premium' || md.verdict === 'over_budget' || overNme);
+        const replace = (basis !== 'need_evidence' || overNme) && (md.verdict === 'negotiate' || md.verdict === 'premium' || md.verdict === 'over_budget' || md.verdict === 'over_max_bid' || md.farOver || overNme);
+        const reasonKey = md.farOver && md.verdict === 'walk_away' ? 'motivation.reason_walk_away_far' : `motivation.reason_${md.verdict}`;
         const venueNote = rawItem.venue === 'dealer' ? t('analysis.venue_note_dealer') : rawItem.venue === 'market' ? t(rawItem.venue_note_key || 'analysis.venue_note_market') : '';
         const thin = '';
-        reasonOut = replace ? `${t(`motivation.reason_${md.verdict}`, a)}${thin} ${venueNote}`.trim() : `${t(`motivation.reason_${md.verdict}`, a)} ${reasonOut}`;
+        reasonOut = replace ? `${t(reasonKey, a)}${thin} ${venueNote}`.trim() : `${t(reasonKey, a)} ${reasonOut}`;
       } else if (md.budget) {
         reasonOut = `${reasonOut} ${t('motivation.within_budget', a)}`;
       }

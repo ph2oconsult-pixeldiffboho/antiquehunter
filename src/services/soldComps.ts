@@ -36,7 +36,7 @@ const TYPES: Array<[string, RegExp]> = [
 ];
 const PERIODS: Array<[string, RegExp]> = [
   ['louis_xiv', /\blouis\s*(xiv|14)\b/], ['regence', /\b(regence|regency\s+period)\b/],
-  ['transition', /\btransition\b/], ['louis_xv', /\b(louis\s*(xv|15)|rococo|rokoko)\b/], ['louis_xvi', /\b(louis\s*(xvi|16)|gustavian\w*|gustaviansk\w*)\b/],
+  ['transition', /\btransition\b/], ['louis_xv', /\b(louis\s*(xv|15)|rococo|rokoko)\b/], ['louis_xvi', /\b(louis\s*(xvi|16))\b/], ['gustavian', /\b(gustavi\w*|gustaviansk\w*|sengustaviansk\w*)\b/],
   ['directoire', /\b(directoire|consulat)\b/], ['empire', /\bempire\b/], ['restauration', /\b(restauration|charles\s*x|karl\s+johan)\b/],
   ['louis_philippe', /\blouis[\s-]philippe\b/], ['napoleon_iii', /\b(napoleon\s*(iii|3)|second\s+empire)\b/],
   ['art_nouveau', /\b(art\s+nouveau|jugend)\b/], ['art_deco', /\bart\s+deco\b/], ['georgian', /\b(george\s+i{1,3}|georgian)\b/], ['victorian', /\b(victorian|edwardian)\b/],
@@ -84,7 +84,7 @@ export const pieceFeatures = (text: string, regionHint?: string): PieceFeatures 
   const materials = MATERIALS.filter(([, re]) => re.test(t)).map(([k]) => k);
   const regional = t.match(REGIONAL)?.[1]?.replace(/(ais|aise|al|ale|ois|oise|ien|ienne|and|ande|on|onne)e?s?$/, '') || null;
   const styleOnly = STYLE_ONLY.test(t) && !PERIOD_WORD.test(t);
-  const region = regionHint === 'NORDIC' || /auctionet\.com|\b(sweden|swedish|sverige|svensk|danmark|norge|gustavian|gustaviansk|karl\s+johan|allmoge)\b|\b\w+-tal\b/.test(t) ? 'NORDIC' : 'FR';
+  const region = regionHint === 'NORDIC' || /auctionet\.com|\b(sweden|swedish|suedois\w*|scandinav\w*|sverige|svensk|danmark|danish|norge|gustavi\w*|sengustaviansk\w*|karl\s+johan|allmoge)\b|\b\w+-tal\b/.test(t) ? 'NORDIC' : 'FR';
   return { type, periods, centuries, materials, regional, styleOnly, region, pieces: Math.max(1, countPieces(text)), sizeCm: sizeOf(t), sizeWord: /\b(petite?s?|small|liten|litet|sma)\b/.test(head) ? 'small' : /\b(grande?s?|importante?s?|large|stor|stort)\b/.test(head) ? 'large' : null };
 };
 
@@ -100,6 +100,12 @@ export const scoreLot = (p: PieceFeatures, lotF: PieceFeatures): { score: number
   }
   if (p.styleOnly === lotF.styleOnly) { score += 1; if (!p.styleOnly && p.periods.length) matched.push('period_piece'); else if (p.styleOnly) matched.push('later_style'); }
   else score -= 2;
+  // A period piece (17th/18th c.) is never priced from a 20th-century lot, nor a 20th-century piece from a period one
+  if (p.centuries.length && lotF.centuries.length && !p.centuries.some(x => lotF.centuries.includes(x))
+      && (p.centuries.includes('c20') !== lotF.centuries.includes('c20'))) return null;
+  // Gustavian and French Louis XVI are distinct markets: a Gustavian piece never takes a Louis XVI lot (or vice versa)
+  if ((p.periods.includes('gustavian') && lotF.periods.includes('louis_xvi') && !lotF.periods.includes('gustavian'))
+      || (p.periods.includes('louis_xvi') && !p.periods.includes('gustavian') && lotF.periods.includes('gustavian'))) return null;
   if (p.centuries.length && lotF.centuries.length) { if (p.centuries.some(x => lotF.centuries.includes(x))) { score += 1; matched.push('century'); } else score -= 1; }
   const mats = p.materials.filter(m => lotF.materials.includes(m));
   score += Math.min(3, mats.length) * 1; if (mats.length) matched.push(...mats);

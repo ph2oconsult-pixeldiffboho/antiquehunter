@@ -78,7 +78,7 @@ export const findMaker = (text: string): Maker | null => {
 
 const LABEL_RE = /\b(label|etiquette|ticket|tag|card)\b|dealer\s+(says|said|claims)|selon\s+le\s+(marchand|vendeur)|d'apres\s+le\s+(marchand|vendeur)/;
 const ATTR_RE = /\b(attribu\w*|attr\.|workshop|atelier|entourage|circle\s+of|manner\s+of|dans\s+le\s+gout|in\s+the\s+style|style\s+of|follower|suiveur|probably|probablement|possibly|peut[\s-]etre|modele\s+repertorie)\b/;
-const STAMP_RE = /\b(estampill\w*|stamped|stamp|stamps|signed|signe|signee|branded|marque\s+au\s+fer|poincon\w*)\b/;
+const STAMP_RE = /\b(estampill\w*|stamped|stamp|stamps|signed|signe|signee|branded|marque\s+au\s+fer|poincon\w*|stampel\w*|stamplad\w*)\b/;
 const CONFIRM_RE = /\b(confirmed|confirme\w*|verified|verifie\w*|checked|i\s+(saw|have\s+seen|checked)|seen\s+(it|the\s+stamp)|visible|lisible|legible|present\s+on\s+(each|every|all)|sur\s+chaque|on\s+each)\b/;
 
 /**
@@ -113,10 +113,16 @@ export const anchorGroupFor = (s: MakerStatus): 'stamped' | 'attributed' | null 
 const STATUS_RANK: Record<MakerStatus, number> = { stamped_confirmed: 6, stamped_stated: 5, stamp_in_photo: 4, attributed: 3, dealer_label: 2, mentioned: 1 };
 
 /** The user's own words win; the model adds a stamp it read in a photo, or a maker the text did not name. */
-export const combineMakerStatus = (fromText: MakerMatch | null, model: { name?: string; status?: string } | null | undefined): MakerMatch | null => {
+export const combineMakerStatus = (fromText: MakerMatch | null, model: { name?: string; status?: string } | null | undefined, ctx?: { text?: string; hasPhotos?: boolean }): MakerMatch | null => {
   const modelMaker = model?.name ? findMaker(model.name) : null;
   const ms = String(model?.status || '');
-  const modelStatus: MakerStatus | null = ms === 'stamp_visible_in_photo' ? 'stamp_in_photo' : ms === 'attributed' ? 'attributed' : ms === 'dealer_label' ? 'dealer_label' : ms === 'stamped_stated' ? 'stamped_stated' : null;
+  let modelStatus: MakerStatus | null = ms === 'stamp_visible_in_photo' ? 'stamp_in_photo' : ms === 'attributed' ? 'attributed' : ms === 'dealer_label' ? 'dealer_label' : ms === 'stamped_stated' ? 'stamped_stated' : null;
+  // A stamp only counts when it is actually described (text) or could have been seen (photos): the model's word alone
+  // never puts a piece on the stamp path
+  if (ctx) {
+    if (modelStatus === 'stamped_stated' && !STAMP_RE.test(fold(ctx.text || ''))) modelStatus = ctx.hasPhotos ? 'stamp_in_photo' : 'mentioned';
+    if (modelStatus === 'stamp_in_photo' && !ctx.hasPhotos) modelStatus = 'mentioned';
+  }
   if (fromText) {
     if (modelStatus === 'stamp_in_photo' && (!modelMaker || modelMaker.key === fromText.key) && STATUS_RANK.stamp_in_photo > STATUS_RANK[fromText.status] && fromText.status !== 'dealer_label')
       return { ...fromText, status: 'stamp_in_photo', source: 'photo' };

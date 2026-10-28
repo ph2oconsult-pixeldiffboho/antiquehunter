@@ -623,7 +623,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     const pieces = countPieces(query) > 1 ? countPieces(query) : countPieces(titleText);
     const pieceKind = pieceKindOf(category, `${titleText} ${query}`);
     const fx = checksEffect(checkAnswers);
-    let maker = combineMakerStatus(detectMaker(query), item.item_summary.maker);
+    let maker = combineMakerStatus(detectMaker(query), item.item_summary.maker, { text: query, hasPhotos });
     const makerAsClaimed = maker;
     let stampAnswer: 'confirmed' | 'denied' | undefined = fx.stampOverride;
     if (maker && stampAnswer === 'confirmed') maker = { ...maker, status: 'stamped_confirmed' };
