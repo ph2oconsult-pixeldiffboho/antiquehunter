@@ -40,7 +40,7 @@ export const Negotiate: React.FC<{ plan?: NegotiationPlan | null; currency?: str
         <div className="p-3 bg-paper rounded-2xl"><p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('negotiate.opening')}</p><p className="text-lg" data-testid="negotiate-opening">{price(plan.opening_offer)}</p></div>
         <div className="p-3 bg-paper rounded-2xl"><p className="text-[9px] uppercase tracking-widest font-bold text-muted">{t('negotiate.happy_at')}</p><p className="text-lg" data-testid="negotiate-happy">{price(plan.happy_at)}</p></div>
       </div>
-      <p className="text-[11px] text-muted leading-relaxed">{t('negotiate.suggestion_note')} {showPrices && t('negotiate.walk_note', { walk: money(plan.walk_away) })}
+      <p className="text-[11px] text-muted leading-relaxed">{t('negotiate.suggestion_note')} {showPrices && (plan.stretch_to ? t('negotiate.walk_note_stretch', { walk: money(plan.walk_away), best: money(plan.stretch_to) }) : t('negotiate.walk_note', { walk: money(plan.walk_away) }))}
         {showPrices && plan.asking_over_walk_pct ? ` ${t('negotiate.asking_over', { pct: plan.asking_over_walk_pct })}` : ''}</p>
       {p && (
         <div data-testid="negotiate-payment" data-mode={p.mode} className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 space-y-1">
@@ -48,7 +48,7 @@ export const Negotiate: React.FC<{ plan?: NegotiationPlan | null; currency?: str
           {p.mode === 'transfer' ? (
             <p className="text-sm text-ink leading-snug">{t('negotiate.pay_transfer', { cap: money(p.cap_eur), capNr: money(p.cap_non_resident_eur) })}</p>
           ) : (
-            <p className="text-sm text-ink leading-snug">{t(p.mode === 'cash' ? 'negotiate.pay_cash' : p.mode === 'cash_market' ? 'negotiate.pay_cash_market' : 'negotiate.pay_cash_private', { lo: p.discount_pct[0], hi: p.discount_pct[1], amount: showPrices && p.discount_amount ? ` (${money(p.discount_amount[0])}–${money(p.discount_amount[1])})` : '', cap: money(p.cap_eur) })}
+            <p className="text-sm text-ink leading-snug">{t(p.mode === 'cash' ? 'negotiate.pay_cash' : p.mode === 'cash_market' ? 'negotiate.pay_cash_market' : 'negotiate.pay_cash_private', { lo: p.discount_pct[0], hi: p.discount_pct[1], amount: showPrices && p.discount_amount && p.discount_amount[0] > 0 ? ` (${money(p.discount_amount[0])}–${money(p.discount_amount[1])})` : '', cap: money(p.cap_eur) })}
               {p.mode === 'cash_private_receipt' && p.over_cap ? ` ${t('negotiate.pay_private_trader', { cap: money(p.cap_eur) })}` : ''}</p>
           )}
         </div>

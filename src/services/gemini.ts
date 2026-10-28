@@ -1,11 +1,12 @@
 import { pieceKey, stableRange, browserStore, type RangeStore } from './priceCache';
 const APPRAISAL_MODEL_ID = 'gemini-3.1-flash-lite';
 import { parseMotivation, parseBudget } from './motivation';
+import { venueOf, marketFigures, marketBands } from './venueGuidance';
 import { Type, ThinkingLevel } from "@google/genai";
 import { getGlossaryPrompt } from "../i18n/glossary";
 import { currencySymbol as currencySymbolFor } from "./currencyPref";
 import {
-  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, reconcileDealerNegotiation, saneDealerRange, dealerBands, dropContradictions, sanitizeDeep,
+  alignProseRanges, calibratedConfidence, confidenceLabel, decideBuy, evidenceCheck, normaliseConfidence, reconcileNegotiation, reconcileDealerNegotiation, saneDealerRange, dealerBands, bandScore, dropContradictions, sanitizeDeep,
   type PriceBasis, type ScoreBand, type VerdictBands,
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFacts";
@@ -90,6 +91,32 @@ const PRICE_AFTER_WORD = /\b(?:above|over|beyond|exceed(?:s|ing)?|more than|high
 /** True when a walk-away condition carries a monetary figure (symbol, currency word, or a number used as a price). */
 export const mentionsPrice = (s: string): boolean =>
   PRICE_CURRENCY.test(s) || PRICE_GROUPED.test(s) || PRICE_K.test(s) || PRICE_AFTER_WORD.test(s);
+/** Model prose fields never carry figures: sentences mentioning a price are dropped (arrays lose empty entries).
+ * Names, titles, sources and structured numbers are untouched. */
+/** Close sold comparables needed before they lift the shown confidence. */
+export const SOLD_AGREE_MIN = 6;
+const NO_STRIP_KEY = /^(title|name|url|urls|source|sources|maker|likely_period|likely_style|currency|comparables|walk_away_if|search_queries|query)$/i;
+export const stripPriceSentences = (s: string): string =>
+  mentionsPrice(s) ? s.split(/(?<=[.!?;])\s+|\n+/).filter(x => !mentionsPrice(x)).join(' ').trim() : s;
+export const stripModelPrices = (item: any): any => {
+  const walk = (o: any) => {
+    if (!o || typeof o !== 'object') return;
+    for (const k of Object.keys(o)) {
+      if (NO_STRIP_KEY.test(k)) continue;
+      const v = o[k];
+      if (typeof v === 'string') o[k] = stripPriceSentences(v);
+      else if (Array.isArray(v)) {
+        if (v.every(x => typeof x === 'string')) o[k] = v.map(stripPriceSentences).filter((x: string) => x);
+        else v.forEach(walk);
+      } else if (v && typeof v === 'object') walk(v);
+    }
+  };
+  for (const k of ['item_summary', 'buy_decision', 'dealer_take', 'negotiation_strategy', 'restoration', 'market_context']) walk(item?.[k]);
+  if (item?.price_guidance && typeof item.price_guidance.pricing_reasoning === 'string') item.price_guidance.pricing_reasoning = stripPriceSentences(item.price_guidance.pricing_reasoning);
+  if (typeof item?.teaser_insight === 'string') item.teaser_insight = stripPriceSentences(item.teaser_insight);
+  for (const k of Object.keys(item || {})) if (/tips?$|_insight$/.test(k) && typeof item[k] === 'string') item[k] = stripPriceSentences(item[k]);
+  return item;
+};
 /** Keep only qualitative walk-away conditions; the figure lives in walk_away_threshold. */
 export const sanitizeWalkAwayIf = (list: unknown): string[] =>
   Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string' && x.trim() !== '' && !mentionsPrice(x)) : [];
@@ -681,6 +708,12 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       pgA.fair_price_high = Math.round(sold.high * 1.6);
       if (Number(pgA.good_buy_below) > sold.high) pgA.good_buy_below = Math.round((sold.low + sold.high) / 2);
     }
+    // Shown confidence: six or more close sold comparables agreeing with the range (or anchoring it) is real evidence,
+    // so it is never "very low" (ten or more, or photos: at least medium). The internal label above drives the range
+    // calibration and is unchanged.
+    const soldAgree = !!sold && sold.n >= SOLD_AGREE_MIN && ['within_cap', 'anchored', 'type_capped'].includes(sold.note);
+    const shownConfScore = soldAgree ? Math.max(finalConfScore, sold!.n >= 10 || hasPhotos ? 55 : 40) : finalConfScore;
+    const shownConfLabel = confidenceLabel(shownConfScore);
     // A re-run with answers starts from the range the checklist was shown with (the model's new numbers would otherwise
     // move it at random), unless the answers changed the stamp basis or verified comparables now anchor it
     const stampedNow = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
@@ -801,17 +834,25 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // Ensure currency consistency
     item.price_guidance.currency = targetCurrency;
 
-    // Teaser: any figure in it must be the app's own smart-buy / walk-away (the model's teaser sometimes quoted a
-    // "buy below" figure above the market high). Qualitative teasers without money amounts are kept.
-    const teaserHasMoney = /(\d[\d\s.,]*\s?(€|£|\$|kr|eur|gbp|usd|sek))|((€|£|\$)\s?\d)/i.test(String(item.teaser_insight || ''));
-    if (!item.teaser_insight || teaserHasMoney) {
+    // Model prose never carries prices: every sentence quoting a figure is dropped from the model's notes (summary,
+    // market signal, insights, dealer view, tips...). Every figure the buyer reads is inserted by code below.
+    stripModelPrices(item);
+    const venueK = venueOf({ isAuction, sellerType });
+    const frT = String(language || '').toLowerCase().startsWith('fr');
+    const mkt = venueK === 'market' ? marketFigures(Number(pg.estimated_market_range_low) || 0, Number(pg.estimated_market_range_high) || 0) : null;
+    if (!String(item.teaser_insight || '').trim()) {
       if (item.price_guidance?.good_buy_below) {
-        const money = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
-        item.teaser_insight = bands
-          ? `A good shop price is below ${money(item.price_guidance.good_buy_below)}. Above ${money(nf.walk_away_price)} (the top of the dealer range), you are overpaying.`
-          : `Dealers would typically buy below ${money(item.price_guidance.good_buy_below)}${isAuction ? ' (hammer)' : ''}. Above ${money(nf.walk_away_price)}, you are overpaying.`;
+        const money = (n: number) => { try { return new Intl.NumberFormat(frT ? 'fr-FR' : (language || 'en'), { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
+        item.teaser_insight = mkt && mkt.walk_away_price > 0
+          ? (frT ? `Sur un marché, en dessous de ${money(mkt.good_buy_below)} c'est une bonne affaire ; au-delà de ${money(mkt.walk_away_price)} (le haut de la fourchette aux enchères), vous payez trop cher.`
+                 : `At a market, below ${money(mkt.good_buy_below)} is a good buy; above ${money(mkt.walk_away_price)} (the top of the auction range), you are overpaying.`)
+          : bands
+          ? (frT ? `En dessous de ${money(item.price_guidance.good_buy_below)} c'est une bonne affaire ; jusqu'à ${money(nf.walk_away_price)} (le haut de la fourchette marchand), un prix correct en boutique ; au-delà, vous payez trop cher.`
+                 : `Below ${money(item.price_guidance.good_buy_below)} is a good buy; up to ${money(nf.walk_away_price)} (the top of the dealer range) is a fair shop price; above that, you are overpaying.`)
+          : (frT ? `Un marchand achèterait en dessous de ${money(item.price_guidance.good_buy_below)}${isAuction ? ' (marteau)' : ''}. Au-delà de ${money(nf.walk_away_price)}, vous payez trop cher.`
+                 : `Dealers would typically buy below ${money(item.price_guidance.good_buy_below)}${isAuction ? ' (hammer)' : ''}. Above ${money(nf.walk_away_price)}, you are overpaying.`);
       } else {
-        item.teaser_insight = `Dealers typically negotiate 30–50% below retail on this category.`;
+        item.teaser_insight = frT ? `Les marchands négocient en général 30 à 50 % sous le prix de détail dans cette catégorie.` : `Dealers typically negotiate 30–50% below retail on this category.`;
       }
     }
 
@@ -864,17 +905,29 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         overpriced: [`${ask} is above the dealer range (${dl}–${dh}): overpriced, even for a shop.`, `${ask} dépasse la fourchette marchand (${dl}–${dh}) : trop cher, même en boutique.`],
         walk_away: [`${ask} is well above the dealer range (${dl}–${dh}): walk away.`, `${ask} est bien au-dessus de la fourchette marchand (${dl}–${dh}) : passez votre chemin.`],
       };
-      const verdictLine = band[basis][fr ? 1 : 0];
+      // Market / fair / private seller: judged on the market scale (walk-away = top of the auction range), the same
+      // bands the result card uses (venueGuidance.ts), so the notes never quote a dealer range there
+      const mb = mkt ? bandScore(Number(askingPrice), marketBands(Number(pg.estimated_market_range_low) || 0, Number(pg.estimated_market_range_high) || 0)) : null;
+      const mw = mkt ? m(mkt.walk_away_price) : '', mg = mkt ? m(mkt.good_buy_below) : '';
+      const mband: Record<string, [string, string]> = {
+        strong_buy: [`${ask} is at or below the bottom of the auction range: a strong buy at a market.`, `${ask} est au niveau ou sous le bas de la fourchette aux enchères : une excellente affaire sur un marché.`],
+        good_buy: [`${ask} is below ${mg}: a good buy at a market.`, `${ask} est sous ${mg} : une bonne affaire sur un marché.`],
+        fair: [`${ask} is within the walk-away (${mw}, the top of the auction range): a fair market price.`, `${ask} reste sous le prix plafond (${mw}, le haut de la fourchette aux enchères) : un prix correct sur un marché.`],
+        overpriced: [`${ask} is above the walk-away (${mw}, the top of the auction range): overpriced for a market.`, `${ask} dépasse le prix plafond (${mw}, le haut de la fourchette aux enchères) : trop cher pour un marché.`],
+        walk_away: [`${ask} is well above the walk-away (${mw}, the top of the auction range): walk away.`, `${ask} est bien au-dessus du prix plafond (${mw}, le haut de la fourchette aux enchères) : passez votre chemin.`],
+      };
+      const vBasis = (mb && mband[mb.basis] ? mb.basis : basis) as keyof typeof band;
+      const verdictLine = (mb && mband[mb.basis] ? mband : band)[vBasis][fr ? 1 : 0];
       const auctionLine = fr ? `Aux enchères, la pièce ferait environ ${al}–${ah} (marteau).` : `At auction it would make about ${al}–${ah} (hammer).`;
-      const fix = (t: any) => { if (typeof t !== 'string') return t; const r = dropContradictions(t, basis); proseRemoved += r.removed; return r.text || verdictLine; };
-      const fixList = (a: any) => { if (!Array.isArray(a)) return a; const out = a.map((x: any) => { const r = dropContradictions(String(x || ''), basis); proseRemoved += r.removed; return r.text; }).filter((x: string) => x); return out.length ? out : [verdictLine]; };
+      const fix = (t: any) => { if (typeof t !== 'string') return t; const r = dropContradictions(t, vBasis as PriceBasis); proseRemoved += r.removed; return r.text || verdictLine; };
+      const fixList = (a: any) => { if (!Array.isArray(a)) return a; const out = a.map((x: any) => { const r = dropContradictions(String(x || ''), vBasis as PriceBasis); proseRemoved += r.removed; return r.text; }).filter((x: string) => x); return out.length ? out : [verdictLine]; };
       const is = item.item_summary || {}, bd = item.buy_decision || {}, dtk = item.dealer_take || {};
       is.snap_judgement = fix(is.snap_judgement);
       bd.decision_summary = fixList(bd.decision_summary);
       bd.investment_insight = fix(bd.investment_insight); bd.must_have_insight = fix(bd.must_have_insight); bd.resale_insight = fix(bd.resale_insight);
       dtk.dealer_view = fixList(dtk.dealer_view); dtk.resale_strategy = fix(dtk.resale_strategy);
       item.teaser_insight = fix(item.teaser_insight);
-      const pr = dropContradictions(String(pg.pricing_reasoning || ''), basis); proseRemoved += pr.removed;
+      const pr = dropContradictions(String(pg.pricing_reasoning || ''), vBasis as PriceBasis); proseRemoved += pr.removed;
       pg.pricing_reasoning = `${verdictLine} ${auctionLine} ${pr.text}`.trim();
     }
 
@@ -958,8 +1011,8 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       },
       item_summary: {
         ...item.item_summary,
-        confidence: confLabel,
-        confidence_score: finalConfScore
+        confidence: shownConfLabel,
+        confidence_score: shownConfScore
       },
       buy_decision: {
         ...item.buy_decision,
@@ -976,7 +1029,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         prose_sentences_removed: bands ? proseRemoved : undefined,
         dealer_bands: bands ? { strong_buy_to: Math.round(bands.strongTop), good_buy_to: Math.round(bands.goodTop), fair_to: Math.round(bands.fairTop), overpriced_to: Math.round(bands.overTop) } : null,
         label: getBuyLabel(basis),
-        confidence: confLabel
+        confidence: shownConfLabel
       }
     };
   });

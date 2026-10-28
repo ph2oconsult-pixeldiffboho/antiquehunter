@@ -123,11 +123,11 @@ export const Home: React.FC<HomeProps> = ({ onScan, onUpload, onDescribe, onView
                 </div>
                 <div className="space-y-1">
                   <span className="text-[8px] bg-gold/15 text-gold border border-gold/25 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">
-                    AI Sourcing Portal
+                    {t('home.sourcing_badge', 'AI Sourcing Portal')}
                   </span>
-                  <h3 className="serif text-xl font-light text-ink">Find Me an Antique</h3>
+                  <h3 className="serif text-xl font-light text-ink">{t('intro.path_hunt_title', 'Find Me an Antique')}</h3>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                    Scan Interencheres, Drouot, eBay & more in real-time
+                    {t('home.sourcing_scan', 'Scan Interencheres, Drouot, eBay & more in real-time')}
                   </p>
                 </div>
               </div>
