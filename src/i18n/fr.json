@@ -48,7 +48,9 @@
     "tip_hardware_title": "Audit de la Quincaillerie",
     "tip_hardware_desc": "Regardez derrière les poignées. Des trous supplémentaires suggèrent que la quincaillerie a été remplacée, affectant la valeur.",
     "tip_smell_title": "Le Test de l'Odeur",
-    "tip_smell_desc": "Le vieux bois a une odeur distincte, de renfermé mais pas de pourri. Les vernis récents sentent les produits chimiques."
+    "tip_smell_desc": "Le vieux bois a une odeur distincte, de renfermé mais pas de pourri. Les vernis récents sentent les produits chimiques.",
+    "sourcing_badge": "Portail de chine IA",
+    "sourcing_scan": "Interencheres, Drouot, eBay et plus, en temps réel"
   },
   "analysis": {
     "title": "Évaluation professionnelle",
@@ -456,7 +458,8 @@
     "found_direct_desc": "Lu directement sur la page de recherche du site d'enchères : estimation, date et frais sont ceux de la maison de ventes.",
     "all_in": "Frais compris ≈ {{range}}",
     "fees_assumed": "(~{{pct}} % de frais supposés)",
-    "lot_number": "Lot {{num}}"
+    "lot_number": "Lot {{num}}",
+    "live_badge": "Recherche mondiale en direct"
   },
   "toast": {
     "saved": "Enregistré dans votre journal.",
@@ -597,6 +600,7 @@
     "happy_at": "Prix « satisfaisant » suggéré",
     "suggestion_note": "Suggestions issues de cette estimation, pas une garantie de ce que le vendeur acceptera.",
     "walk_note": "Ne dépassez jamais votre prix plafond de {{walk}}.",
+    "walk_note_stretch": "Votre prix plafond est de {{walk}} ; comme cette pièce comble un manque, vous acceptez d'aller jusqu'à {{best}}, pas au-delà.",
     "asking_over": "Le prix demandé dépasse ce plafond de {{pct}} % : soyez prêt à partir.",
     "payment_title": "Levier du paiement",
     "pay_cash": "Proposez un paiement en espèces pour conclure vite : les marchands accordent souvent {{lo}} à {{hi}} %{{amount}}. En France, un résident fiscal peut payer un professionnel en espèces jusqu'à {{cap}} (art. D112-3 CMF) ; demandez une facture.",

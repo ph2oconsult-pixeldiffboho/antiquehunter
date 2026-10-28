@@ -8,6 +8,8 @@ export type Motivation = 'browsing' | 'would_like' | 'fills_gap';
 export const MOTIVATIONS: Motivation[] = ['browsing', 'would_like', 'fills_gap'];
 /** "Fills a gap": the best-and-final may go up to this much over the walk-away (and never over the budget). */
 export const GAP_PREMIUM_PCT = 15;
+/** "Just browsing": the ceiling sits this far under the walk-away. */
+export const BROWSING_FACTOR = 0.9;
 /** Cash price: this much below the best-and-final (cash is a lever, not a second ceiling). */
 export const CASH_DISCOUNT = 0.08;
 
@@ -78,24 +80,28 @@ export const motivationDecision = (item: Record<string, any> | null | undefined)
   else if (over && effMotivation === 'fills_gap') verdict = budgetEur ? 'premium' : 'negotiate';
 
   const fairValue = Math.min(walkAway, Number(pg.good_buy_below) || walkAway);
-  const needPlan = price > fairValue || over;
+  // auctions always get the plan (max bid as hammer + all-in), whatever the estimate
+  const needPlan = isAuction || price > fairValue || over;
   let plan: OfferPlan | null = null;
   if (needPlan) {
     // premium allowed only for "fills a gap" with a budget that covers it
     const premiumCap = niceDown(walkAway * (1 + GAP_PREMIUM_PCT / 100));
     const stretch = effMotivation === 'fills_gap' && !!budgetEur;
+    // "Just browsing" is more cautious than "I'd like it": a lower ceiling and a lower opening
+    const cautious = effMotivation === 'browsing';
+    const ceiling = cautious ? niceDown(walkAway * BROWSING_FACTOR) : walkAway;
     if (isAuction) {
       const budgetHammer = budgetEur ? niceDown(budgetEur / (1 + premiumPct / 100)) : Infinity;
-      let maxHammer = stretch ? Math.max(walkAway, Math.min(premiumCap, budgetHammer)) : Math.min(walkAway, budgetHammer);
+      let maxHammer = stretch ? Math.max(walkAway, Math.min(premiumCap, budgetHammer)) : Math.min(ceiling, budgetHammer);
       maxHammer = Math.max(0, Math.round(maxHammer));
       plan = { venue, max_hammer: maxHammer, max_all_in: Math.round(maxHammer * (1 + premiumPct / 100)), premium_pct: premiumPct,
         over_walk_away: maxHammer > walkAway ? maxHammer - walkAway : 0, premium_cap_pct: GAP_PREMIUM_PCT };
     } else {
-      let best = stretch ? Math.max(walkAway, Math.min(premiumCap, niceDown(budgetEur!))) : walkAway;
+      let best = stretch ? Math.max(walkAway, Math.min(premiumCap, niceDown(budgetEur!))) : ceiling;
       if (budgetEur) best = Math.min(best, niceDown(budgetEur));
       best = Math.min(best, price);           // never offer more than they ask
       const low = Number(pg.estimated_market_range_low) || 0;
-      const opening = Math.min(best, nice(Math.max(low, Math.min(walkAway, best) * 0.75)));
+      const opening = Math.min(best, nice(Math.max(low, Math.min(walkAway, best) * (cautious ? 0.65 : 0.75))));
       const cashRaw = nice(Math.max(opening, best * (1 - CASH_DISCOUNT)));
       const cashEur = convertApprox(cashRaw, pg.currency || 'EUR', 'EUR') ?? cashRaw;
       const capped = venue === 'dealer' && cashEur > CASH_CAP_FR_RESIDENT_EUR;

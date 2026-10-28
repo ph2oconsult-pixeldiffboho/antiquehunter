@@ -1,5 +1,6 @@
 // Quick self-checks for the hunt URL filters and appraisal maths.
 // Run: npx tsx scripts/check-hunt-logic.ts
+import { alignWithOfferPlan, discountAmount } from "../src/services/negotiation";
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller, needEvidenceWalkAway } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
 import { calibrateRange } from "../src/services/thinEvidence";
@@ -10,7 +11,7 @@ import { motivationDecision, overridesNeedEvidence, GAP_PREMIUM_PCT } from "../s
 import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services/imageResize.ts";
 import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS, CALL_TIMEOUT_MS, TOTAL_BUDGET_MS, callTimeoutFor } from "../src/services/appraiseHandler.ts";
 import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
-import { postProcessAppraisal } from "../src/services/gemini.ts";
+import { postProcessAppraisal, stripModelPrices, stripPriceSentences } from "../src/services/gemini.ts";
 import { matchSoldComps, anchorOnSoldComps, pieceFeatures, MIN_ANCHOR_COMPS } from "../src/services/soldComps.ts";
 import { handleSoldCompsRequest, soldPool } from "../src/services/soldCompsHandler.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -1340,9 +1341,9 @@ check("dealer mode wired: the Louis-Philippe mirror (auction €300–700, deale
   assert.deepEqual(w.buy_decision.decision_summary, ["Large size is desirable.", "Painted finish limits the audience."]);
   assert.deepEqual(w.dealer_take.dealer_view, ["La peinture est un risque."]);
   assert.equal(w.item_summary.snap_judgement, "A decorative piece.");
-  assert.match(w.price_guidance.pricing_reasoning, /^€950 is within the dealer range \(€700–€1,100\): a fair shop price\. At auction it would make about €300–€700 \(hammer\)\. Louis-Philippe mirrors are common\. Auction hammers fall between 300 and 700 EUR\.$/);
+  assert.match(w.price_guidance.pricing_reasoning, /^€950 is within the dealer range \(€700–€1,100\): a fair shop price\. At auction it would make about €300–€700 \(hammer\)\. Louis-Philippe mirrors are common\.$/);
   assert.ok(w.buy_decision.resale_insight && !/retail/.test(w.buy_decision.resale_insight)); // emptied -> the verdict line
-  assert.ok(w.buy_decision.prose_sentences_removed >= 5);
+  assert.ok(w.buy_decision.prose_sentences_removed >= 3); // sentences quoting a price are already gone (stripModelPrices)
   const wf: any = postProcessAppraisal(wordy(), dealerCtx(q, { askingPrice: 950, category: "mirrors", language: "fr" }))[0];
   assert.match(wf.price_guidance.pricing_reasoning, /dans la fourchette marchand/);
   // Overpriced: "a bargain" style sentences go instead
@@ -1758,7 +1759,7 @@ check("motivation: offer plan figures (cash cap, best-and-final <= walk-away unl
   });
   for (const st of ["Market/Fair", "Private Seller"]) for (const m of ["browsing", "would_like"]) {
     const p = motivationDecision(it(st, m, 1500))!.plan!;
-    assert.equal(p.best_and_final, 900, `${st} ${m}: best = walk-away`); assert.ok(p.opening_offer! < p.best_and_final!); assert.ok(p.cash_price! > 0 && p.cash_price! <= 900); assert.equal(p.over_walk_away, 0);
+    assert.equal(p.best_and_final, m === "browsing" ? 810 : 900, `${st} ${m}: best = walk-away (browsing: 90%)`); assert.ok(p.opening_offer! < p.best_and_final!); assert.ok(p.cash_price! > 0 && p.cash_price! <= 900); assert.equal(p.over_walk_away, 0);
   }
   const g = motivationDecision(it("Market/Fair", "fills_gap", 1500))!.plan!;
   assert.equal(g.best_and_final, 1000, "walk 900 + at most 15% (1,035) rounded down"); assert.ok(g.best_and_final! <= 900 * (1 + GAP_PREMIUM_PCT / 100)); assert.equal(g.over_walk_away, g.best_and_final! - 900);
@@ -1777,6 +1778,22 @@ check("motivation: offer plan figures (cash cap, best-and-final <= walk-away unl
   assert.equal(ag.max_hammer, 1000, "fills a gap: min(walk +15% rounded down, budget / 1.25 = 1,040)");
   assert.equal(motivationDecision(it("Auction", "fills_gap", 1200))!.plan!.max_hammer, 960, "budget-bound: 1,200 / 1.25 = 960"); assert.ok(ag.max_all_in! <= 1300);
   assert.equal(motivationDecision(it("Market/Fair", undefined, undefined, 500, 900))!.plan, null, "below fair value: no plan");
+  // auctions always get the plan (max bid as hammer + all-in), even below the estimate
+  const al = motivationDecision(it("Auction", "would_like", undefined, 500, 900))!.plan!;
+  assert.deepEqual([al.max_hammer, al.max_all_in], [900, 1125]);
+  // browsing is more cautious than would_like: lower best-and-final and opening, still <= walk-away
+  const pb = motivationDecision(it("Antique Shop", "browsing", 2000, 2000, 1800))!.plan!, pw = motivationDecision(it("Antique Shop", "would_like", 2000, 2000, 1800))!.plan!;
+  assert.ok(pb.best_and_final! < pw.best_and_final! && pb.opening_offer! < pw.opening_offer! && pb.best_and_final! <= 1800, JSON.stringify([pb, pw]));
+  assert.ok(motivationDecision(it("Auction", "browsing", undefined, 1250, 900))!.plan!.max_hammer! < 900);
+  // the Negotiate card shows the offer plan's figures; a fills-a-gap stretch replaces "never go above"
+  const pg2 = motivationDecision(it("Antique Shop", "fills_gap", 2100, 2000, 1800))!.plan!;
+  const np0: any = { kind: "dealer", opening_offer: 1400, happy_at: 1600, walk_away: 1800, levers: [], invoice: { terms: [] }, payment: { mode: "transfer", discount_pct: [5, 10], cap_eur: 1000, cap_non_resident_eur: 15000, over_cap: true } };
+  const al2 = alignWithOfferPlan(np0, pg2)!;
+  assert.deepEqual([al2.opening_offer, al2.happy_at, al2.stretch_to], [pg2.opening_offer, pg2.best_and_final, pg2.best_and_final]); assert.ok(pg2.best_and_final! > 1800);
+  assert.equal(alignWithOfferPlan(np0, pw)!.stretch_to, undefined);
+  assert.match(readFileSync("src/components/Negotiate.tsx", "utf8"), /walk_note_stretch/);
+  // small cash discounts: never an empty "(—–—)"
+  assert.equal(discountAmount("cash_market", 60)?.join("-"), "3-6"); assert.equal(discountAmount("cash_market", 8), null); assert.equal(discountAmount("transfer", 900), null);
   assert.match(readFileSync("src/components/AnalysisView.tsx", "utf8"), /md\.verdict === 'negotiate' \|\| md\.verdict === 'premium'/, "negotiate / premium replace the contradicting walk-away sentence");
   assert.match(readFileSync("src/components/AnalysisView.tsx", "utf8"), /md\.verdict === 'premium' \|\| md\.verdict === 'over_budget'/, "over budget: the budget line replaces the old price sentence");
   for (const f of ["en", "fr"]) { const j = JSON.parse(readFileSync(`src/i18n/${f}.json`, "utf8")); for (const k of ["verdict_negotiate", "verdict_premium", "verdict_over_budget", "reason_premium"]) assert.ok(j.motivation[k], f + k); assert.ok(j.offer.cash_capped && j.describe.motivation_fills_gap, f); }
@@ -2182,3 +2199,21 @@ check("sold comparables: matched by type/period/material, self excluded, range i
 });
 console.log(`
 ${passed} checks passed`);
+
+check("rt4: comps types (dresser / confiturier split, mirrors exclude dressing tables, consoles, trolleys; FR/EN/SV synonyms), prose never carries prices", () => {
+  const ty = (q: string) => pieceFeatures(q).type;
+  for (const q of ["Welsh dresser in oak", "Vaisselier en chêne", "Buffet deux-corps vaisselier", "Buffet à deux corps en noyer", "Kitchen dresser, pine"]) assert.equal(ty(q), "dresser", q);
+  assert.equal(ty("Confiturier en merisier"), "confiturier"); assert.notEqual(ty("Confiturier en merisier"), ty("Welsh dresser"));
+  for (const q of ["Chiffonnier Louis-Philippe", "Chiffonier, mahogany", "Semainier en noyer", "Chiffonjé gustaviansk"]) assert.equal(ty(q), "chiffonnier", q);
+  for (const q of ["Miroir doré Louis XVI", "Pier glass, giltwood", "Spegel gustaviansk", "Glace à fronton"]) assert.equal(ty(q), "mirror", q);
+  assert.equal(ty("Coiffeuse Louis XV à miroir"), "dressing_table"); assert.equal(ty("Console en acajou et sa glace"), "console");
+  assert.equal(ty("Desserte en métal chromé, plateaux miroir"), "trolley"); assert.equal(ty("Bar cart, chrome and mirror"), "trolley");
+  assert.equal(stripPriceSentences("Good carving. Dealers buy below €350. Check the feet."), "Good carving. Check the feet.");
+  const it: any = { item_summary: { title: "Mirror €1", snap_judgement: "Well below €400 is fair. Nice gilding." }, buy_decision: { decision_summary: ["A shop price of €900 is fair.", "Original glass."] }, teaser_insight: "A good price is below €450.", price_guidance: { pricing_reasoning: "Common. Hammers 300–700 EUR." } };
+  stripModelPrices(it);
+  assert.equal(it.item_summary.title, "Mirror €1"); assert.equal(it.item_summary.snap_judgement, "Nice gilding."); assert.deepEqual(it.buy_decision.decision_summary, ["Original glass."]);
+  assert.equal(it.teaser_insight, ""); assert.equal(it.price_guidance.pricing_reasoning, "Common.");
+  const fr = JSON.parse(readFileSync("src/i18n/fr.json", "utf8"));
+  assert.ok(fr.home.sourcing_badge && fr.hunter.live_badge && fr.negotiate.walk_note_stretch);
+  assert.ok(!/>\s*(AI Sourcing Portal|Find Me an Antique)\s*</.test(readFileSync("src/components/Home.tsx", "utf8") + readFileSync("src/components/AntiqueHunter.tsx", "utf8")), "home strings go through i18n");
+});

@@ -4,6 +4,7 @@ import { applyVenueGuidance, needEvidenceWalkAway } from '../services/venueGuida
 import { motivationDecision, overridesNeedEvidence } from '../services/motivation';
 import { OfferPlan } from './OfferPlan';
 import { ResetRangeButton } from './RangeAdmin';
+import { alignWithOfferPlan } from '../services/negotiation';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckCircle, Info, ShieldAlert, ArrowRight, Save, ArrowLeft, Gavel, Handshake, OctagonX, Share2, TrendingUp, Quote, Pen, Sparkles } from 'lucide-react';
@@ -980,7 +981,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
 
       {/* 3e. Negotiate (dealer / private) or bidding tips (auction), part of "Before you buy" */}
       {(
-        <Negotiate plan={currentItem.negotiation_plan} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
+        <Negotiate plan={alignWithOfferPlan(currentItem.negotiation_plan, currentItem.motivation_decision?.plan)} currency={currentItem.price_guidance?.currency} showPrices={showProContent} />
       )}
 
       {/* Field notes matched to this piece */}

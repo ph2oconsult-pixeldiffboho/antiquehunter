@@ -48,7 +48,9 @@
     "tip_hardware_title": "Hardware Audit",
     "tip_hardware_desc": "Look behind the handles. Extra holes suggest the hardware was replaced, affecting value.",
     "tip_smell_title": "The Smell Test",
-    "tip_smell_desc": "Old wood has a distinct, musty but not rotten smell. New stains smell like chemicals."
+    "tip_smell_desc": "Old wood has a distinct, musty but not rotten smell. New stains smell like chemicals.",
+    "sourcing_badge": "AI Sourcing Portal",
+    "sourcing_scan": "Scan Interencheres, Drouot, eBay & more in real-time"
   },
   "analysis": {
     "title": "Professional Appraisal",
@@ -456,7 +458,8 @@
     "found_direct_desc": "Read directly from the auction site's own search page: estimate, sale date and fees are the auction house's.",
     "all_in": "All-in ≈ {{range}}",
     "fees_assumed": "(~{{pct}}% fees assumed)",
-    "lot_number": "Lot {{num}}"
+    "lot_number": "Lot {{num}}",
+    "live_badge": "Live Global Sourcing"
   },
   "toast": {
     "saved": "Saved to your log.",
@@ -597,6 +600,7 @@
     "happy_at": "Suggested 'happy at' price",
     "suggestion_note": "Suggestions from this appraisal, not a guarantee of what the seller will accept.",
     "walk_note": "Never go above your walk-away of {{walk}}.",
+    "walk_note_stretch": "Your walk-away is {{walk}}; because this fills a gap, you have agreed to stretch to {{best}} — not a cent more.",
     "asking_over": "The asking price is {{pct}}% above that walk-away: be ready to walk.",
     "payment_title": "Payment leverage",
     "pay_cash": "Offer cash for a quick sale: dealers often take {{lo}}–{{hi}}% off{{amount}}. In France, a French tax resident may pay a professional in cash up to {{cap}} (art. D112-3 CMF); ask for an invoice.",

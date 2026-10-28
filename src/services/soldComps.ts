@@ -13,18 +13,23 @@ const fold = (s: string) => String(s || '').toLowerCase().normalize('NFD').repla
 
 /** Piece types, most specific first (a "commode-scriban" is a scriban). Swedish/English words cover Auctionet titles. */
 const TYPES: Array<[string, RegExp]> = [
-  ['chiffonnier', /\b(chiffonn?ier|chiffonniere|semainier|chiffonje|tallboy|chest[\s-]on[\s-]chest)\b/],
+  ['chiffonnier', /\b(chiffonn?ier|chiffonn?iere|chiffonier|semainier|chiffonje|tallboy|chest[\s-]on[\s-]chest)\b/],
   ['scriban', /\b(scriban|bureau\s+de\s+pente|bureau[\s-]bookcase|slant[\s-]front|klaffbyra|skrivbyra|skrivchiffonje)\b/],
   ['secretaire', /\b(secretaire|sekretar|secretary)\b/],
   ['commode', /\b(commode|chest\s+of\s+drawers|byra|kommod|sauteuse)\b/],
   ['armoire', /\b(armoire|wardrobe|linen\s+press|kladskap|linneskap|bonnetiere|garde[\s-]robe)\b/],
   ['encoignure', /\b(encoignure|corner\s+cupboard|hornskap)\b/],
-  ['buffet', /\b(buffet|vaisselier|enfilade|sideboard|skank|dresser|confiturier|bahut|homme\s+debout)\b/],
+  // Welsh dresser / vaisselier / buffet deux-corps (open rack on a base) is its own type; a confiturier (small jam
+  // cupboard) is never a comparable for it
+  ['dresser', /\b(vaisseliers?|buffet[\s-]+vaisselier|buffets?[\s-]+(a\s+)?deux[\s-]corps|welsh\s+dressers?|kitchen\s+dressers?|dressers?|dressoirs?|homme\s+debout|kokshylla|tallriksskap)\b/],
+  ['confiturier', /\b(confituriers?|jam\s+cupboards?)\b/],
+  ['buffet', /\b(buffet|enfilade|sideboard|skank|bahut)\b/],
   ['bookcase', /\b(bibliotheque|vitrine|bookcase|vitrinskap|bokhylla|display\s+cabinet)\b/],
   ['mirror', /\b(miroirs?|glaces?|trumeaux?|mirrors?|speglar|spegel|pier\s+glass|psyche)\b/],
   ['console', /\b(console|konsolbord)\b/],
   ['desk', /\b(bureau|writing\s+desk|skrivbord|bonheur[\s-]du[\s-]jour|desk)\b/],
   ['dressing_table', /\b(coiffeuse|poudreuse|dressing\s+table)\b/],
+  ['trolley', /\b(dessertes?|trolleys?|bar\s+carts?|serving\s+carts?|tea\s+carts?|rullbord|tevagn)\b/],
   ['table', /\b(table|gueridon|bord|tea\s+table)\b/],
   ['seat', /\b(fauteuils?|chaises?|bergeres?|canape|sofa|chairs?|armchairs?|stol|stolar|fatolj|soffa)\b/],
   ['cabinet', /\b(cabinet|cupboard|skap)\b/],
@@ -65,7 +70,15 @@ export interface PieceFeatures { type: string | null; periods: string[]; centuri
 export const pieceFeatures = (text: string, regionHint?: string): PieceFeatures => {
   const t = fold(text);
   const head = t.slice(0, 160);
-  const type = (TYPES.find(([, re]) => re.test(head)) || TYPES.find(([, re]) => re.test(t)) || [null])[0] as string | null;
+  let type = (TYPES.find(([, re]) => re.test(head)) || TYPES.find(([, re]) => re.test(t)) || [null])[0] as string | null;
+  // "Coiffeuse ... à miroir", "Console ... et sa glace", "Desserte ... plateau miroir": the piece named first wins over
+  // the mirror it carries, so dressing tables, consoles and trolleys never count as mirrors
+  if (type === 'mirror') {
+    const pos = (re: RegExp) => { const m = head.match(re); return m ? (m.index ?? 999) : 999; };
+    const mp = pos(TYPES.find(([k]) => k === 'mirror')![1]);
+    const first = TYPES.filter(([k]) => k !== 'mirror').map(([k, re]) => [k, pos(re)] as const).filter(([, p]) => p < mp).sort((a, b) => a[1] - b[1])[0];
+    if (first) type = first[0];
+  }
   const periods = PERIODS.filter(([, re]) => re.test(t)).map(([k]) => k);
   const centuries = CENTURY.filter(([, re]) => re.test(t)).map(([k]) => k);
   const materials = MATERIALS.filter(([, re]) => re.test(t)).map(([k]) => k);

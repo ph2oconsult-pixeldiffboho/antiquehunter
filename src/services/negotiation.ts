@@ -43,7 +43,34 @@ export interface NegotiationPlan {
   levers: Array<{ id: 'bundle' | 'flaws' | 'delivery' | 'timing'; flaws?: string[] }>;
   invoice: { terms: string[] };
   bidding?: { max_hammer: number; max_all_in: number; premium_pct: number };
+  stretch_to?: number;                     // "fills a gap": the agreed stretch above the walk-away
 }
+
+/** Cash discount in money (5–10 % of the price paid): fine rounding on small sums; omitted when it rounds to nothing,
+ * so the card never shows an empty "(—–—)". */
+export const discountAmount = (mode: string, base: number): [number, number] | null => {
+  if (mode === 'transfer' || !(base > 0)) return null;
+  const r = (x: number) => base < 200 ? Math.round(x) : nice(x);
+  const lo = r(base * 0.05), hi = r(base * 0.10);
+  return lo > 0 && hi > lo ? [lo, hi] : null;
+};
+
+/** The Negotiate card uses the offer plan's computed figures (motivation.ts): opening = plan opening, happy at =
+ * best-and-final; above the walk-away ("fills a gap" stretch) the card says so instead of "never go above". */
+export const alignWithOfferPlan = (plan: NegotiationPlan | null | undefined, offer: { opening_offer?: number; best_and_final?: number; max_hammer?: number; max_all_in?: number; over_walk_away?: number } | null | undefined): NegotiationPlan | null | undefined => {
+  if (!plan || !offer) return plan;
+  if (plan.kind === 'auction') {
+    if (!(Number(offer.max_hammer) > 0) || !plan.bidding) return plan;
+    return { ...plan, bidding: { ...plan.bidding, max_hammer: offer.max_hammer!, max_all_in: Number(offer.max_all_in) || plan.bidding.max_all_in }, stretch_to: (offer.over_walk_away || 0) > 0 ? offer.max_hammer : undefined };
+  }
+  if (!(Number(offer.best_and_final) > 0)) return plan;
+  const happy = offer.best_and_final!;
+  const opening = Math.min(happy, Number(offer.opening_offer) || plan.opening_offer || happy);
+  const da = plan.payment ? discountAmount(plan.payment.mode, happy) : null;
+  const payment = plan.payment ? { ...plan.payment, discount_amount: da || undefined } : undefined;
+  if (payment && !da) delete payment.discount_amount;
+  return { ...plan, opening_offer: opening, happy_at: happy, payment, stretch_to: (offer.over_walk_away || 0) > 0 ? happy : undefined };
+};
 
 export const buildNegotiationPlan = (i: NegotiationInput): NegotiationPlan => {
   const kind = sellerKindOf(i.sellerType, i.isAuction);
@@ -92,7 +119,7 @@ export const buildNegotiationPlan = (i: NegotiationInput): NegotiationPlan => {
   const mode: 'cash' | 'cash_private_receipt' | 'cash_market' | 'transfer' = market ? (paidEur <= CASH_CAP_FR_RESIDENT_EUR ? 'cash_market' : 'transfer') : kind === 'private' ? 'cash_private_receipt' : paidEur <= CASH_CAP_FR_RESIDENT_EUR ? 'cash' : 'transfer';
   const base = happy || ask || 0;
   const payment = { mode, over_cap: paidEur > CASH_CAP_FR_RESIDENT_EUR, discount_pct: CASH_DISCOUNT_PCT, cap_eur: CASH_CAP_FR_RESIDENT_EUR, cap_non_resident_eur: CASH_CAP_FR_NON_RESIDENT_EUR,
-    ...(mode !== 'transfer' && base > 0 ? { discount_amount: [nice(base * 0.05), nice(base * 0.10)] as [number, number] } : {}) };
+    ...(discountAmount(mode, base) ? { discount_amount: discountAmount(mode, base)! } : {}) };
 
   const flaws = (i.checklist || []).filter(c => i.answers?.[c.id] === 'no' && c.id !== 'invoice_wording' && c.id !== 'provenance_condition_report').map(c => c.id);
   const levers: NegotiationPlan['levers'] = [{ id: 'bundle' }];

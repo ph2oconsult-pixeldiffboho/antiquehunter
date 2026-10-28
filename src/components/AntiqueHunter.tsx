@@ -235,10 +235,10 @@ export const AntiqueHunter: React.FC<AntiqueHunterProps> = ({ onBack, currency, 
           </button>
           <div className="inline-flex items-center gap-1 px-3 py-1 bg-gold/10 text-gold rounded-full border border-gold/20">
             <Globe className="w-3 h-3 animate-spin" />
-            <span className="text-[9px] uppercase tracking-widest font-bold">Live Global Sourcing</span>
+            <span className="text-[9px] uppercase tracking-widest font-bold">{t('hunter.live_badge', 'Live Global Sourcing')}</span>
           </div>
         </div>
-        <h1 className="serif text-4xl font-light tracking-tight leading-tight text-ink">Find Me an Antique</h1>
+        <h1 className="serif text-4xl font-light tracking-tight leading-tight text-ink">{t('intro.path_hunt_title', 'Find Me an Antique')}</h1>
         <div className="text-muted leading-relaxed [&_strong]:text-ink [&_strong]:font-semibold">
           <ReactMarkdown>{t('hunter.intro')}</ReactMarkdown>
         </div>
