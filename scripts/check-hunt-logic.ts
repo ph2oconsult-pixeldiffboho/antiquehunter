@@ -442,7 +442,7 @@ check("Interencheres lot JSON gives the real estimate, sale date, city and fees"
   const f = parseInterencheresItem(json)!;
   assert.equal(f.estimateLow, 600);
   assert.equal(f.estimateHigh, 800);
-  assert.equal(f.saleDate?.toISOString(), "2026-11-05T13:30:00.000Z");
+  assert.equal(f.saleDate?.toISOString(), "2027-11-05T13:30:00.000Z");
   assert.equal(f.location, "Biarritz, France");
   assert.equal(f.buyerPremiumPct, 28.8);
   assert.ok(f.image?.startsWith("https://thumbor-indbupload.interencheres.com/"));
@@ -468,7 +468,7 @@ check("Interencheres lot JSON gives the real estimate, sale date, city and fees"
     assert.equal(out.match!.verification, "verified");
     assert.equal(out.match!.price, "Estimate €600 – €800");
     assert.equal(out.match!.buyerPremiumPct, 28.8);
-    assert.match(out.match!.date || "", /5 Nov 2026/);
+    assert.match(out.match!.date || "", /5 Nov 2027/);
     // UK-only: the same lot is dropped before any network call
     const uk = await validateMatch(
       { url: "https://www.interencheres.com/art-decoration/collections-dautomne-678390/lot-89074306.html", title: "Buffet vaisselier", location: "Biarritz", dealerAnalysis: "ok" },
