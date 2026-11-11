@@ -56,6 +56,7 @@ export const SoldComparables: React.FC<{ item: any }> = ({ item }) => {
   const date = (d?: string) => { if (!d) return '—'; const x = new Date(d); return isNaN(x.getTime()) ? d : x.toLocaleDateString(i18n.language || 'en', { year: 'numeric', month: 'short', day: 'numeric' }); };
   const headline = sc.mode === 'anchored' ? t('sold_comps.anchored', { n: sc.n, median: money(sc.median_hammer_eur || 0) })
     : sc.mode === 'capped' ? t('sold_comps.capped', { n: sc.n, median: money(sc.median_hammer_eur || 0) })
+    : sc.mode === 'tightened' ? t('sold_comps.tightened', { n: sc.n, median: money(sc.median_hammer_eur || 0) })
     : null;
   return (
     <section data-testid="sold-comps" className="p-6 bg-white border border-border-custom rounded-[32px] space-y-4 shadow-sm">

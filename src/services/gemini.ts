@@ -14,7 +14,7 @@ import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
 import { calibrateRange } from "./thinEvidence";
-import { anchorOnSoldComps, soldCompsProse, type SoldCompsResponse } from "./soldComps";
+import { anchorOnSoldComps, soldCompsProse, tightenRange, type SoldCompsResponse } from "./soldComps";
 import { dealerWalkAwayFromDibs, dibsCompsProse, type DibsCompsResponse } from "./dibsComps";
 import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
@@ -738,8 +738,8 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // so it is never "very low" (ten or more, or photos: at least medium). The internal label above drives the range
     // calibration and is unchanged.
     const soldAgree = !!sold && sold.n >= SOLD_AGREE_MIN && ['within_cap', 'anchored', 'type_capped'].includes(sold.note);
-    const shownConfScore = soldAgree ? Math.max(finalConfScore, sold!.n >= 10 || hasPhotos ? 55 : 40) : finalConfScore;
-    const shownConfLabel = confidenceLabel(shownConfScore);
+    let shownConfScore = soldAgree ? Math.max(finalConfScore, sold!.n >= 10 || hasPhotos ? 55 : 40) : finalConfScore;
+    let shownConfLabel = confidenceLabel(shownConfScore);
     // A re-run with answers starts from the range the checklist was shown with (the model's new numbers would otherwise
     // move it at random), unless the answers changed the stamp basis or verified comparables now anchor it
     const stampedNow = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
@@ -786,6 +786,25 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       if (Number(pgA.fair_price_high) > hi * 1.6) pgA.fair_price_high = Math.round(hi * 1.6);
       if (Number(pgA.fair_price_low) > Number(pgA.fair_price_high)) pgA.fair_price_low = Math.round(lo * 1.3);
       if (Number(pgA.good_buy_below) > hi) pgA.good_buy_below = Math.round((lo + hi) / 2);
+    }
+    // Dense close comps: narrow the (calibrated, possibly capped) range toward their spread. Never widens.
+    if (sold?.tightenVals?.length && !anchor.applied) {
+      const t = tightenRange(sold.tightenVals, {
+        modelLow: Number(pgA.estimated_market_range_low) || 0,
+        modelHigh: Number(pgA.estimated_market_range_high) || 0,
+      });
+      if (t) {
+        pgA.estimated_market_range_low = t.low; pgA.estimated_market_range_high = t.high;
+        const fLo = Number(pgA.fair_price_low) || 0, fHi = Number(pgA.fair_price_high) || 0;
+        if (fHi > t.high * 1.6) pgA.fair_price_high = Math.round(t.high * 1.6);
+        if (fLo > Number(pgA.fair_price_high)) pgA.fair_price_low = Math.round(t.low * 1.3);
+        if (Number(pgA.good_buy_below) > t.high) pgA.good_buy_below = Math.round((t.low + t.high) / 2);
+        sold.tightened = true; sold.low = t.low; sold.high = t.high;
+        if (sold.tightenVals.length >= SOLD_AGREE_MIN) {
+          shownConfScore = Math.max(shownConfScore, sold.tightenVals.length >= 10 || hasPhotos ? 55 : 40);
+          shownConfLabel = confidenceLabel(shownConfScore);
+        }
+      }
     }
     if (maker && (maker.status === 'stamped_confirmed' || maker.status === 'stamped_stated' || maker.status === 'stamp_in_photo'))
       item.item_summary.title = String(item.item_summary.title || '').replace(/,?\s*\(?\s*attributed\s+to\s+[^),]*\)?/i, ` (stamped ${maker.name})`).replace(/,?\s*\(?\s*attribu[ée]e?s?\s+[àa]\s+[^),]*\)?/i, ` (estampillé ${maker.name})`).replace(/\s{2,}/g, ' ').trim();
@@ -1037,7 +1056,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
       sold_comps: sold ? {
-        mode: soldComps === null || soldComps?.ok === false ? 'error' : sold.mode, n: sold.n, basis: sold.basis, median_hammer_eur: sold.medianHammerEur || null,
+        mode: soldComps === null || soldComps?.ok === false ? 'error' : (sold.tightened ? 'tightened' : sold.mode), n: sold.tightened ? (sold.tightenVals?.length ?? sold.n) : sold.n, basis: sold.basis, median_hammer_eur: sold.medianHammerEur || null,
         model_low: soldModel.low, model_high: soldModel.high, note: soldNote?.note || null, pool: soldComps?.pool || 0,
         list: sold.used.map(c => ({ url: c.u, title: c.t, hammer_eur: c.h, fee_pct: c.f ?? null, date: c.d, house: c.house || null, city: c.city || null, source: c.src, pieces: c.pieces, matched: c.matched })),
       } : null,

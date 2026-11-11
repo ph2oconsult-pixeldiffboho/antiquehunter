@@ -403,6 +403,7 @@
     "title": "Comparable sales",
     "anchored": "Range computed from {{n}} comparable sales of the same type, period/style and materials (median {{median}} hammer).",
     "capped": "Stamp with no verified maker results: range capped from {{n}} comparable sales of the type (median {{median}} hammer).",
+    "tightened": "已按{{n}}条相近可比成交（同一类型、产地与年代）的分布收窄估价区间（落槌中位数 {{median}}）。",
     "hammer": "hammer (fees stripped)",
     "fees": "buyer's fees {{pct}}%",
     "source_note": "Real sold lots (Drouot, Auctionet; {{pool}} results, fees stripped), matched by type, period/style, materials, size and market. The app checks and caps the range against them in code; the appraiser only writes the notes."
