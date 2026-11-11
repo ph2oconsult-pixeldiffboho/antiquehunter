@@ -15,6 +15,7 @@ import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
 import { calibrateRange } from "./thinEvidence";
 import { anchorOnSoldComps, soldCompsProse, type SoldCompsResponse } from "./soldComps";
+import { dealerWalkAwayFromDibs, dibsCompsProse, type DibsCompsResponse } from "./dibsComps";
 import { buildNegotiationPlan } from "./negotiation";
 import { buildChecklist, checksEffect, checksPrompt, type CheckAnswers } from "./checklist";
 import { pieceKindOf } from "./appraisalMath";
@@ -43,6 +44,10 @@ export interface AppraisalExtra {
   soldComps?: SoldCompsResponse | null;
   /** Injectable for tests; default POST /api/sold-comps */
   fetchSoldComps?: (req: SoldCompsRequest) => Promise<SoldCompsResponse | null>;
+  /** 1stDibs asking-price comparables already fetched (harness); undefined = fetch in dealer venue only */
+  dibsComps?: DibsCompsResponse | null;
+  /** Injectable for tests; default POST /api/dibs-comps */
+  fetchDibsComps?: (req: SoldCompsRequest) => Promise<DibsCompsResponse | null>;
   /** Injectable for tests; default POST /api/comps */
   fetchComps?: (req: { maker: string; piece?: string; material?: string; pieces: number; language: string }) => Promise<CompsResponse | null>;
 }
@@ -72,6 +77,17 @@ export const fetchSoldCompsFromApi = async (req: SoldCompsRequest): Promise<Sold
     if (!res.ok) return null;
     const j = await res.json();
     return j && Array.isArray(j.comps) ? j as SoldCompsResponse : null;
+  } catch { return null; } finally { clearTimeout(timer); }
+};
+
+export const fetchDibsCompsFromApi = async (req: SoldCompsRequest): Promise<DibsCompsResponse | null> => {
+  const c = new AbortController();
+  const timer = setTimeout(() => c.abort(), SOLD_COMPS_CLIENT_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/dibs-comps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req), signal: c.signal });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return j && Array.isArray(j.comps) ? j as DibsCompsResponse : null;
   } catch { return null; } finally { clearTimeout(timer); }
 };
 
@@ -557,14 +573,22 @@ ${getGlossaryPrompt(language)}`;
   // Sold comparables (Drouot / Auctionet results) for pieces with no verified maker anchor: matched server-side on the
   // buyer's text plus the model's title, style and period words; the range itself is computed in postProcessAppraisal
   const is0 = result?.items?.[0]?.item_summary || {};
-  const soldP: Promise<SoldCompsResponse | null> = extra.soldComps !== undefined ? Promise.resolve(extra.soldComps)
-    : (extra.fetchSoldComps || fetchSoldCompsFromApi)({
-        text: `${query} ${is0.title || ''} ${is0.likely_style || ''} ${is0.likely_period || ''}`.slice(0, 4000), lotUrl: lotUrl || undefined,
+  const soldText = `${query} ${is0.title || ''} ${is0.likely_style || ''} ${is0.likely_period || ''}`.slice(0, 4000);
+  const soldReq: SoldCompsRequest = {
+        text: soldText, lotUrl: lotUrl || undefined,
         region: targetCurrency === 'SEK' || /auctionet\.com/.test(String(lotUrl || '')) ? 'NORDIC' : undefined,
-      }).catch(() => null);
-  const [comps, soldComps] = await Promise.all([compsP ? compsP : Promise.resolve(undefined), soldP]);
+      };
+  const soldP: Promise<SoldCompsResponse | null> = extra.soldComps !== undefined ? Promise.resolve(extra.soldComps)
+    : (extra.fetchSoldComps || fetchSoldCompsFromApi)(soldReq).catch(() => null);
+  // 1stDibs asking-price comps are only fetched in dealer / antique-shop venue. Auction, market,
+  // brocante and private/Leboncoin paths never look them up, so their figures cannot change.
+  const dealerVenue = venueOf({ isAuction, sellerType }) === 'dealer';
+  const dibsP: Promise<DibsCompsResponse | null | undefined> = !dealerVenue ? Promise.resolve(undefined)
+    : extra.dibsComps !== undefined ? Promise.resolve(extra.dibsComps)
+    : (extra.fetchDibsComps || fetchDibsCompsFromApi)(soldReq).catch(() => null);
+  const [comps, soldComps, dibsComps] = await Promise.all([compsP ? compsP : Promise.resolve(undefined), soldP, dibsP]);
   return postProcessAppraisal(result, {
-    soldComps,
+    soldComps, dibsComps,
     query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl,
     lotFacts, fetchedEstimate, eurTo, category, comps, checkAnswers: extra.checkAnswers, previousBase: extra.previousBase, motivation: extra.motivation, budget: extra.budget,
   });
@@ -579,6 +603,8 @@ export interface PostProcessContext {
   comps?: CompsResponse | null;
   /** Sold comparables from /api/sold-comps (null = lookup failed; undefined = not looked up) */
   soldComps?: SoldCompsResponse | null;
+  /** 1stDibs asking-price comparables from /api/dibs-comps (dealer venue only; undefined = not looked up) */
+  dibsComps?: DibsCompsResponse | null;
   checkAnswers?: CheckAnswers;
   previousBase?: ChecklistBase | null;
 }
@@ -588,7 +614,7 @@ export interface PostProcessContext {
  * consistent negotiation figures, the verdict (hammer vs hammer), calibrated confidence, text clean-up.
  */
 export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
-  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, soldComps, checkAnswers, previousBase } = ctx;
+  const { query, hasPhotos, askingPrice, isAuction, premiumPct, targetCurrency, currencySymbol, language, sellerType, lotUrl, lotFacts, fetchedEstimate, eurTo, category, comps, soldComps, dibsComps, checkAnswers, previousBase } = ctx;
   
   // Scoring configuration for easy tuning
   // Verdict label comes from the price band (never from the model), so label, reason and score always agree
@@ -811,6 +837,28 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       pg.fair_price_low = dr.low; pg.fair_price_high = dr.high;
       bands = dealerBands(pg.estimated_market_range_low, pg.estimated_market_range_high, dr.low, dr.high);
     }
+    // Dealer / antique-shop only: a discounted median of close 1stDibs asking prices is the most
+    // a buyer should pay a dealer (never below the auction high). Other venues are untouched.
+    const venueForDibs = venueOf({ isAuction, sellerType });
+    const dibs = venueForDibs === 'dealer' && dibsComps !== undefined
+      ? dealerWalkAwayFromDibs(dibsComps?.ok ? dibsComps.comps : [], {
+          auctionHigh: Number(pg.estimated_market_range_high) || 0,
+          dealerHigh: Number(pg.fair_price_high) || 0,
+          eurTo: toTarget,
+        })
+      : null;
+    if (dibs && (dibs.mode === 'applied' || dibs.mode === 'replacement_only') && dibs.replacementAsk > 0) {
+      pg.replacement_ask_median = dibs.replacementAsk;
+      pg.replacement_ask_n = dibs.n;
+    }
+    if (dibs && dibs.mode === 'applied') {
+      pg.fair_price_high = dibs.walkAway;
+      if (Number(pg.fair_price_low) > dibs.walkAway) {
+        const mid = ((Number(pg.estimated_market_range_low) || 0) + (Number(pg.estimated_market_range_high) || 0)) / 2;
+        pg.fair_price_low = Math.round(Math.min(dibs.walkAway, Math.max(mid, Number(pg.estimated_market_range_high) || 0)));
+      }
+      bands = dealerBands(pg.estimated_market_range_low, pg.estimated_market_range_high, pg.fair_price_low, pg.fair_price_high);
+    }
     const nf = bands ? reconcileDealerNegotiation(bands, pg.fair_price_low) : reconcileNegotiation(
       { good_buy_below: pg.good_buy_below, ...(ns || {}) },
       pg.estimated_market_range_low, pg.estimated_market_range_high, premiumPct, isAuction
@@ -961,6 +1009,9 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     if (evidence.required && !sold) item.price_guidance = { ...item.price_guidance, provisional: true };
     const soldNote = sold ? soldCompsProse(sold, { language, isAuction, model: soldModel, stamped: stampedEarly, evidenceThin: evidence.required, fmt: (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } } }) : null;
     if (soldNote) item.price_guidance = { ...item.price_guidance, pricing_reasoning: `${soldNote.lead} ${item.price_guidance.pricing_reasoning || ''}`.trim() };
+    const moneyFmt = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: targetCurrency, maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `${currencySymbol}${Math.round(n)}`; } };
+    const dibsNote = dibs ? dibsCompsProse(dibs, { language, fmt: moneyFmt }) : null;
+    if (dibsNote?.lead) item.price_guidance = { ...item.price_guidance, pricing_reasoning: `${dibsNote.lead} ${item.price_guidance.pricing_reasoning || ''}`.trim(), replacement_ask_note: dibsNote.replacement };
     if (anchor.applied) {
       const money0 = (n: number) => { try { return new Intl.NumberFormat(language || 'en', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n)); } catch { return `€${Math.round(n)}`; } };
       item.price_guidance = { ...item.price_guidance, pricing_reasoning: `Anchored on ${anchor.used.length} verified auction results for ${anchor.group === 'stamped' ? 'stamped' : 'attributed'} ${maker?.name} pieces (median ${money0(anchor.perPieceMedianEur)} per piece ${isAuction ? 'hammer' : 'incl. fees'}, × ${anchor.pieces}). ${item.price_guidance.pricing_reasoning || ''}`.trim() };
@@ -989,6 +1040,12 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
         mode: soldComps === null || soldComps?.ok === false ? 'error' : sold.mode, n: sold.n, basis: sold.basis, median_hammer_eur: sold.medianHammerEur || null,
         model_low: soldModel.low, model_high: soldModel.high, note: soldNote?.note || null, pool: soldComps?.pool || 0,
         list: sold.used.map(c => ({ url: c.u, title: c.t, hammer_eur: c.h, fee_pct: c.f ?? null, date: c.d, house: c.house || null, city: c.city || null, source: c.src, pieces: c.pieces, matched: c.matched })),
+      } : null,
+      dibs_comps: dibs ? {
+        mode: dibsComps === null || dibsComps?.ok === false ? 'error' : dibs.mode, n: dibs.n, discount: dibs.discount,
+        median_ask_eur: dibs.medianAskEur || null, walk_away: dibs.mode === 'applied' ? dibs.walkAway : null,
+        replacement_ask: dibs.mode === 'applied' ? dibs.replacementAsk : null, note: dibs.note, pool: dibsComps?.pool || 0,
+        list: dibs.used.map(c => ({ url: c.u, title: c.title || c.t, ask_eur: c.ask, date: c.d, origin: c.origin, typology: c.typology || null, matched: c.matched })),
       } : null,
       comparables: {
         status: comps === undefined ? (maker ? 'not_searched' : 'no_maker') : comps === null || comps.ok === false ? 'error' : compList.length === 0 ? 'none_verified' : anchor.applied ? 'anchored' : 'shown',

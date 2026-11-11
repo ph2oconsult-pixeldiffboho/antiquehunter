@@ -155,6 +155,7 @@
     "market_bargain_band": "Market bargain band",
     "venue_note_market": "At a brocante or flea market, bargains below auction level are possible, but quality is not guaranteed: no provenance, no guarantee, and condition is as found.",
     "venue_note_dealer": "Dealers cost more than auction, but quality is generally more guaranteed: provenance, a guarantee and professional restoration are usually part of the price.",
+    "replacement_value": "高級ディーラーでの再調達価格：{{price}}（類似する{{n}}件の1stDibs出品の希望価格の中央値。売却価格ではなく希望価格です）。",
     "reason_market_strong_buy": "{{price}} is at or below the auction low ({{bargainLow}}): a real market bargain.",
     "reason_market_good_buy": "{{price}} is inside the market bargain band ({{bargainLow}}–{{bargainHigh}}).",
     "reason_market_fair": "{{price}} is above the bargain band but within the walk-away (auction high {{walkAway}}).",

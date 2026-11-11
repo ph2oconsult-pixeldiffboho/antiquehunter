@@ -14,6 +14,8 @@ import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/se
 import { postProcessAppraisal, stripModelPrices, stripPriceSentences } from "../src/services/gemini.ts";
 import { matchSoldComps, anchorOnSoldComps, pieceFeatures, MIN_ANCHOR_COMPS } from "../src/services/soldComps.ts";
 import { handleSoldCompsRequest, soldPool } from "../src/services/soldCompsHandler.ts";
+import { matchDibsComps, dealerWalkAwayFromDibs, dibsCompsProse, DIBS_DISCOUNT, DIBS_DISCOUNT_PCT, DIBS_MIN_COMPS, DIBS_MAX_UPLIFT, DIBS_MIN_RATIO } from "../src/services/dibsComps.ts";
+import { handleDibsCompsRequest, dibsPool } from "../src/services/dibsCompsHandler.ts";
 import { existsSync, readFileSync } from "node:fs";
 import {
   allowedDomainsFor, cleanText, failsPeriodRule, interencheresLotId, isAllowedHost, isGenericUrl, isSpecificListingUrl,
@@ -2244,4 +2246,120 @@ check("rt5: Gustavian comps, stamp path only when described, far-over walk away,
   assert.equal(motivationDecision(it("Auction", "fills_gap", 1200, 500, 450))!.verdict, "premium", "within the stretch-capped max bid");
   const en = JSON.parse(readFileSync("src/i18n/en.json", "utf8")), fr = JSON.parse(readFileSync("src/i18n/fr.json", "utf8"));
   for (const j of [en, fr]) assert.ok(j.offer.never_above_max_auction && j.motivation.verdict_over_max_bid && j.motivation.reason_walk_away_far);
+});
+
+check("1stDibs dealer walk-away: discounted median ceiling in shop mode only; auction/market unchanged; asking prices labelled; holdout excluded", () => {
+  const pool = dibsPool();
+  assert.ok(pool.length >= 400, `pool loaded n=${pool.length}`);
+  assert.ok(pool.every(l => l.u.startsWith("https://") && l.ask > 0 && l.src === "1stDibs"), "every comp is a 1stDibs asking price");
+  const hold = JSON.parse(readFileSync("scripts/accuracy/dibs_holdout_ids.json", "utf8"));
+  assert.equal(hold.n, hold.ids.length);
+  for (const id of hold.ids) assert.ok(!pool.some(l => l.id === String(id)), `holdout ${id} excluded from comps`);
+  assert.equal(DIBS_DISCOUNT, 0.85);
+  assert.equal(DIBS_DISCOUNT_PCT, 15);
+  assert.equal(DIBS_MIN_COMPS, 4);
+
+  const qFr = "French 18th century Louis XV walnut commode, period, three drawers, marble top, W 120 cm.";
+  const m = matchDibsComps(pool, qFr);
+  assert.ok(m.features.type === "commode");
+  assert.ok(m.comps.every(c => c.origin === "FR" || c.origin === "OTHER"));
+  assert.ok(m.comps.every(c => c.matched.includes("period") || c.matched.includes("century") || c.matched.includes("period_piece") || c.matched.includes("later_style")));
+  const one = m.comps[0];
+  if (one) {
+    const self = matchDibsComps(pool, qFr, { lotUrl: one.u }).comps;
+    assert.ok(!self.some(c => c.u === one.u || c.id === one.id), "the listing itself is never its own comparable");
+  }
+  const qUk = "Antique English Georgian oak Welsh dresser, 18th century, plate rack, 160 cm wide.";
+  const uk = matchDibsComps(pool, qUk).comps;
+  assert.ok(uk.every(c => c.origin === "UK" || c.origin === "OTHER"), "Welsh dressers are not matched to French buffets");
+
+  const mk = (asks: number[]) => asks.map((ask, i) => ({
+    id: `f_${i}`, u: `https://www.1stdibs.com/x/id-f_${i}/`, t: "commode", ask, d: "2026-11-11", src: "1stDibs" as const,
+    rg: "FR" as const, origin: "FR" as const, score: 6, matched: ["type", "period"],
+  }));
+  const asks = [4000, 5000, 6000, 8000, 9000, 10000];
+  const a = dealerWalkAwayFromDibs(mk(asks), { auctionHigh: 3000, dealerHigh: 4800, eurTo: e => e });
+  assert.equal(a.mode, "applied");
+  assert.equal(a.n, 6);
+  assert.equal(a.medianAskEur, 7000);
+  assert.equal(a.replacementAsk, 7000);
+  assert.equal(a.walkAway, 5950, `15% off 7000 rounded: ${a.walkAway}`);
+  const floored = dealerWalkAwayFromDibs(mk(asks), { auctionHigh: 8000, dealerHigh: 8000, eurTo: e => e });
+  assert.equal(floored.mode, "applied");
+  assert.equal(floored.walkAway, 8000, "walk-away never falls below the auction high");
+  const few = dealerWalkAwayFromDibs(mk([4000, 5000]), { auctionHigh: 3000, dealerHigh: 4800, eurTo: e => e });
+  assert.equal(few.mode, "too_few");
+  assert.equal(few.walkAway, 4800, "too few comps keep the current dealer high");
+  const out = dealerWalkAwayFromDibs(mk([4000, 5000, 6000, 8000, 9000, 200000]), { auctionHigh: 3000, dealerHigh: 4800, eurTo: e => e });
+  assert.ok(out.n === 5 && out.walkAway < 20000, "an outlier ask never moves the ceiling");
+  assert.equal(DIBS_MAX_UPLIFT, 1.5);
+  assert.equal(DIBS_MIN_RATIO, 2 / 3);
+  const farUp = dealerWalkAwayFromDibs(mk([20000, 22000, 24000, 26000, 28000, 30000]), { auctionHigh: 2000, dealerHigh: 4000, eurTo: e => e });
+  assert.equal(farUp.mode, "replacement_only");
+  assert.equal(farUp.walkAway, 4000, "a far higher 1stDibs median does not raise the walk-away");
+  assert.ok(farUp.replacementAsk > 20000, "replacement value is still the 1stDibs median ask");
+  const farDown = dealerWalkAwayFromDibs(mk([2000, 2200, 2400, 2600, 2800, 3000]), { auctionHigh: 2000, dealerHigh: 12000, eurTo: e => e });
+  assert.equal(farDown.mode, "replacement_only");
+  assert.equal(farDown.walkAway, 12000, "a far lower 1stDibs median does not cut a high-end dealer walk-away");
+
+  const prose = dibsCompsProse(a, { language: "en", fmt: n => `€${n}` });
+  assert.ok(/asking prices, not recorded sales/i.test(prose.lead), prose.lead);
+  assert.ok(/asking prices, not sales/i.test(String(prose.replacement)), String(prose.replacement));
+  assert.ok(!/sold|hammer|sale price/i.test(prose.lead));
+  const proseFr = dibsCompsProse(a, { language: "fr", fmt: n => `${n} €` });
+  assert.ok(/prix demandés, pas des ventes/i.test(proseFr.lead), proseFr.lead);
+  const proseTier = dibsCompsProse(farUp, { language: "en", fmt: n => `€${n}` });
+  assert.ok(/different price tier/i.test(proseTier.lead) && /asking prices, not recorded sales/i.test(proseTier.lead), proseTier.lead);
+  assert.ok(/asking prices, not sales/i.test(String(proseTier.replacement)));
+
+  const raw = () => ({ items: [{ item_summary: { title: "Louis XV walnut commode", likely_period: "Louis XV period", likely_style: "Louis XV", value_tier: "B", snap_judgement: "", confidence: "low",
+    confidence_breakdown: { evidence_quality: 10, identification_certainty: 12, risk_factors: 15 }, confidence_reason: "", period_certainty: "probable_period", reproduction_risk: false, construction_evidence: "none shown" },
+    buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 2000, estimated_market_range_high: 4000, fair_price_low: 4000, fair_price_high: 6400, good_buy_below: 3000, pricing_reasoning: "Solid provincial piece." },
+    negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
+  const dibsBody = { ok: true as const, pool: 6, comps: mk(asks) };
+  const shopCtx: any = { query: "Commode Louis XV en noyer, époque, 120 cm", hasPhotos: false, askingPrice: 5000, isAuction: false, premiumPct: 0, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Antique Shop", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture", soldComps: undefined, dibsComps: dibsBody };
+  const base: any = postProcessAppraisal(raw(), { ...shopCtx, dibsComps: undefined })[0];
+  const shop: any = postProcessAppraisal(raw(), shopCtx)[0];
+  assert.equal(shop.dibs_comps.mode, "applied");
+  assert.equal(shop.price_guidance.fair_price_high, 5950);
+  assert.equal(shop.negotiation_strategy.walk_away_price, 5950);
+  assert.equal(shop.walk_away_threshold.hammer, 5950);
+  assert.equal(shop.price_guidance.replacement_ask_median, 7000);
+  assert.ok(/asking prices, not recorded sales/i.test(shop.price_guidance.pricing_reasoning), shop.price_guidance.pricing_reasoning);
+  assert.equal(shop.price_guidance.estimated_market_range_low, base.price_guidance.estimated_market_range_low, "auction low is unchanged by the 1stDibs ceiling");
+  assert.equal(shop.price_guidance.estimated_market_range_high, base.price_guidance.estimated_market_range_high, "auction high is unchanged by the 1stDibs ceiling");
+  assert.ok(shop.price_guidance.fair_price_high !== base.price_guidance.fair_price_high, "the dealer walk-away moves when comps are sufficient");
+
+  const auc: any = postProcessAppraisal(raw(), { ...shopCtx, isAuction: true, premiumPct: 27, sellerType: "Auction", askingPrice: 3000 })[0];
+  assert.equal(auc.dibs_comps, null, "auction mode never applies the 1stDibs ceiling");
+  assert.equal(auc.price_guidance.estimated_market_range_high, base.price_guidance.estimated_market_range_high);
+  assert.equal(auc.negotiation_strategy.walk_away_price, base.price_guidance.estimated_market_range_high, "auction walk-away stays the auction high");
+  assert.equal(auc.price_guidance.replacement_ask_median, undefined);
+
+  const mktRaw: any = postProcessAppraisal(raw(), { ...shopCtx, sellerType: "Market/Fair" })[0];
+  assert.equal(mktRaw.dibs_comps, null, "market venue never applies the 1stDibs ceiling");
+  assert.equal(mktRaw.price_guidance.fair_price_high, 6400, "market leaves the dealer high untouched so venue guidance can use the auction scale");
+  const mkt = applyVenueGuidance(mktRaw);
+  assert.equal(mkt.negotiation_strategy.walk_away_price, 4000, "market walk-away stays the auction high");
+
+  const far: any = postProcessAppraisal(raw(), { ...shopCtx, dibsComps: { ok: true, pool: 6, comps: mk([20000, 22000, 24000, 26000, 28000, 30000]) } })[0];
+  assert.equal(far.dibs_comps.mode, "replacement_only");
+  assert.equal(far.price_guidance.fair_price_high, base.price_guidance.fair_price_high, "different-tier asks leave the walk-away in place");
+  assert.equal(far.negotiation_strategy.walk_away_price, base.negotiation_strategy.walk_away_price);
+  assert.ok(far.price_guidance.replacement_ask_median > 20000);
+  assert.ok(/different price tier/i.test(far.price_guidance.pricing_reasoning), far.price_guidance.pricing_reasoning);
+
+  const fallback: any = postProcessAppraisal(raw(), { ...shopCtx, dibsComps: { ok: true, pool: 2, comps: mk([4000, 5000]) } })[0];
+  assert.equal(fallback.dibs_comps.mode, "too_few");
+  assert.equal(fallback.price_guidance.fair_price_high, 6400, "too few comps keep current dealer high");
+
+  const none: any = postProcessAppraisal(raw(), { ...shopCtx, dibsComps: undefined })[0];
+  assert.equal(none.dibs_comps, null, "no lookup -> no 1stDibs section");
+
+  const h = handleDibsCompsRequest({ text: qFr });
+  assert.equal(h.status, 200); assert.ok(h.body.comps.length >= 1 && h.body.comps.every(c => c.score >= 4 && c.ask > 0));
+  assert.equal(handleDibsCompsRequest({}).status, 400);
+  const en = JSON.parse(readFileSync("src/i18n/en.json", "utf8")), fr = JSON.parse(readFileSync("src/i18n/fr.json", "utf8"));
+  assert.ok(/asking prices, not sales/i.test(en.analysis.replacement_value));
+  assert.ok(/prix demandés, pas des ventes/i.test(fr.analysis.replacement_value));
 });
