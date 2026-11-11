@@ -3,7 +3,7 @@
 // scripts/accuracy/build_sold_comps.py from Drouot and Auctionet results, fees stripped to the hammer); the app then
 // computes the range from the matched hammers here. The model never sets these figures; it only writes prose.
 
-import { countPieces } from "./makers.js";
+import { countPieces, textHasStampMark } from "./makers.js";
 
 export interface SoldLot { id: string; u: string; t: string; h: number; f?: number; d: string; src: string; house?: string; city?: string; rg: string }
 export interface SoldComp extends SoldLot { score: number; matched: string[]; pieces: number; perPieceH: number }
@@ -322,7 +322,9 @@ export interface SoldAnchor {
 /**
  * The range from the comparables' hammers (venue-aware: at auction the hammer; elsewhere the auction all-in, which the
  * dealer tier is then built on). Unstamped → anchored on the quartiles (widened to ±20% of the median at least).
- * Stamped without verified maker results → only capped (a stamp can lift a piece above its type, but not without limit).
+ * Stamped / signed without verified maker results → only capped by stamped or signed comps of the type
+ * (a stamp can lift a piece above its type, but not without limit). Unstamped comps never cap a stamped piece;
+ * if too few stamped comps remain, or they sit in a cheaper tier than the appraiser's low, the model band stays.
  */
 export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamped: boolean; isAuction: boolean; premiumPct: number; modelLow: number; modelHigh: number; eurTo: (eur: number) => number }): SoldAnchor => {
   const basis: 'hammer' | 'all_in' = o.isAuction ? 'hammer' : 'all_in';
@@ -359,11 +361,21 @@ export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamp
     return withT({ ...base, low: Math.min(round(o.modelLow), high), high, medianHammerEur, n: close.length, used: close, mode: 'capped', note: 'type_capped' });
   }
   if (o.stamped) {
-    const cap = o.eurTo(quantile(vals, 0.75) * STAMP_CAP_MULT);
-    if (!(o.modelHigh > cap)) return { ...base, medianHammerEur, mode: 'none', note: 'within_cap' };
+    // Only stamped / signed comps may cap a stamped or signed piece. Cheap unstamped size-matches
+    // (a modern desk, a later utility piece) are a different quality tier and must not pull the range down.
+    const marked = comps.filter(c => textHasStampMark(c.t));
+    if (marked.length < MIN_ANCHOR_COMPS) {
+      return { ...base, medianHammerEur, n: marked.length, used: comps, mode: 'too_few', note: 'too_few_stamped' };
+    }
+    const mvals = marked.map(c => c.perPieceH * n * fee(c));
+    const cap = o.eurTo(quantile(mvals, 0.75) * STAMP_CAP_MULT);
+    // If even the cap sits below the appraiser's low, the stamped comps are a cheaper tier: do not cap.
+    if (cap < o.modelLow) return { ...base, medianHammerEur, n: marked.length, used: marked, mode: 'none', note: 'not_close' };
+    if (!(o.modelHigh > cap)) return { ...base, medianHammerEur, n: marked.length, used: marked, mode: 'none', note: 'within_cap' };
     const high = round(cap);
-    const low = round(Math.min(o.modelLow, Math.max(hi, high / 3)));
-    return { ...base, low: Math.min(low, high), high, medianHammerEur, mode: 'capped', note: o.stamped ? 'stamp_capped' : 'type_capped' };
+    const mhi = o.eurTo(Math.max(quantile(mvals, 0.75), quantile(mvals, 0.5) * 1.2));
+    const low = round(Math.min(o.modelLow, Math.max(mhi, high / 3)));
+    return { ...base, low: Math.min(low, high), high, medianHammerEur, n: marked.length, used: marked, mode: 'capped', note: 'stamp_capped' };
   }
   // Blend with the appraiser's range in log space: more (and tighter) comparables weigh more; never fully replace it,
   // since a description match cannot see quality, condition or size the way the appraisal does.
@@ -404,6 +416,16 @@ export const soldCompsProse = (a: SoldAnchor, o: { language: string; isAuction: 
   };
   if (a.note === 'not_close') return { lead: '', note: fr ? `${a.n} ventes du type listées pour référence (médiane ${med} au marteau) : trop disparates ou d'une autre gamme pour fixer la fourchette, qui reste l'estimation de l'expert.` : `${a.n} sales of the type listed for reference (median ${med} hammer): too varied or a different quality tier to set the range, which stays the appraiser's estimate.` };
   if (a.note === 'within_cap') return { lead: '', note: fr ? `Fourchette cohérente avec ${a.n} ventes comparables du type (médiane ${med} au marteau).` : `Range consistent with ${a.n} comparable sales of the type (median ${med} hammer).` };
+  if (a.note === 'too_few_stamped') return {
+    lead: '',
+    note: fr
+      ? (a.n > 0
+          ? `Confiance limitée : seulement ${a.n} vente${a.n > 1 ? 's' : ''} estampillée${a.n > 1 ? 's' : ''} comparable${a.n > 1 ? 's' : ''} (médiane ${med} au marteau) ; les lots non estampillés ne plafonnent pas une pièce estampillée ou signée. La fourchette reste l'estimation de l'expert.`
+          : `Confiance limitée : les ventes comparables du type ne sont pas estampillées ; elles ne plafonnent pas une pièce estampillée ou signée. La fourchette reste l'estimation de l'expert.`)
+      : (a.n > 0
+          ? `Limited confidence: only ${a.n} stamped comparable sale${a.n > 1 ? 's' : ''} (median ${med} hammer); unstamped lots cannot cap a stamped or signed piece. The range is the appraiser's estimate.`
+          : `Limited confidence: the comparable sales of the type are unstamped, so they cannot cap a stamped or signed piece. The range is the appraiser's estimate.`),
+  };
   const few = a.mode === 'too_few' && a.n > 0;
   const note = few
     ? (fr ? `Confiance faible : seulement ${a.n} vente${a.n > 1 ? 's' : ''} comparable${a.n > 1 ? 's' : ''} (médiane ${med} au marteau) ; la fourchette reste l'estimation de l'expert.`

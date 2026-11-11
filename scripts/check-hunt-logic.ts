@@ -13,6 +13,7 @@ import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APP
 import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
 import { postProcessAppraisal, stripModelPrices, stripPriceSentences } from "../src/services/gemini.ts";
 import { matchSoldComps, anchorOnSoldComps, pieceFeatures, MIN_ANCHOR_COMPS, dimensionsOf, sizeOf, scoreLot, tightenRange, TIGHTEN_CFG } from "../src/services/soldComps.ts";
+import { textHasStampMark } from "../src/services/makers.ts";
 import { handleSoldCompsRequest, soldPool } from "../src/services/soldCompsHandler.ts";
 import { matchDibsComps, dealerWalkAwayFromDibs, dibsCompsProse, DIBS_DISCOUNT, DIBS_DISCOUNT_PCT, DIBS_MIN_COMPS, DIBS_MAX_UPLIFT, DIBS_MIN_RATIO } from "../src/services/dibsComps.ts";
 import { handleDibsCompsRequest, dibsPool } from "../src/services/dibsCompsHandler.ts";
@@ -2175,8 +2176,8 @@ check("sold comparables: matched by type/period/material, self excluded, range i
   assert.ok(d.high > a.high, "shop/dealer basis sits above the hammer");
   const out = anchorOnSoldComps(mk([300, 400, 500, 600, 700, 90000]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 0, modelHigh: 0, eurTo: e => e });
   assert.ok(out.high < 1000 && out.n === 5, "an outlier never moves the range");
-  const st = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: true, isAuction: true, premiumPct: 27, modelLow: 4000, modelHigh: 8000, eurTo: e => e });
-  assert.equal(st.mode, "capped"); assert.ok(st.high <= 1800, `stamp cap ${st.high}`);
+  const stCheap = anchorOnSoldComps(mk([300, 400, 500, 600, 700]), { stamped: true, isAuction: true, premiumPct: 27, modelLow: 4000, modelHigh: 8000, eurTo: e => e });
+  assert.ok(stCheap.mode !== "capped" && stCheap.high === 8000, `unstamped comps must not cap a stamped piece (${stCheap.mode} ${stCheap.high})`);
   assert.equal(anchorOnSoldComps(mk([300, 400]), { stamped: false, isAuction: true, premiumPct: 27, modelLow: 2000, modelHigh: 5000, eurTo: e => e }).mode, "too_few");
   assert.equal(MIN_ANCHOR_COMPS, 4);
   const raw = () => ({ items: [{ item_summary: { title: "Louis XV walnut commode", likely_period: "Louis XV period", likely_style: "Louis XV", value_tier: "B", snap_judgement: "", confidence: "low",
@@ -2198,6 +2199,59 @@ check("sold comparables: matched by type/period/material, self excluded, range i
   const h = handleSoldCompsRequest({ text: "Commode d'époque Louis XV en noyer" });
   assert.equal(h.status, 200); assert.ok(h.body.comps.length >= 1 && h.body.comps.every(c => c.score >= 4));
   assert.equal(handleSoldCompsRequest({}).status, 400);
+});
+
+check("stamped or signed pieces are only capped by stamped comps, never by cheaper unstamped size-matches", () => {
+  assert.equal(textHasStampMark("Estampille P. MIGEON et poinçon de jurande (JME)"), true);
+  assert.equal(textHasStampMark("Signée sur la platine Paul Sormani"), true);
+  assert.equal(textHasStampMark("Commode estampillée J.B. Vassou & JME"), true);
+  assert.equal(textHasStampMark("TRAVAIL MODERNE Bureau plat en placage"), false);
+  assert.equal(textHasStampMark("Petit bureau design en aluminium"), false);
+  const mk = (rows: { h: number; t: string }[]) => rows.map((r, i) => ({ id: String(i), u: `https://x/${i}`, t: r.t, h: r.h, d: "2026-09-10", src: "drouot", rg: "FR", score: 6, matched: ["type", "period"], pieces: 1, perPieceH: r.h }));
+  const unstamped = mk([300, 400, 500, 600, 700].map(h => ({ h, t: "Bureau plat en bois de placage, 77 x 147 cm" })));
+  const cheapStamped = mk([300, 400, 500, 600, 700].map(h => ({ h, t: "Bureau plat estampillé d'un maître inconnu, 77 x 147 cm" })));
+  const mixed = mk([
+    { h: 300, t: "TRAVAIL MODERNE Bureau plat en placage" },
+    { h: 77, t: "Bureau en bois de placage, un tiroir" },
+    { h: 504, t: "Petit bureau design en aluminium" },
+    { h: 133, t: "Bureau plat en bois clair à 11 tiroirs" },
+  ]);
+  const enoughStamped = mk([
+    { h: 1800, t: "Bureau plat estampillé, Louis XV, marqueterie" },
+    { h: 2000, t: "Bureau plat stamped by a Paris maître, gilt bronze" },
+    { h: 2200, t: "Bureau plat signé, plateau de cuir, 80 x 150 cm" },
+    { h: 2500, t: "Bureau plat d'époque Louis XV, estampille et JME" },
+    { h: 400, t: "Bureau plat en bois de placage, sans estampille" },
+  ]);
+  const o = { stamped: true, isAuction: true, premiumPct: 27, modelLow: 2500, modelHigh: 6000, eurTo: (e: number) => e };
+  const skipU = anchorOnSoldComps(unstamped, o);
+  assert.notEqual(skipU.mode, "capped"); assert.equal(skipU.high, 6000); assert.equal(skipU.low, 2500);
+  assert.equal(skipU.note, "too_few_stamped");
+  const skipM = anchorOnSoldComps(mixed, o);
+  assert.notEqual(skipM.mode, "capped"); assert.equal(skipM.high, 6000);
+  // Cheaper-tier stamped comps (3× P75 still below the appraiser's low) do not pull the range down
+  const skipTier = anchorOnSoldComps(cheapStamped, { ...o, modelLow: 4000, modelHigh: 8000 });
+  assert.notEqual(skipTier.mode, "capped"); assert.equal(skipTier.high, 8000);
+  // Enough same-tier stamped comps may still cap an optimistic high
+  const cap = anchorOnSoldComps(enoughStamped, { ...o, modelLow: 2500, modelHigh: 12000 });
+  assert.equal(cap.mode, "capped");
+  assert.ok(cap.high < 12000 && cap.high >= 2500, `same-tier stamp cap ${cap.high}`);
+  assert.ok(cap.n >= 4 && cap.used.every(c => textHasStampMark(c.t)), "only stamped comps used to cap");
+  // Wired into post-processing: a stamped desk keeps the model band when comps are unstamped, verdict stays decisive
+  const raw = () => ({ items: [{ item_summary: { title: "Louis XV bureau plat stamped P. Migeon", likely_period: "Louis XV period", likely_style: "Louis XV", value_tier: "B", snap_judgement: "", confidence: "low",
+    confidence_breakdown: { evidence_quality: 10, identification_certainty: 12, risk_factors: 15 }, confidence_reason: "", period_certainty: "probable_period", reproduction_risk: false, construction_evidence: "none shown",
+    maker: { name: "Pierre Migeon", status: "stamped_stated" } },
+    buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 2500, estimated_market_range_high: 6000, fair_price_low: 6000, fair_price_high: 12000, pricing_reasoning: "Period stamped desk." },
+    negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
+  const ctx: any = { query: "Bureau plat d'époque Louis XV. Estampille P. MIGEON et poinçon de jurande (JME). 77,5 x 147 x 76 cm.", hasPhotos: false, askingPrice: 5000, isAuction: true, premiumPct: 27, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture",
+    soldComps: { ok: true, pool: 4, comps: mixed } };
+  const r: any = postProcessAppraisal(raw(), ctx)[0];
+  assert.equal(r.price_guidance.estimated_market_range_high, 6000);
+  assert.equal(r.price_guidance.estimated_market_range_low, 2500);
+  assert.equal(r.walk_away_threshold.hammer, 6000);
+  assert.notEqual(r.sold_comps.mode, "capped");
+  assert.notEqual(r.buy_decision.price_basis, "need_evidence");
+  assert.ok(/cannot cap a stamped or signed piece|appraiser's estimate/i.test(r.sold_comps.note + r.price_guidance.pricing_reasoning), r.sold_comps.note);
 });
 
 check("dimensions: H/W/D in cm or inches, labelled or HxWxD, used in size matching; years ignored", () => {

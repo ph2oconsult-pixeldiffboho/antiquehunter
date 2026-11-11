@@ -79,6 +79,9 @@ export const findMaker = (text: string): Maker | null => {
 const LABEL_RE = /\b(label|etiquette|ticket|tag|card)\b|dealer\s+(says|said|claims)|selon\s+le\s+(marchand|vendeur)|d'apres\s+le\s+(marchand|vendeur)/;
 const ATTR_RE = /\b(attribu\w*|attr\.|workshop|atelier|entourage|circle\s+of|manner\s+of|dans\s+le\s+gout|in\s+the\s+style|style\s+of|follower|suiveur|probably|probablement|possibly|peut[\s-]etre|modele\s+repertorie)\b/;
 const STAMP_RE = /\b(estampill\w*|stamped|stamp|stamps|signed|signe|signee|branded|marque\s+au\s+fer|poincon\w*|stampel\w*|stamplad\w*)\b/;
+
+/** Catalogue wording that marks a lot as stamped, signed or branded (same tokens as maker-status detection). */
+export const textHasStampMark = (text: string): boolean => STAMP_RE.test(fold(text));
 const CONFIRM_RE = /\b(confirmed|confirme\w*|verified|verifie\w*|checked|i\s+(saw|have\s+seen|checked)|seen\s+(it|the\s+stamp)|visible|lisible|legible|present\s+on\s+(each|every|all)|sur\s+chaque|on\s+each)\b/;
 
 /**
