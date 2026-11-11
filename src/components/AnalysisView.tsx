@@ -1138,6 +1138,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
           {dealerScale && (
             <p className="text-xs text-ink leading-relaxed" data-testid="dealer-scale-note">{t('analysis.dealer_scale_note')}</p>
           )}
+          {dealerScale && Number(currentItem.price_guidance?.replacement_ask_median) > 0 && (
+            <p className="text-xs text-ink leading-relaxed" data-testid="replacement-ask">
+              {t('analysis.replacement_value', {
+                price: formatPrice(currentItem.price_guidance.replacement_ask_median),
+                n: currentItem.price_guidance.replacement_ask_n || currentItem.dibs_comps?.n || 0,
+              })}
+            </p>
+          )}
           <p className="text-xs text-muted leading-relaxed border-t border-border-custom pt-4 italic">
             {currentItem.price_guidance.pricing_reasoning}
           </p>

@@ -195,6 +195,7 @@
     "market_bargain_band": "Fourchette « bonne affaire » (brocante)",
     "venue_note_market": "En brocante ou aux puces, on peut trouver des affaires sous le niveau des enchères, mais la qualité n'est pas garantie : ni provenance, ni garantie, état en l'état.",
     "venue_note_dealer": "Un antiquaire coûte plus cher que les enchères, mais la qualité est en général mieux garantie : provenance, garantie et restauration professionnelle sont comprises dans le prix.",
+    "replacement_value": "Valeur de remplacement chez un marchand haut de gamme : {{price}} (prix demandé médian sur 1stDibs pour {{n}} pièces similaires ; prix demandés, pas des ventes).",
     "reason_market_strong_buy": "{{price}} est au niveau ou sous le bas des enchères ({{bargainLow}}) : une vraie affaire.",
     "reason_market_good_buy": "{{price}} est dans la fourchette « bonne affaire » ({{bargainLow}}–{{bargainHigh}}).",
     "reason_market_fair": "{{price}} dépasse la fourchette « bonne affaire » mais reste sous le prix plafond (haut des enchères, {{walkAway}}).",

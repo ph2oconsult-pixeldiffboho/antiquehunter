@@ -18,6 +18,10 @@
     "api/sold-comps.ts": {
       "maxDuration": 10,
       "includeFiles": "src/data/soldComps.json"
+    },
+    "api/dibs-comps.ts": {
+      "maxDuration": 10,
+      "includeFiles": "src/data/dibsComps.json"
     }
   }
 }

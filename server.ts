@@ -9,6 +9,7 @@ import { handleHuntRequest } from "./src/services/huntHandler.ts";
 import { fetchLotFacts } from "./src/services/lotFetch.ts";
 import { handleCompsRequest } from "./src/services/compsSearch.ts";
 import { handleSoldCompsRequest } from "./src/services/soldCompsHandler.ts";
+import { handleDibsCompsRequest } from "./src/services/dibsCompsHandler.ts";
 import { handleAppraiseRequest } from "./src/services/appraiseHandler.ts";
 import { handleRangeClear } from "./src/services/rangeAdmin.ts";
 
@@ -35,6 +36,12 @@ async function startServer() {
 
   app.post("/api/sold-comps", (req, res) => {
     const { status, body } = handleSoldCompsRequest(req.body);
+    res.setHeader("Cache-Control", "no-store");
+    res.status(status).json(body);
+  });
+
+  app.post("/api/dibs-comps", (req, res) => {
+    const { status, body } = handleDibsCompsRequest(req.body);
     res.setHeader("Cache-Control", "no-store");
     res.status(status).json(body);
   });
