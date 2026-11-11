@@ -256,10 +256,67 @@ export const BLEND_K = 6;
 export const BLEND_MAX = 0.6;
 export const BLEND_DISP = 2.5;
 
+/**
+ * When close sold comps (same type, market and period or century) are dense and not too dispersed,
+ * narrow the displayed range toward their spread after calibration. Never widens; sparse or
+ * mismatched-tier cases are unchanged. Defaults were picked on sha256(id) mod 3 == 1 of the
+ * non-sealed replay set (sha256(id) mod 3 == 1) and reported on the other half (mod 3 == 2);
+ * sealed lots (mod 3 == 0) were not used. Chosen so harmful-high, walk-away safety, overpriced-floor
+ * and in-range were unchanged on the train half; maxW 0.5 and onlyLowerHighIfAboveMult 2 were the
+ * strongest narrowing that kept those rates flat.
+ */
+export const TIGHTEN_CFG = {
+  enabled: true,
+  minClose: 4,
+  maxDisp: 3,
+  /** Comps IQR must overlap the current range (same quality tier). */
+  requireOverlap: true,
+  loQ: 0.1,
+  hiQ: 0.9,
+  lowPad: 0.8,
+  highPad: 1.2,
+  highMult: 1,
+  minWidthRatio: 2,
+  maxW: 0.5,
+  /** Only lower the high when it sits at least this multiple of the target high. */
+  onlyLowerHighIfAboveMult: 2,
+};
+
+/**
+ * Narrow [modelLow, modelHigh] toward the comps' spread. Never widens. Returns null when the
+ * comps are too few or too dispersed, when they sit in a different quality tier, or when the
+ * range is already as tight as the target.
+ */
+export const tightenRange = (vals: number[], o: { modelLow: number; modelHigh: number }): { low: number; high: number; weight: number } | null => {
+  const C = TIGHTEN_CFG;
+  if (!C.enabled || vals.length < C.minClose || !(o.modelLow > 0) || !(o.modelHigh > o.modelLow)) return null;
+  const p25 = quantile(vals, 0.25), p75 = quantile(vals, 0.75), med = quantile(vals, 0.5);
+  if (!(p25 > 0) || p75 < p25) return null;
+  const disp = p75 / Math.max(1, p25);
+  if (disp > C.maxDisp) return null;
+  if (C.requireOverlap && (p75 < o.modelLow || p25 > o.modelHigh)) return null;
+  let tLo = Math.min(quantile(vals, C.loQ), med * C.lowPad);
+  let tHi = Math.max(quantile(vals, C.hiQ) * C.highMult, med * C.highPad);
+  if (tHi / Math.max(1, tLo) < C.minWidthRatio) tHi = Math.max(tHi, tLo * C.minWidthRatio);
+  const w = Math.max(0, Math.min(1, C.maxW));
+  let low = o.modelLow, high = o.modelHigh;
+  if (tLo > o.modelLow) low = o.modelLow + w * (tLo - o.modelLow);
+  if (tHi < o.modelHigh && o.modelHigh + 1e-9 >= tHi * C.onlyLowerHighIfAboveMult) high = o.modelHigh + w * (tHi - o.modelHigh);
+  low = round(low); high = round(Math.max(low + 1, high));
+  // never widen after rounding
+  low = Math.max(low, round(o.modelLow));
+  high = Math.min(high, round(o.modelHigh));
+  if (!(high > low) || (low <= round(o.modelLow) && high >= round(o.modelHigh))) return null;
+  return { low, high, weight: w };
+};
+
 export type SoldAnchorMode = 'anchored' | 'capped' | 'too_few' | 'none';
 export interface SoldAnchor {
   mode: SoldAnchorMode; low: number; high: number; used: SoldComp[]; medianHammerEur: number; n: number;
   basis: 'hammer' | 'all_in'; note: string; weight?: number;
+  /** Close-comp values in the display currency (fee-adjusted), for a late tighten against the calibrated range. */
+  tightenVals?: number[];
+  tightened?: boolean;
 }
 
 /**
@@ -280,7 +337,11 @@ export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamp
   const vals = comps.map(c => c.perPieceH * n * fee(c));
   const med = quantile(vals, 0.5);
   const medianHammerEur = Math.round(quantile(comps.map(c => c.perPieceH * n), 0.5));
-  if (comps.length < MIN_ANCHOR_COMPS) return { ...base, medianHammerEur, mode: 'too_few', note: 'too_few' };
+  const close0 = comps.filter(c => c.matched.includes('period') || c.matched.includes('century'));
+  const tightenVals = !o.stamped && close0.length >= TIGHTEN_CFG.minClose
+    ? close0.map(c => o.eurTo(c.perPieceH * n * fee(c))) : undefined;
+  const withT = (a: SoldAnchor): SoldAnchor => tightenVals ? { ...a, tightenVals } : a;
+  if (comps.length < MIN_ANCHOR_COMPS) return withT({ ...base, medianHammerEur, mode: 'too_few', note: 'too_few' });
   const lo = o.eurTo(Math.min(quantile(vals, 0.25), med * 0.8));
   const hi = o.eurTo(Math.max(quantile(vals, 0.75), med * 1.2));
   // Unstamped with an appraiser range: same cap rule as a stamp (measured: blending the noisy comps median in lowered
@@ -291,11 +352,11 @@ export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamp
     const disp = cv.length ? quantile(cv, 0.75) / Math.max(1, quantile(cv, 0.25)) : Infinity;
     const cmed = cv.length ? o.eurTo(quantile(cv, 0.5)) : 0;
     if (close.length < SOLD_CFG.minClose || disp > SOLD_CFG.maxDisp || (SOLD_CFG.skipRatio > 0 && cmed * SOLD_CFG.skipRatio < o.modelLow))
-      return { ...base, ...(close.length < SOLD_CFG.minClose ? { n: close.length, used: close } : {}), medianHammerEur, mode: close.length < SOLD_CFG.minClose ? 'too_few' : 'none', note: close.length < SOLD_CFG.minClose ? 'too_few' : 'not_close' };
+      return withT({ ...base, ...(close.length < SOLD_CFG.minClose ? { n: close.length, used: close } : {}), medianHammerEur, mode: close.length < SOLD_CFG.minClose ? 'too_few' : 'none', note: close.length < SOLD_CFG.minClose ? 'too_few' : 'not_close' });
     const cap = Math.max(o.eurTo(quantile(cv, 0.75) * SOLD_CFG.capMult), o.modelHigh * SOLD_CFG.minHighShare);
-    if (!(o.modelHigh > cap)) return { ...base, medianHammerEur, mode: 'none', note: 'within_cap' };
+    if (!(o.modelHigh > cap)) return withT({ ...base, medianHammerEur, mode: 'none', note: 'within_cap' });
     const high = round(cap);
-    return { ...base, low: Math.min(round(o.modelLow), high), high, medianHammerEur, n: close.length, used: close, mode: 'capped', note: 'type_capped' };
+    return withT({ ...base, low: Math.min(round(o.modelLow), high), high, medianHammerEur, n: close.length, used: close, mode: 'capped', note: 'type_capped' });
   }
   if (o.stamped) {
     const cap = o.eurTo(quantile(vals, 0.75) * STAMP_CAP_MULT);
@@ -310,7 +371,7 @@ export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamp
   const w = o.modelLow > 0 && o.modelHigh > 0 ? Math.min(BLEND_MAX, comps.length / (comps.length + BLEND_K)) * Math.min(1, BLEND_DISP / disp) : 1;
   const mix = (m: number, c: number) => Math.exp((1 - w) * Math.log(Math.max(1, m)) + w * Math.log(Math.max(1, c)));
   const low = round(o.modelLow > 0 ? mix(o.modelLow, lo) : lo), high = round(o.modelHigh > 0 ? mix(o.modelHigh, hi) : hi);
-  return { ...base, low, high: Math.max(low, high), medianHammerEur, mode: 'anchored', note: 'anchored', weight: Math.round(w * 100) / 100 };
+  return withT({ ...base, low, high: Math.max(low, high), medianHammerEur, mode: 'anchored', note: 'anchored', weight: Math.round(w * 100) / 100 });
 };
 
 /**
@@ -321,6 +382,11 @@ export const soldCompsProse = (a: SoldAnchor, o: { language: string; isAuction: 
   const fr = String(o.language || '').toLowerCase().startsWith('fr');
   const med = a.medianHammerEur ? o.fmt(a.medianHammerEur) : '';
   const basis = fr ? (o.isAuction ? 'au marteau' : 'frais inclus') : (o.isAuction ? 'hammer' : 'incl. buyer fees');
+  if (a.tightened) return {
+    lead: fr ? `Fourchette resserrée sur la dispersion de ${a.tightenVals?.length ?? a.n} ventes comparables proches (même type, origine et époque ; médiane ${med} au marteau, frais retirés), en ${basis}.`
+             : `Range narrowed to the spread of ${a.tightenVals?.length ?? a.n} close comparable sales (same type, origin and period; median ${med} hammer, fees stripped), shown ${basis}.`,
+    note: (a.tightenVals?.length ?? a.n) < 6 ? (fr ? `Confiance modérée : ${a.tightenVals?.length ?? a.n} comparables seulement.` : `Moderate confidence: only ${a.tightenVals?.length ?? a.n} comparables.`) : null,
+  };
   if (a.mode === 'anchored') return {
     lead: fr ? `Fourchette calculée sur ${a.n} ventes comparables (même type, époque/style et matériaux ; médiane ${med} au marteau, frais retirés), en ${basis}.`
              : `Range computed from ${a.n} comparable sales (same type, period/style and materials; median ${med} hammer, fees stripped), shown ${basis}.`,

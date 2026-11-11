@@ -12,7 +12,7 @@ import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services
 import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS, CALL_TIMEOUT_MS, TOTAL_BUDGET_MS, callTimeoutFor } from "../src/services/appraiseHandler.ts";
 import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
 import { postProcessAppraisal, stripModelPrices, stripPriceSentences } from "../src/services/gemini.ts";
-import { matchSoldComps, anchorOnSoldComps, pieceFeatures, MIN_ANCHOR_COMPS, dimensionsOf, sizeOf, scoreLot } from "../src/services/soldComps.ts";
+import { matchSoldComps, anchorOnSoldComps, pieceFeatures, MIN_ANCHOR_COMPS, dimensionsOf, sizeOf, scoreLot, tightenRange, TIGHTEN_CFG } from "../src/services/soldComps.ts";
 import { handleSoldCompsRequest, soldPool } from "../src/services/soldCompsHandler.ts";
 import { matchDibsComps, dealerWalkAwayFromDibs, dibsCompsProse, DIBS_DISCOUNT, DIBS_DISCOUNT_PCT, DIBS_MIN_COMPS, DIBS_MAX_UPLIFT, DIBS_MIN_RATIO } from "../src/services/dibsComps.ts";
 import { handleDibsCompsRequest, dibsPool } from "../src/services/dibsCompsHandler.ts";
@@ -2254,6 +2254,46 @@ check("thin text-only nudge is optional and non-blocking; appraisal still gives 
   const src = readFileSync("src/components/AnalysisView.tsx", "utf8");
   assert.match(src, /data-testid="thin-text-nudge"/);
 });
+
+check("dense sold comps tighten a wide range toward the IQR, never widen, leave sparse or other-tier cases alone", () => {
+  const tight = [80, 90, 100, 110, 120, 130];
+  const t = tightenRange(tight, { modelLow: 40, modelHigh: 500 });
+  assert.ok(t, "dense same-tier comps should tighten");
+  assert.ok(t!.low >= 40 && t!.high <= 500 && t!.high > t!.low, `${t!.low}-${t!.high}`);
+  assert.ok((t!.high / t!.low) < (500 / 40), "width narrows");
+  assert.equal(tightenRange(tight, { modelLow: 90, modelHigh: 120 }), null, "already tight: no change");
+  assert.equal(tightenRange([80, 90, 100], { modelLow: 40, modelHigh: 500 }), null, "too few close comps");
+  const wide = [50, 80, 100, 400, 500, 600];
+  assert.ok(wide[5] / wide[0] > 3);
+  const d = 400 / 80; // p75/p25 of this set is not precomputed here; force a clearly dispersed set
+  const dispersed = tightenRange([100, 120, 140, 800, 900, 1000], { modelLow: 80, modelHigh: 2000 });
+  assert.equal(dispersed, null, "dispersed comps never tighten");
+  assert.equal(tightenRange(tight, { modelLow: 2000, modelHigh: 5000 }), null, "comps in a cheaper tier do not raise or shift the range");
+  // never widens: a range already inside the comps spread stays or shrinks
+  const inner = tightenRange(tight, { modelLow: 50, modelHigh: 200 });
+  if (inner) assert.ok(inner.low >= 50 && inner.high <= 200);
+  // wired into post-processing: walk-away follows the tightened high, verdict stays decisive
+  const mk = (h: number[]) => h.map((x, i) => ({ id: String(i), u: `https://x/${i}`, t: "commode", h: x, d: "2026-09-10", src: "drouot", rg: "FR", score: 6, matched: ["type", "period"], pieces: 1, perPieceH: x }));
+  const raw = () => ({ items: [{ item_summary: { title: "Louis XV walnut commode", likely_period: "Louis XV period", likely_style: "Louis XV", value_tier: "B", snap_judgement: "", confidence: "low",
+    confidence_breakdown: { evidence_quality: 10, identification_certainty: 12, risk_factors: 15 }, confidence_reason: "", period_certainty: "probable_period", reproduction_risk: false, construction_evidence: "none shown" },
+    buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 40, estimated_market_range_high: 500, fair_price_low: 80, fair_price_high: 1000, pricing_reasoning: "Solid provincial piece." },
+    negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
+  const ctx: any = { query: "Commode Louis XV en noyer, H. 90 x L. 110 x P. 55 cm", hasPhotos: true, askingPrice: 150, isAuction: true, premiumPct: 27, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture",
+    soldComps: { ok: true, pool: 6, comps: mk(tight) } };
+  const r: any = postProcessAppraisal(raw(), ctx)[0];
+  assert.ok(r.price_guidance.estimated_market_range_high < 500, `high ${r.price_guidance.estimated_market_range_high}`);
+  assert.ok(r.price_guidance.estimated_market_range_low >= 40);
+  assert.equal(r.walk_away_threshold.hammer, r.price_guidance.estimated_market_range_high, "walk-away follows the tightened high");
+  assert.equal(r.sold_comps.mode, "tightened");
+  assert.ok(/close comparable sales/.test(r.price_guidance.pricing_reasoning), r.price_guidance.pricing_reasoning);
+  assert.notEqual(r.buy_decision.price_basis, "need_evidence");
+  const sparse: any = postProcessAppraisal(raw(), { ...ctx, soldComps: { ok: true, pool: 2, comps: mk([90, 100]) } })[0];
+  assert.notEqual(sparse.sold_comps.mode, "tightened");
+  assert.equal(sparse.price_guidance.estimated_market_range_high >= 500 || sparse.sold_comps.mode === "too_few", true);
+  assert.notEqual(sparse.buy_decision.price_basis, "need_evidence");
+  assert.equal(typeof TIGHTEN_CFG.minClose, "number");
+});
+
 console.log(`
 ${passed} checks passed`);
 
