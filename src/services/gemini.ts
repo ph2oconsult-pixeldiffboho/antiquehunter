@@ -11,9 +11,9 @@ import {
 } from "./appraisalMath";
 import { lotFactsPrompt, type LotFacts } from "./lotFacts";
 import { convertApprox } from "./budget";
-import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
+import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, textHasStampMark, type MakerMatch } from "./makers";
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
-import { calibrateRange } from "./thinEvidence";
+import { calibrateRange, isThinTextInput } from "./thinEvidence";
 import { anchorOnSoldComps, soldCompsProse, tightenRange, type SoldCompsResponse } from "./soldComps";
 import { dealerWalkAwayFromDibs, dibsCompsProse, type DibsCompsResponse } from "./dibsComps";
 import { buildNegotiationPlan } from "./negotiation";
@@ -718,7 +718,8 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     // No verified maker anchor: the sold comparables (same type, period/style, materials, market) set the range in code
     // (unstamped: anchored on them; stamped without maker results: capped at a multiple of them). Model figures stay
     // only when there are too few comparables, with a confidence note.
-    const stampedEarly = !!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo'].includes(maker.status);
+    const stampedEarly = (!!maker && ['stamped_confirmed', 'stamped_stated', 'stamp_in_photo', 'attributed', 'dealer_label'].includes(maker.status))
+      || textHasStampMark(`${query || ''} ${lotFacts?.ok ? `${lotFacts.title || ''} ${lotFacts.description || ''}` : ''}`);
     const sold = soldComps === undefined || anchor.applied ? null : anchorOnSoldComps(soldComps?.ok ? soldComps.comps : [], {
       pieces, stamped: stampedEarly, isAuction, premiumPct, eurTo: toTarget,
       modelLow: Number(pgA.estimated_market_range_low) || 0, modelHigh: Number(pgA.estimated_market_range_high) || 0 });
@@ -1053,6 +1054,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     return {
       ...item,
       negotiation_plan: negotiationPlan,
+      thin_text_nudge: isThinTextInput({ text: query, hasPhotos, extraText: lotFacts?.ok ? `${lotFacts.title || ''} ${lotFacts.description || ''}` : '' }),
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
       sold_comps: sold ? {

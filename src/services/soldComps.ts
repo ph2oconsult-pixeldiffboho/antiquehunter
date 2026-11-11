@@ -3,7 +3,7 @@
 // scripts/accuracy/build_sold_comps.py from Drouot and Auctionet results, fees stripped to the hammer); the app then
 // computes the range from the matched hammers here. The model never sets these figures; it only writes prose.
 
-import { countPieces } from "./makers.js";
+import { countPieces, textHasStampMark } from "./makers.js";
 
 export interface SoldLot { id: string; u: string; t: string; h: number; f?: number; d: string; src: string; house?: string; city?: string; rg: string }
 export interface SoldComp extends SoldLot { score: number; matched: string[]; pieces: number; perPieceH: number }
@@ -56,16 +56,90 @@ const REGIONAL = /\b(lyonnais\w*|provencal\w*|dauphinois\w*|bordelais\w*|normand
 const STYLE_ONLY = /(\bde\s+style\b|\bdans\s+le\s+style\b|\bin\s+the\s+style\b|\bstyle\s+(louis|empire|regence|napoleon|directoire|restauration|transition|gustav)|[\s-]style\b|\w+-stil\b|\bstil\b)/;
 const PERIOD_WORD = /(\bd'?\s?epoque\b|\bperiod\b|\bepoque\s+(louis|regence|transition|empire|directoire|restauration|napoleon))/;
 
-/** Largest catalogue dimension in cm ("H. 120 cm", "87 x 44 cm", "höjd 77 cm"); null when none is given. */
-export const sizeOf = (t: string): number | null => {
-  const nums: number[] = [];
-  for (const m of t.matchAll(/(\d{2,3}(?:[.,]\d)?)\s*(?:x\s*(\d{2,3}(?:[.,]\d)?)\s*)?(?:x\s*(\d{2,3}(?:[.,]\d)?)\s*)?cm\b/g))
-    for (const g of [m[1], m[2], m[3]]) if (g) nums.push(Number(g.replace(',', '.')));
-  const big = nums.filter(n => n >= 15 && n <= 400);
-  return big.length ? Math.max(...big) : null;
+export interface PieceSize { h: number | null; w: number | null; d: number | null; max: number }
+
+const inCmRange = (cm: number) => cm >= 15 && cm <= 400;
+const parseNum = (s: string) => Number(String(s).replace(',', '.'));
+const asCm = (n: number, unit: 'cm' | 'mm' | 'in'): number | null => {
+  const cm = unit === 'in' ? n * 2.54 : unit === 'mm' ? n / 10 : n;
+  return inCmRange(cm) ? Math.round(cm * 10) / 10 : null;
+};
+const parseUnit = (s?: string | null): 'cm' | 'mm' | 'in' | null => {
+  if (!s) return null;
+  const u = fold(s);
+  if (/^(pouces?|in(?:ches?)?|"|”)$/.test(u)) return 'in';
+  if (/^(mm|millimetres?)$/.test(u)) return 'mm';
+  if (/^(cm|cms|centimetres?)$/.test(u)) return 'cm';
+  return null;
+};
+const slotOf = (lab?: string | null): 'h' | 'w' | 'd' | null => {
+  if (!lab) return null;
+  const l = fold(lab).replace(/[^a-z]/g, '');
+  if (/^(h|haut|hauteur|height|hojd|hohe|alto|high)$/.test(l)) return 'h';
+  if (/^(l|larg|largeur|width|bredd|breite|ancho|langd|lange|length|w|wide)$/.test(l)) return 'w';
+  if (/^(p|prof|profondeur|depth|djup|tiefe|fondo|dia|diameter|d|deep)$/.test(l)) return 'd';
+  return null;
+};
+const NORDIC_OR_FR_LABEL = /^(haut|hauteur|hojd|larg|largeur|bredd|langd|prof|profondeur|djup)$/;
+
+/**
+ * Catalogue dimensions in cm (height / width / depth when the labels are given).
+ * Accepts "H. 120 cm", "H 250 x L 150 x P 60 cm", "87 x 44 cm", "höjd 77 cm",
+ * "Höjd 89 Bredd 93 Djup 46", "32 x 18 in". Unlabelled Height/Width in inches
+ * is only used when an inch unit is present, so a bare English "Height 32" is
+ * not treated as centimetres.
+ */
+export const dimensionsOf = (raw: string): PieceSize | null => {
+  const t = fold(raw).replace(/['’‘]/g, '"');
+  type Hit = { n: number; unit: 'cm' | 'mm' | 'in' | null; slot: 'h' | 'w' | 'd' | null; i: number; inferCm: boolean };
+  const hits: Hit[] = [];
+  const labRe = /(?:\b(h(?:aut(?:eur)?)?|height|hojd|hohe|alto|l(?:arg(?:eur)?)?|width|bredd|breite|ancho|langd|lange|length|p(?:rof(?:ondeur)?)?|depth|djup|tiefe|fondo|dia(?:meter)?)\.?)\s*[:.]?\s*(\d{2,3}(?:[.,]\d)?)(?:\s*(cm|cms|mm|in(?:ches?)?|pouces?|"))?/g;
+  for (const m of t.matchAll(labRe)) {
+    const lab = m[1];
+    hits.push({ n: parseNum(m[2]), unit: parseUnit(m[3]), slot: slotOf(lab), i: m.index ?? 0, inferCm: NORDIC_OR_FR_LABEL.test(fold(lab).replace(/[^a-z]/g, '')) });
+  }
+  const xxxRe = /(\d{2,3}(?:[.,]\d)?)\s*[x×]\s*(\d{2,3}(?:[.,]\d)?)(?:\s*[x×]\s*(\d{2,3}(?:[.,]\d)?))?\s*(cm|cms|mm|in(?:ches?)?|pouces?|")\b/g;
+  for (const m of t.matchAll(xxxRe)) {
+    const u = parseUnit(m[4]);
+    const i = m.index ?? 0;
+    for (const g of [m[1], m[2], m[3]]) if (g) hits.push({ n: parseNum(g), unit: u, slot: null, i, inferCm: false });
+  }
+  const nuRe = /(\d{2,3}(?:[.,]\d)?)\s*(cm|cms|mm|in(?:ches?)?|pouces?|")\b(?:\s*(high|height|haut(?:eur)?|hojd|wide|width|larg(?:eur)?|bredd|deep|depth|prof(?:ondeur)?|djup))?/g;
+  for (const m of t.matchAll(nuRe)) {
+    hits.push({ n: parseNum(m[1]), unit: parseUnit(m[2]), slot: slotOf(m[3] || ''), i: m.index ?? 0, inferCm: false });
+  }
+  if (!hits.length) return null;
+  // Inherit a nearby unit (e.g. "H 250 x L 150 x P 60 cm", "Höjd 71 Bredd 62 Djup 31 (cm)").
+  for (const h of hits) {
+    if (h.unit) continue;
+    const window = t.slice(h.i, h.i + 80);
+    const near = window.match(/\((cm)\)|\b(cm|cms|mm|in(?:ches?)?|pouces?)\b|(")/);
+    if (near) h.unit = parseUnit(near[1] || near[2] || near[3]);
+  }
+  for (const h of hits) {
+    if (!h.unit && hits.some(o => o.unit && Math.abs(o.i - h.i) < 80))
+      h.unit = hits.find(o => o.unit && Math.abs(o.i - h.i) < 80)!.unit;
+  }
+  let h: number | null = null, w: number | null = null, d: number | null = null;
+  const vals: number[] = [];
+  for (const hit of hits) {
+    const unit = hit.unit || (hit.inferCm ? 'cm' : null);
+    if (!unit) continue;
+    const cm = asCm(hit.n, unit);
+    if (cm == null) continue;
+    vals.push(cm);
+    if (hit.slot === 'h' && h == null) h = cm;
+    if (hit.slot === 'w' && w == null) w = cm;
+    if (hit.slot === 'd' && d == null) d = cm;
+  }
+  if (!vals.length) return null;
+  return { h, w, d, max: Math.max(...vals) };
 };
 
-export interface PieceFeatures { type: string | null; periods: string[]; centuries: string[]; materials: string[]; regional: string | null; styleOnly: boolean; region: 'FR' | 'NORDIC'; pieces: number; sizeCm: number | null; sizeWord: 'small' | 'large' | null }
+/** Largest catalogue dimension in cm; null when none is given. */
+export const sizeOf = (t: string): number | null => dimensionsOf(t)?.max ?? null;
+
+export interface PieceFeatures { type: string | null; periods: string[]; centuries: string[]; materials: string[]; regional: string | null; styleOnly: boolean; region: 'FR' | 'NORDIC'; pieces: number; sizeCm: number | null; size: PieceSize | null; sizeWord: 'small' | 'large' | null }
 
 export const pieceFeatures = (text: string, regionHint?: string): PieceFeatures => {
   const t = fold(text);
@@ -85,7 +159,8 @@ export const pieceFeatures = (text: string, regionHint?: string): PieceFeatures 
   const regional = t.match(REGIONAL)?.[1]?.replace(/(ais|aise|al|ale|ois|oise|ien|ienne|and|ande|on|onne)e?s?$/, '') || null;
   const styleOnly = STYLE_ONLY.test(t) && !PERIOD_WORD.test(t);
   const region = regionHint === 'NORDIC' || /auctionet\.com|\b(sweden|swedish|suedois\w*|scandinav\w*|sverige|svensk|danmark|danish|norge|gustavi\w*|sengustaviansk\w*|karl\s+johan|allmoge)\b|\b\w+-tal\b/.test(t) ? 'NORDIC' : 'FR';
-  return { type, periods, centuries, materials, regional, styleOnly, region, pieces: Math.max(1, countPieces(text)), sizeCm: sizeOf(t), sizeWord: /\b(petite?s?|small|liten|litet|sma)\b/.test(head) ? 'small' : /\b(grande?s?|importante?s?|large|stor|stort)\b/.test(head) ? 'large' : null };
+  const size = dimensionsOf(t);
+  return { type, periods, centuries, materials, regional, styleOnly, region, pieces: Math.max(1, countPieces(text)), sizeCm: size?.max ?? null, size, sizeWord: /\b(petite?s?|small|liten|litet|sma)\b/.test(head) ? 'small' : /\b(grande?s?|importante?s?|large|stor|stort)\b/.test(head) ? 'large' : null };
 };
 
 /** Similarity of a sold lot to the piece; null when the lot cannot be a comparable (other type, other market, the lot itself). */
@@ -110,8 +185,17 @@ export const scoreLot = (p: PieceFeatures, lotF: PieceFeatures): { score: number
   const mats = p.materials.filter(m => lotF.materials.includes(m));
   score += Math.min(3, mats.length) * 1; if (mats.length) matched.push(...mats);
   if (p.regional && lotF.regional === p.regional) { score += 1; matched.push('regional'); }
-  if (p.sizeCm && lotF.sizeCm) {
-    const r = Math.max(p.sizeCm, lotF.sizeCm) / Math.min(p.sizeCm, lotF.sizeCm);
+  const sizeRatio = (a: number, b: number) => Math.max(a, b) / Math.min(a, b);
+  if (p.size && lotF.size) {
+    // Prefer height-to-height when both have it (a tall chiffonnier is not a low wide commode).
+    const primary = (p.size.h && lotF.size.h) ? sizeRatio(p.size.h, lotF.size.h) : sizeRatio(p.size.max, lotF.size.max);
+    if (primary <= 1.3) { score += 2; matched.push('size'); } else if (primary > 1.8) score -= 3;
+    if (p.size.w && lotF.size.w) {
+      const rw = sizeRatio(p.size.w, lotF.size.w);
+      if (rw <= 1.3) { score += 1; matched.push('size_w'); } else if (rw > 1.8) score -= 2;
+    }
+  } else if (p.sizeCm && lotF.sizeCm) {
+    const r = sizeRatio(p.sizeCm, lotF.sizeCm);
     if (r <= 1.3) { score += 2; matched.push('size'); } else if (r > 1.8) score -= 3;
   } else if (p.sizeWord && lotF.sizeWord) { if (p.sizeWord === lotF.sizeWord) { score += 1; matched.push('size'); } else score -= 2; }
   return { score, matched };
@@ -238,7 +322,9 @@ export interface SoldAnchor {
 /**
  * The range from the comparables' hammers (venue-aware: at auction the hammer; elsewhere the auction all-in, which the
  * dealer tier is then built on). Unstamped → anchored on the quartiles (widened to ±20% of the median at least).
- * Stamped without verified maker results → only capped (a stamp can lift a piece above its type, but not without limit).
+ * Stamped / signed without verified maker results → only capped by stamped or signed comps of the type
+ * (a stamp can lift a piece above its type, but not without limit). Unstamped comps never cap a stamped piece;
+ * if too few stamped comps remain, or they sit in a cheaper tier than the appraiser's low, the model band stays.
  */
 export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamped: boolean; isAuction: boolean; premiumPct: number; modelLow: number; modelHigh: number; eurTo: (eur: number) => number }): SoldAnchor => {
   const basis: 'hammer' | 'all_in' = o.isAuction ? 'hammer' : 'all_in';
@@ -275,11 +361,21 @@ export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamp
     return withT({ ...base, low: Math.min(round(o.modelLow), high), high, medianHammerEur, n: close.length, used: close, mode: 'capped', note: 'type_capped' });
   }
   if (o.stamped) {
-    const cap = o.eurTo(quantile(vals, 0.75) * STAMP_CAP_MULT);
-    if (!(o.modelHigh > cap)) return { ...base, medianHammerEur, mode: 'none', note: 'within_cap' };
+    // Only stamped / signed comps may cap a stamped or signed piece. Cheap unstamped size-matches
+    // (a modern desk, a later utility piece) are a different quality tier and must not pull the range down.
+    const marked = comps.filter(c => textHasStampMark(c.t));
+    if (marked.length < MIN_ANCHOR_COMPS) {
+      return { ...base, medianHammerEur, n: marked.length, used: comps, mode: 'too_few', note: 'too_few_stamped' };
+    }
+    const mvals = marked.map(c => c.perPieceH * n * fee(c));
+    const cap = o.eurTo(quantile(mvals, 0.75) * STAMP_CAP_MULT);
+    // If even the cap sits below the appraiser's low, the stamped comps are a cheaper tier: do not cap.
+    if (cap < o.modelLow) return { ...base, medianHammerEur, n: marked.length, used: marked, mode: 'none', note: 'not_close' };
+    if (!(o.modelHigh > cap)) return { ...base, medianHammerEur, n: marked.length, used: marked, mode: 'none', note: 'within_cap' };
     const high = round(cap);
-    const low = round(Math.min(o.modelLow, Math.max(hi, high / 3)));
-    return { ...base, low: Math.min(low, high), high, medianHammerEur, mode: 'capped', note: o.stamped ? 'stamp_capped' : 'type_capped' };
+    const mhi = o.eurTo(Math.max(quantile(mvals, 0.75), quantile(mvals, 0.5) * 1.2));
+    const low = round(Math.min(o.modelLow, Math.max(mhi, high / 3)));
+    return { ...base, low: Math.min(low, high), high, medianHammerEur, n: marked.length, used: marked, mode: 'capped', note: 'stamp_capped' };
   }
   // Blend with the appraiser's range in log space: more (and tighter) comparables weigh more; never fully replace it,
   // since a description match cannot see quality, condition or size the way the appraisal does.
@@ -320,6 +416,16 @@ export const soldCompsProse = (a: SoldAnchor, o: { language: string; isAuction: 
   };
   if (a.note === 'not_close') return { lead: '', note: fr ? `${a.n} ventes du type listées pour référence (médiane ${med} au marteau) : trop disparates ou d'une autre gamme pour fixer la fourchette, qui reste l'estimation de l'expert.` : `${a.n} sales of the type listed for reference (median ${med} hammer): too varied or a different quality tier to set the range, which stays the appraiser's estimate.` };
   if (a.note === 'within_cap') return { lead: '', note: fr ? `Fourchette cohérente avec ${a.n} ventes comparables du type (médiane ${med} au marteau).` : `Range consistent with ${a.n} comparable sales of the type (median ${med} hammer).` };
+  if (a.note === 'too_few_stamped') return {
+    lead: '',
+    note: fr
+      ? (a.n > 0
+          ? `Confiance limitée : seulement ${a.n} vente${a.n > 1 ? 's' : ''} estampillée${a.n > 1 ? 's' : ''} comparable${a.n > 1 ? 's' : ''} (médiane ${med} au marteau) ; les lots non estampillés ne plafonnent pas une pièce estampillée ou signée. La fourchette reste l'estimation de l'expert.`
+          : `Confiance limitée : les ventes comparables du type ne sont pas estampillées ; elles ne plafonnent pas une pièce estampillée ou signée. La fourchette reste l'estimation de l'expert.`)
+      : (a.n > 0
+          ? `Limited confidence: only ${a.n} stamped comparable sale${a.n > 1 ? 's' : ''} (median ${med} hammer); unstamped lots cannot cap a stamped or signed piece. The range is the appraiser's estimate.`
+          : `Limited confidence: the comparable sales of the type are unstamped, so they cannot cap a stamped or signed piece. The range is the appraiser's estimate.`),
+  };
   const few = a.mode === 'too_few' && a.n > 0;
   const note = few
     ? (fr ? `Confiance faible : seulement ${a.n} vente${a.n > 1 ? 's' : ''} comparable${a.n > 1 ? 's' : ''} (médiane ${med} au marteau) ; la fourchette reste l'estimation de l'expert.`

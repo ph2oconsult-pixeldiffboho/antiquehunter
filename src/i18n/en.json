@@ -208,7 +208,9 @@
     "nme_range_auction_equivalent": "The provisional range is auction-equivalent (what it would make at auction), not a shop or private price.",
     "nme_walk_away_auction": "Provisional walk-away: {{walkAway}} hammer ({{walkAwayAllIn}} all-in with the {{premiumPct}}% premium).",
     "nme_walk_away_dealer": "Provisional walk-away: {{walkAway}} (top of the dealer range; shops price above auction).",
-    "nme_walk_away_market": "Provisional walk-away: {{walkAway}} (the auction high)."
+    "nme_walk_away_market": "Provisional walk-away: {{walkAway}} (the auction high).",
+    "thin_text_nudge_title": "A measurement and a photo will tighten this estimate (optional)",
+    "thin_text_nudge_body": "Add the width and height, and one photo, if you have them. The appraisal above already stands — you do not need to re-run unless you want a tighter range."
   },
   "results": {
     "title": "Dealer's Findings",

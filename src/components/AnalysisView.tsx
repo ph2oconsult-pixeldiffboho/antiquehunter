@@ -957,6 +957,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, images = [],
         </div>
       </section>
 
+      {/* Optional, non-blocking: short text-only description with no measurements. The verdict already stands. */}
+      {currentItem.thin_text_nudge && (
+        <section data-testid="thin-text-nudge" className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+          <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600">{t('analysis.thin_text_nudge_title')}</p>
+          <p className="text-sm text-ink">{t('analysis.thin_text_nudge_body')}</p>
+        </section>
+      )}
+
       {/* 3b. Thin evidence: at most two optional "check before you pay" tips (no blocking, no re-asking) */}
       {currentItem.evidence_check?.required && (currentItem.evidence_check.asks || []).length > 0 && (
         <section data-testid="check-before-pay" className="p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-1">
