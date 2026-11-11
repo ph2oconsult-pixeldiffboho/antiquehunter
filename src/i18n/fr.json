@@ -208,7 +208,9 @@
     "nme_range_auction_equivalent": "La fourchette provisoire est un équivalent enchères (ce que la pièce ferait aux enchères), pas un prix boutique ou particulier.",
     "nme_walk_away_auction": "Prix plafond provisoire : {{walkAway}} au marteau ({{walkAwayAllIn}} frais compris, avec {{premiumPct}} % de frais acheteur).",
     "nme_walk_away_dealer": "Prix plafond provisoire : {{walkAway}} (haut de la fourchette marchand ; les boutiques vendent au-dessus des enchères).",
-    "nme_walk_away_market": "Prix plafond provisoire : {{walkAway}} (haut des enchères)."
+    "nme_walk_away_market": "Prix plafond provisoire : {{walkAway}} (haut des enchères).",
+    "thin_text_nudge_title": "Une mesure et une photo resserreront cette estimation (facultatif)",
+    "thin_text_nudge_body": "Ajoutez la largeur et la hauteur, et une photo, si vous les avez. L’estimation ci-dessus vaut déjà — vous n’avez pas à relancer, sauf si vous voulez une fourchette plus serrée."
   },
   "results": {
     "title": "Trouvailles de l'antiquaire",

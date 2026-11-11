@@ -56,16 +56,90 @@ const REGIONAL = /\b(lyonnais\w*|provencal\w*|dauphinois\w*|bordelais\w*|normand
 const STYLE_ONLY = /(\bde\s+style\b|\bdans\s+le\s+style\b|\bin\s+the\s+style\b|\bstyle\s+(louis|empire|regence|napoleon|directoire|restauration|transition|gustav)|[\s-]style\b|\w+-stil\b|\bstil\b)/;
 const PERIOD_WORD = /(\bd'?\s?epoque\b|\bperiod\b|\bepoque\s+(louis|regence|transition|empire|directoire|restauration|napoleon))/;
 
-/** Largest catalogue dimension in cm ("H. 120 cm", "87 x 44 cm", "höjd 77 cm"); null when none is given. */
-export const sizeOf = (t: string): number | null => {
-  const nums: number[] = [];
-  for (const m of t.matchAll(/(\d{2,3}(?:[.,]\d)?)\s*(?:x\s*(\d{2,3}(?:[.,]\d)?)\s*)?(?:x\s*(\d{2,3}(?:[.,]\d)?)\s*)?cm\b/g))
-    for (const g of [m[1], m[2], m[3]]) if (g) nums.push(Number(g.replace(',', '.')));
-  const big = nums.filter(n => n >= 15 && n <= 400);
-  return big.length ? Math.max(...big) : null;
+export interface PieceSize { h: number | null; w: number | null; d: number | null; max: number }
+
+const inCmRange = (cm: number) => cm >= 15 && cm <= 400;
+const parseNum = (s: string) => Number(String(s).replace(',', '.'));
+const asCm = (n: number, unit: 'cm' | 'mm' | 'in'): number | null => {
+  const cm = unit === 'in' ? n * 2.54 : unit === 'mm' ? n / 10 : n;
+  return inCmRange(cm) ? Math.round(cm * 10) / 10 : null;
+};
+const parseUnit = (s?: string | null): 'cm' | 'mm' | 'in' | null => {
+  if (!s) return null;
+  const u = fold(s);
+  if (/^(pouces?|in(?:ches?)?|"|”)$/.test(u)) return 'in';
+  if (/^(mm|millimetres?)$/.test(u)) return 'mm';
+  if (/^(cm|cms|centimetres?)$/.test(u)) return 'cm';
+  return null;
+};
+const slotOf = (lab?: string | null): 'h' | 'w' | 'd' | null => {
+  if (!lab) return null;
+  const l = fold(lab).replace(/[^a-z]/g, '');
+  if (/^(h|haut|hauteur|height|hojd|hohe|alto|high)$/.test(l)) return 'h';
+  if (/^(l|larg|largeur|width|bredd|breite|ancho|langd|lange|length|w|wide)$/.test(l)) return 'w';
+  if (/^(p|prof|profondeur|depth|djup|tiefe|fondo|dia|diameter|d|deep)$/.test(l)) return 'd';
+  return null;
+};
+const NORDIC_OR_FR_LABEL = /^(haut|hauteur|hojd|larg|largeur|bredd|langd|prof|profondeur|djup)$/;
+
+/**
+ * Catalogue dimensions in cm (height / width / depth when the labels are given).
+ * Accepts "H. 120 cm", "H 250 x L 150 x P 60 cm", "87 x 44 cm", "höjd 77 cm",
+ * "Höjd 89 Bredd 93 Djup 46", "32 x 18 in". Unlabelled Height/Width in inches
+ * is only used when an inch unit is present, so a bare English "Height 32" is
+ * not treated as centimetres.
+ */
+export const dimensionsOf = (raw: string): PieceSize | null => {
+  const t = fold(raw).replace(/['’‘]/g, '"');
+  type Hit = { n: number; unit: 'cm' | 'mm' | 'in' | null; slot: 'h' | 'w' | 'd' | null; i: number; inferCm: boolean };
+  const hits: Hit[] = [];
+  const labRe = /(?:\b(h(?:aut(?:eur)?)?|height|hojd|hohe|alto|l(?:arg(?:eur)?)?|width|bredd|breite|ancho|langd|lange|length|p(?:rof(?:ondeur)?)?|depth|djup|tiefe|fondo|dia(?:meter)?)\.?)\s*[:.]?\s*(\d{2,3}(?:[.,]\d)?)(?:\s*(cm|cms|mm|in(?:ches?)?|pouces?|"))?/g;
+  for (const m of t.matchAll(labRe)) {
+    const lab = m[1];
+    hits.push({ n: parseNum(m[2]), unit: parseUnit(m[3]), slot: slotOf(lab), i: m.index ?? 0, inferCm: NORDIC_OR_FR_LABEL.test(fold(lab).replace(/[^a-z]/g, '')) });
+  }
+  const xxxRe = /(\d{2,3}(?:[.,]\d)?)\s*[x×]\s*(\d{2,3}(?:[.,]\d)?)(?:\s*[x×]\s*(\d{2,3}(?:[.,]\d)?))?\s*(cm|cms|mm|in(?:ches?)?|pouces?|")\b/g;
+  for (const m of t.matchAll(xxxRe)) {
+    const u = parseUnit(m[4]);
+    const i = m.index ?? 0;
+    for (const g of [m[1], m[2], m[3]]) if (g) hits.push({ n: parseNum(g), unit: u, slot: null, i, inferCm: false });
+  }
+  const nuRe = /(\d{2,3}(?:[.,]\d)?)\s*(cm|cms|mm|in(?:ches?)?|pouces?|")\b(?:\s*(high|height|haut(?:eur)?|hojd|wide|width|larg(?:eur)?|bredd|deep|depth|prof(?:ondeur)?|djup))?/g;
+  for (const m of t.matchAll(nuRe)) {
+    hits.push({ n: parseNum(m[1]), unit: parseUnit(m[2]), slot: slotOf(m[3] || ''), i: m.index ?? 0, inferCm: false });
+  }
+  if (!hits.length) return null;
+  // Inherit a nearby unit (e.g. "H 250 x L 150 x P 60 cm", "Höjd 71 Bredd 62 Djup 31 (cm)").
+  for (const h of hits) {
+    if (h.unit) continue;
+    const window = t.slice(h.i, h.i + 80);
+    const near = window.match(/\((cm)\)|\b(cm|cms|mm|in(?:ches?)?|pouces?)\b|(")/);
+    if (near) h.unit = parseUnit(near[1] || near[2] || near[3]);
+  }
+  for (const h of hits) {
+    if (!h.unit && hits.some(o => o.unit && Math.abs(o.i - h.i) < 80))
+      h.unit = hits.find(o => o.unit && Math.abs(o.i - h.i) < 80)!.unit;
+  }
+  let h: number | null = null, w: number | null = null, d: number | null = null;
+  const vals: number[] = [];
+  for (const hit of hits) {
+    const unit = hit.unit || (hit.inferCm ? 'cm' : null);
+    if (!unit) continue;
+    const cm = asCm(hit.n, unit);
+    if (cm == null) continue;
+    vals.push(cm);
+    if (hit.slot === 'h' && h == null) h = cm;
+    if (hit.slot === 'w' && w == null) w = cm;
+    if (hit.slot === 'd' && d == null) d = cm;
+  }
+  if (!vals.length) return null;
+  return { h, w, d, max: Math.max(...vals) };
 };
 
-export interface PieceFeatures { type: string | null; periods: string[]; centuries: string[]; materials: string[]; regional: string | null; styleOnly: boolean; region: 'FR' | 'NORDIC'; pieces: number; sizeCm: number | null; sizeWord: 'small' | 'large' | null }
+/** Largest catalogue dimension in cm; null when none is given. */
+export const sizeOf = (t: string): number | null => dimensionsOf(t)?.max ?? null;
+
+export interface PieceFeatures { type: string | null; periods: string[]; centuries: string[]; materials: string[]; regional: string | null; styleOnly: boolean; region: 'FR' | 'NORDIC'; pieces: number; sizeCm: number | null; size: PieceSize | null; sizeWord: 'small' | 'large' | null }
 
 export const pieceFeatures = (text: string, regionHint?: string): PieceFeatures => {
   const t = fold(text);
@@ -85,7 +159,8 @@ export const pieceFeatures = (text: string, regionHint?: string): PieceFeatures 
   const regional = t.match(REGIONAL)?.[1]?.replace(/(ais|aise|al|ale|ois|oise|ien|ienne|and|ande|on|onne)e?s?$/, '') || null;
   const styleOnly = STYLE_ONLY.test(t) && !PERIOD_WORD.test(t);
   const region = regionHint === 'NORDIC' || /auctionet\.com|\b(sweden|swedish|suedois\w*|scandinav\w*|sverige|svensk|danmark|danish|norge|gustavi\w*|sengustaviansk\w*|karl\s+johan|allmoge)\b|\b\w+-tal\b/.test(t) ? 'NORDIC' : 'FR';
-  return { type, periods, centuries, materials, regional, styleOnly, region, pieces: Math.max(1, countPieces(text)), sizeCm: sizeOf(t), sizeWord: /\b(petite?s?|small|liten|litet|sma)\b/.test(head) ? 'small' : /\b(grande?s?|importante?s?|large|stor|stort)\b/.test(head) ? 'large' : null };
+  const size = dimensionsOf(t);
+  return { type, periods, centuries, materials, regional, styleOnly, region, pieces: Math.max(1, countPieces(text)), sizeCm: size?.max ?? null, size, sizeWord: /\b(petite?s?|small|liten|litet|sma)\b/.test(head) ? 'small' : /\b(grande?s?|importante?s?|large|stor|stort)\b/.test(head) ? 'large' : null };
 };
 
 /** Similarity of a sold lot to the piece; null when the lot cannot be a comparable (other type, other market, the lot itself). */
@@ -110,8 +185,17 @@ export const scoreLot = (p: PieceFeatures, lotF: PieceFeatures): { score: number
   const mats = p.materials.filter(m => lotF.materials.includes(m));
   score += Math.min(3, mats.length) * 1; if (mats.length) matched.push(...mats);
   if (p.regional && lotF.regional === p.regional) { score += 1; matched.push('regional'); }
-  if (p.sizeCm && lotF.sizeCm) {
-    const r = Math.max(p.sizeCm, lotF.sizeCm) / Math.min(p.sizeCm, lotF.sizeCm);
+  const sizeRatio = (a: number, b: number) => Math.max(a, b) / Math.min(a, b);
+  if (p.size && lotF.size) {
+    // Prefer height-to-height when both have it (a tall chiffonnier is not a low wide commode).
+    const primary = (p.size.h && lotF.size.h) ? sizeRatio(p.size.h, lotF.size.h) : sizeRatio(p.size.max, lotF.size.max);
+    if (primary <= 1.3) { score += 2; matched.push('size'); } else if (primary > 1.8) score -= 3;
+    if (p.size.w && lotF.size.w) {
+      const rw = sizeRatio(p.size.w, lotF.size.w);
+      if (rw <= 1.3) { score += 1; matched.push('size_w'); } else if (rw > 1.8) score -= 2;
+    }
+  } else if (p.sizeCm && lotF.sizeCm) {
+    const r = sizeRatio(p.sizeCm, lotF.sizeCm);
     if (r <= 1.3) { score += 2; matched.push('size'); } else if (r > 1.8) score -= 3;
   } else if (p.sizeWord && lotF.sizeWord) { if (p.sizeWord === lotF.sizeWord) { score += 1; matched.push('size'); } else score -= 2; }
   return { score, matched };

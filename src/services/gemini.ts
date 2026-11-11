@@ -13,7 +13,7 @@ import { lotFactsPrompt, type LotFacts } from "./lotFacts";
 import { convertApprox } from "./budget";
 import { combineMakerStatus, countPieces, detectMaker, materialOf, pieceOf, type MakerMatch } from "./makers";
 import { anchorOnComparables, type CompsResponse } from "./compsMath";
-import { calibrateRange } from "./thinEvidence";
+import { calibrateRange, isThinTextInput } from "./thinEvidence";
 import { anchorOnSoldComps, soldCompsProse, type SoldCompsResponse } from "./soldComps";
 import { dealerWalkAwayFromDibs, dibsCompsProse, type DibsCompsResponse } from "./dibsComps";
 import { buildNegotiationPlan } from "./negotiation";
@@ -1034,6 +1034,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
     return {
       ...item,
       negotiation_plan: negotiationPlan,
+      thin_text_nudge: isThinTextInput({ text: query, hasPhotos, extraText: lotFacts?.ok ? `${lotFacts.title || ''} ${lotFacts.description || ''}` : '' }),
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
       sold_comps: sold ? {

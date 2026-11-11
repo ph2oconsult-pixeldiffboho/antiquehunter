@@ -3,7 +3,7 @@
 import { alignWithOfferPlan, discountAmount } from "../src/services/negotiation";
 import { applyVenueGuidance, venueOf, marketFigures, isPrivateSeller, needEvidenceWalkAway } from "../src/services/venueGuidance";
 import assert from "node:assert/strict";
-import { calibrateRange } from "../src/services/thinEvidence";
+import { calibrateRange, isThinTextInput, THIN_TEXT_WORD_LIMIT } from "../src/services/thinEvidence";
 import { handleRangeClear, tokenMatches } from "../src/services/rangeAdmin.ts";
 import { redisEnv, upstashClient, resolveSharedRange, RANGE_STORE_TIMEOUT_MS } from "../src/services/rangeStore.ts";
 import { pieceKey, stableRange, RANGE_TTL_MS } from "../src/services/priceCache.ts";
@@ -12,7 +12,7 @@ import { fitWithin, prepareImagesForUpload, payloadBytes } from "../src/services
 import { handleAppraiseRequest, upstreamStatus, failureFor, RETRY_DELAYS_MS, APPRAISAL_MODEL, FALLBACK_MODELS, configFor, ATTEMPT_DEADLINE_MS, CALL_TIMEOUT_MS, TOTAL_BUDGET_MS, callTimeoutFor } from "../src/services/appraiseHandler.ts";
 import { appraisalErrorCode, mentionsPrice, sanitizeWalkAwayIf } from "../src/services/gemini.ts";
 import { postProcessAppraisal, stripModelPrices, stripPriceSentences } from "../src/services/gemini.ts";
-import { matchSoldComps, anchorOnSoldComps, pieceFeatures, MIN_ANCHOR_COMPS } from "../src/services/soldComps.ts";
+import { matchSoldComps, anchorOnSoldComps, pieceFeatures, MIN_ANCHOR_COMPS, dimensionsOf, sizeOf, scoreLot } from "../src/services/soldComps.ts";
 import { handleSoldCompsRequest, soldPool } from "../src/services/soldCompsHandler.ts";
 import { matchDibsComps, dealerWalkAwayFromDibs, dibsCompsProse, DIBS_DISCOUNT, DIBS_DISCOUNT_PCT, DIBS_MIN_COMPS, DIBS_MAX_UPLIFT, DIBS_MIN_RATIO } from "../src/services/dibsComps.ts";
 import { handleDibsCompsRequest, dibsPool } from "../src/services/dibsCompsHandler.ts";
@@ -2198,6 +2198,61 @@ check("sold comparables: matched by type/period/material, self excluded, range i
   const h = handleSoldCompsRequest({ text: "Commode d'époque Louis XV en noyer" });
   assert.equal(h.status, 200); assert.ok(h.body.comps.length >= 1 && h.body.comps.every(c => c.score >= 4));
   assert.equal(handleSoldCompsRequest({}).status, 400);
+});
+
+check("dimensions: H/W/D in cm or inches, labelled or HxWxD, used in size matching; years ignored", () => {
+  const hx = dimensionsOf("H 250 x L 150 x P 60 cm");
+  assert.equal(hx?.h, 250); assert.equal(hx?.w, 150); assert.equal(hx?.d, 60); assert.equal(hx?.max, 250);
+  const sv = dimensionsOf("Höjd 89 Bredd 93 Djup 46");
+  assert.equal(sv?.h, 89); assert.equal(sv?.w, 93); assert.equal(sv?.d, 46);
+  assert.equal(dimensionsOf("Höjd 71 Bredd 62 Djup 31 (cm)")?.h, 71);
+  assert.equal(sizeOf("87 x 44 cm"), 87);
+  assert.equal(sizeOf("H. 120 cm"), 120);
+  assert.equal(sizeOf("höjd 77 cm"), 77);
+  const inch = dimensionsOf("32 x 18 x 16 in");
+  assert.ok(inch && Math.abs(inch.max - 32 * 2.54) < 0.2, String(inch?.max));
+  const hw = dimensionsOf("74cm wide, 115cm high");
+  assert.equal(hw?.h, 115); assert.equal(hw?.w, 74);
+  assert.equal(sizeOf("dated 1763. Nice commode."), null);
+  assert.equal(sizeOf("Commode Louis XV en noyer, trois tiroirs."), null);
+  const tall = pieceFeatures("Commode d'époque Louis XV en noyer, H. 140 x L. 70 x P. 45 cm");
+  const wide = pieceFeatures("Commode d'époque Louis XV en noyer, H. 85 x L. 160 x P. 55 cm");
+  const close = pieceFeatures("Commode d'époque Louis XV en noyer, H. 135 x L. 72 x P. 46 cm");
+  const vsClose = scoreLot(tall, close);
+  const vsWide = scoreLot(tall, wide);
+  assert.ok(vsClose && vsClose.matched.includes("size"), JSON.stringify(vsClose));
+  assert.ok(vsWide && (vsWide.score < vsClose!.score), `tall vs wide ${vsWide?.score} vs close ${vsClose?.score}`);
+});
+
+check("thin text-only nudge is optional and non-blocking; appraisal still gives a decisive verdict", () => {
+  assert.equal(isThinTextInput({ text: "Commode Louis XV en noyer, trois tiroirs, accidents.", hasPhotos: false }), true);
+  assert.equal(isThinTextInput({ text: "Commode Louis XV en noyer, H. 90 x L. 110 x P. 55 cm", hasPhotos: false }), false, "dimensions suppress the nudge");
+  assert.equal(isThinTextInput({ text: "Commode Louis XV en noyer, trois tiroirs, accidents.", hasPhotos: true }), false, "a photo suppresses the nudge");
+  assert.equal(isThinTextInput({ text: "Commode Louis XV en noyer", hasPhotos: false, extraText: "H. 90 x L. 110 x P. 55 cm" }), false, "lot-page dimensions suppress the nudge");
+  assert.ok(THIN_TEXT_WORD_LIMIT >= 20);
+  const raw = () => ({ items: [{ item_summary: { title: "Louis XV walnut commode", likely_period: "Louis XV", likely_style: "Louis XV", value_tier: "B", snap_judgement: "", confidence: "very_low",
+    confidence_breakdown: { evidence_quality: 10, identification_certainty: 12, risk_factors: 15 }, confidence_reason: "", period_certainty: "probable_period", reproduction_risk: false, construction_evidence: "none shown" },
+    buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 200, estimated_market_range_high: 600, fair_price_low: 400, fair_price_high: 1200, pricing_reasoning: "Solid provincial piece." },
+    negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
+  const ctx: any = { query: "Commode Louis XV en noyer, trois tiroirs, accidents.", hasPhotos: false, askingPrice: 300, isAuction: true, premiumPct: 27, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture" };
+  const r: any = postProcessAppraisal(raw(), ctx)[0];
+  assert.equal(r.thin_text_nudge, true);
+  assert.notEqual(r.buy_decision.price_basis, "need_evidence");
+  assert.ok(r.price_guidance.estimated_market_range_high >= r.price_guidance.estimated_market_range_low);
+  const withDims: any = postProcessAppraisal(raw(), { ...ctx, query: "Commode Louis XV en noyer, H. 90 x L. 110 cm" })[0];
+  assert.equal(withDims.thin_text_nudge, false);
+  const withPhoto: any = postProcessAppraisal(raw(), { ...ctx, hasPhotos: true })[0];
+  assert.equal(withPhoto.thin_text_nudge, false);
+  const en = JSON.parse(readFileSync("src/i18n/en.json", "utf8"));
+  const fr = JSON.parse(readFileSync("src/i18n/fr.json", "utf8"));
+  assert.ok(en.analysis.thin_text_nudge_title && en.analysis.thin_text_nudge_body);
+  assert.ok(fr.analysis.thin_text_nudge_title && fr.analysis.thin_text_nudge_body);
+  for (const loc of ["es", "de", "ja", "zh"]) {
+    const j = JSON.parse(readFileSync(`src/i18n/${loc}.json`, "utf8"));
+    assert.ok(j.analysis.thin_text_nudge_title && j.analysis.thin_text_nudge_body, loc);
+  }
+  const src = readFileSync("src/components/AnalysisView.tsx", "utf8");
+  assert.match(src, /data-testid="thin-text-nudge"/);
 });
 console.log(`
 ${passed} checks passed`);

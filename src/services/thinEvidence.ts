@@ -1,3 +1,4 @@
+import { sizeOf } from "./soldComps";
 // Cheap-piece calibration (shared, pure; figures computed here, never by the model).
 // Rebuilt from the ideas in old PRs #25 (unsupported claims / style and cheap-material wording) and #27 (thin evidence),
 // on today's engine. Factors are carried over from those PRs unchanged; they were NOT re-tuned on the sealed set.
@@ -45,4 +46,14 @@ export const calibrateRange = (i: CalibrationInput): Calibration => {
   if (isThinEvidence(i) && low > high / THIN_LOW_RATIO) { low = high / THIN_LOW_RATIO; factors.push('thin_evidence_low'); }
   if (!factors.length) return { low: i.low, high: i.high, factor: 1, factors };
   return { low: r(low), high: Math.max(r(low), r(high)), factor: f, factors };
+};
+
+/** A short text-only description with no measurements: show an optional, non-blocking nudge. The appraisal still runs. */
+export const THIN_TEXT_WORD_LIMIT = 40;
+export const isThinTextInput = (o: { text: string; hasPhotos: boolean; extraText?: string }): boolean => {
+  if (o.hasPhotos) return false;
+  const blob = `${o.text || ''} ${o.extraText || ''}`;
+  if (sizeOf(blob)) return false;
+  const words = String(o.text || '').trim().split(/\s+/).filter(Boolean).length;
+  return words > 0 && words < THIN_TEXT_WORD_LIMIT;
 };
