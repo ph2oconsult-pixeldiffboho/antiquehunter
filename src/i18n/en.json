@@ -729,6 +729,7 @@
     "anchored": "Range computed from {{n}} comparable sales of the same type, period/style and materials (median {{median}} hammer).",
     "capped": "Stamp with no verified maker results: range capped from {{n}} comparable sales of the type (median {{median}} hammer).",
     "tightened": "Range narrowed to the spread of {{n}} close comparable sales of the same type, origin and period (median {{median}} hammer).",
+    "floor_lowered": "Low end lowered toward {{n}} close comparable sales of the same type, origin and period (median {{median}} hammer): the appraiser's low sat well above them.",
     "hammer": "hammer (fees stripped)",
     "fees": "buyer's fees {{pct}}%",
     "source_note": "Real sold lots (Drouot, Auctionet; {{pool}} results, fees stripped), matched by type, period/style, materials, size and market. The app checks and caps the range against them in code; the appraiser only writes the notes."

@@ -2188,8 +2188,10 @@ check("sold comparables: matched by type/period/material, self excluded, range i
     soldComps: { ok: true, pool: 6, comps: mk(SIX) } };
   const r: any = postProcessAppraisal(raw(), ctx)[0];
   assert.ok(r.price_guidance.estimated_market_range_high <= a.high, `${r.price_guidance.estimated_market_range_high}`); assert.equal(r.walk_away_threshold.hammer, r.price_guidance.estimated_market_range_high, "walk-away follows the capped range");
-  assert.equal(r.sold_comps.mode, "capped"); assert.equal(r.sold_comps.list.length, 6); assert.ok(r.sold_comps.list[0].url.startsWith("https://"));
-  assert.ok(/6 comparable sales/.test(r.price_guidance.pricing_reasoning), r.price_guidance.pricing_reasoning);
+  // Capped high, then the 2000 floor (>= 2x the comps' padded P10) is pulled halfway down toward them
+  assert.equal(r.sold_comps.mode, "floor_lowered"); assert.equal(r.sold_comps.list.length, 6); assert.ok(r.sold_comps.list[0].url.startsWith("https://"));
+  assert.ok(r.price_guidance.estimated_market_range_low < 2000 && r.price_guidance.estimated_market_range_low >= 350, `floor ${r.price_guidance.estimated_market_range_low}`);
+  assert.ok(/High capped by 6 comparable sales/.test(r.price_guidance.pricing_reasoning) && /Low end lowered toward 6 close comparable sales/.test(r.price_guidance.pricing_reasoning), r.price_guidance.pricing_reasoning);
   assert.notEqual(r.buy_decision.price_basis, "need_evidence");
   const few: any = postProcessAppraisal(raw(), { ...ctx, soldComps: { ok: true, pool: 2, comps: mk([300, 400]) } })[0];
   assert.equal(few.sold_comps.mode, "too_few"); assert.ok(/Low confidence/.test(few.sold_comps.note)); assert.notEqual(few.buy_decision.price_basis, "need_evidence");
@@ -2322,7 +2324,10 @@ check("dense sold comps tighten a wide range toward the IQR, never widen, leave 
   const d = 400 / 80; // p75/p25 of this set is not precomputed here; force a clearly dispersed set
   const dispersed = tightenRange([100, 120, 140, 800, 900, 1000], { modelLow: 80, modelHigh: 2000 });
   assert.equal(dispersed, null, "dispersed comps never tighten");
-  assert.equal(tightenRange(tight, { modelLow: 2000, modelHigh: 5000 }), null, "comps in a cheaper tier do not raise or shift the range");
+  // Comps in a cheaper tier never trim the high; a floor >= 2x their padded P10 is pulled at most halfway down
+  const cheaper = tightenRange(tight, { modelLow: 2000, modelHigh: 5000 })!;
+  assert.ok(cheaper && cheaper.floorPulled && cheaper.high === 5000 && cheaper.low < 2000 && cheaper.low >= 1000, `cheaper tier ${cheaper?.low}-${cheaper?.high}`);
+  assert.equal(tightenRange([1000, 1100, 1200, 1300, 1400, 1500], { modelLow: 50, modelHigh: 200 }), null, "comps in a pricier tier never raise the range");
   // never widens: a range already inside the comps spread stays or shrinks
   const inner = tightenRange(tight, { modelLow: 50, modelHigh: 200 });
   if (inner) assert.ok(inner.low >= 50 && inner.high <= 200);
@@ -2346,6 +2351,60 @@ check("dense sold comps tighten a wide range toward the IQR, never widen, leave 
   assert.equal(sparse.price_guidance.estimated_market_range_high >= 500 || sparse.sold_comps.mode === "too_few", true);
   assert.notEqual(sparse.buy_decision.price_basis, "need_evidence");
   assert.equal(typeof TIGHTEN_CFG.minClose, "number");
+});
+
+check("floor pull-down: a floor >= 2x the close comps' padded P10 is pulled down by 0.5; high and walk-away untouched; stamped floor-only", () => {
+  const C = TIGHTEN_CFG;
+  assert.equal(C.maxW, 0.5); assert.equal(C.onlyLowerLowIfAboveMult, 2); assert.equal(C.onlyLowerHighIfAboveMult, 2);
+  const vals = [300, 350, 400, 450, 500, 600, 700];
+  // padded P10 = min(P10, 0.8 x median) = min(330, 360) = 330
+  const t = tightenRange(vals, { modelLow: 1000, modelHigh: 1400 })!;
+  assert.ok(t && t.floorPulled, "floor 1000 >= 2 x 330: pulled");
+  assert.equal(t.low, 670, `low halfway from 1000 to 330 -> ${t.low}`);
+  assert.equal(t.high, 1400, "high below 2x the target high: untouched");
+  // gate: a floor under 2x the padded P10 is left alone (no other change -> null)
+  assert.equal(tightenRange(vals, { modelLow: 600, modelHigh: 1400 }), null, "floor 600 < 2 x 330: no pull, nothing else moves");
+  // both ends: floor pulled and an optimistic high trimmed in the same step
+  // comps wholly below the floor (another tier): floor pulled, the high is never trimmed from them
+  const tier = tightenRange(vals, { modelLow: 1000, modelHigh: 4000 })!;
+  assert.ok(tier.floorPulled && tier.low === 670 && tier.high === 4000, `${tier.low}-${tier.high}`);
+  // overlapping comps: floor pulled and an optimistic high trimmed in the same step
+  const both = tightenRange([300, 400, 500, 900, 1000, 1100, 1200], { modelLow: 800, modelHigh: 4000 })!;
+  assert.ok(both.floorPulled && both.low === 580 && both.high === 2550, `${both.low}-${both.high}`);
+  // floorOnly (stamped with too few stamped comps): only the floor drops, the high is never capped, floor never raised
+  const fo = tightenRange(vals, { modelLow: 1000, modelHigh: 9000, floorOnly: true })!;
+  assert.ok(fo.floorPulled && fo.low === 670 && fo.high === 9000, `floorOnly ${fo.low}-${fo.high}`);
+  assert.equal(tightenRange(vals, { modelLow: 100, modelHigh: 9000, floorOnly: true }), null, "floorOnly never raises a floor or trims a high");
+  // dispersed or sparse comps never move the floor
+  assert.equal(tightenRange([100, 120, 140, 800, 900, 1000], { modelLow: 2000, modelHigh: 4000 }), null);
+  assert.equal(tightenRange([300, 350, 400], { modelLow: 1000, modelHigh: 1400 }), null);
+  // anchorOnSoldComps: a stamped piece with too few stamped comps carries the unstamped type + period comps, floor only
+  const mk = (rows: { h: number; t: string; m?: string[] }[]) => rows.map((r, i) => ({ id: String(i), u: `https://x/${i}`, t: r.t, h: r.h, d: "2026-09-10", src: "drouot", rg: "FR", score: 6, matched: r.m || ["type", "period"], pieces: 1, perPieceH: r.h }));
+  const unst = mk(vals.map(h => ({ h, t: "Semainier en noyer d'époque Transition" })));
+  const sa = anchorOnSoldComps(unst, { stamped: true, isAuction: true, premiumPct: 27, modelLow: 1000, modelHigh: 2200, eurTo: e => e });
+  assert.equal(sa.note, "too_few_stamped"); assert.equal(sa.tightenFloorOnly, true); assert.equal(sa.tightenVals?.length, 7);
+  assert.equal(sa.low, 1000); assert.equal(sa.high, 2200, "anchor itself keeps the model band");
+  const noPeriod = anchorOnSoldComps(mk(vals.map(h => ({ h, t: "Semainier en noyer", m: ["type"] }))), { stamped: true, isAuction: true, premiumPct: 27, modelLow: 1000, modelHigh: 2200, eurTo: e => e });
+  assert.equal(noPeriod.tightenVals, undefined, "type-only comps (no period/century match) never move a stamped floor");
+  // Wired: stamped semainier, model 1000-2200, unstamped comps 300-700 -> floor lowered, high and walk-away unchanged
+  const raw = () => ({ items: [{ item_summary: { title: "Semainier estampillé, époque Transition", likely_period: "Transition period", likely_style: "Transition", value_tier: "B", snap_judgement: "", confidence: "medium",
+    confidence_breakdown: { evidence_quality: 14, identification_certainty: 14, risk_factors: 15 }, confidence_reason: "", period_certainty: "confirmed_period", reproduction_risk: false, construction_evidence: "none shown",
+    maker: { name: "J.G.T. Sar", status: "stamped_stated", evidence: "stamp stated in the description" } },
+    buy_decision: { decision_summary: [] }, price_guidance: { estimated_market_range_low: 1000, estimated_market_range_high: 2200, fair_price_low: 2500, fair_price_high: 4500, pricing_reasoning: "A stamped Transition semainier. Expect around €1,000 at auction." },
+    negotiation_strategy: {}, scoring_inputs: { risk_penalty: 0 }, dealer_take: {} }] });
+  const ctx: any = { query: "Semainier en bois naturel estampillé J.G.T SAR et JME d'époque Transition, H. 145 L. 63 P. 33 cm", hasPhotos: false, askingPrice: 400, isAuction: true, premiumPct: 27, targetCurrency: "EUR", currencySymbol: "€", language: "en", sellerType: "Auction", fetchedEstimate: false, eurTo: (e: number) => e, category: "furniture",
+    soldComps: { ok: true, pool: 7, comps: unst } };
+  const base: any = postProcessAppraisal(raw(), { ...ctx, soldComps: { ok: true, pool: 2, comps: unst.slice(0, 2) } })[0];
+  const r: any = postProcessAppraisal(raw(), ctx)[0];
+  assert.equal(r.sold_comps.mode, "floor_lowered", JSON.stringify([r.sold_comps.mode, r.sold_comps.note, r.price_guidance.estimated_market_range_low, r.price_guidance.estimated_market_range_high, r.price_guidance.calibration, r.maker_attribution]));
+  assert.ok(r.price_guidance.estimated_market_range_low < base.price_guidance.estimated_market_range_low, `floor ${base.price_guidance.estimated_market_range_low} -> ${r.price_guidance.estimated_market_range_low}`);
+  assert.equal(r.price_guidance.estimated_market_range_high, base.price_guidance.estimated_market_range_high, "unstamped comps never cap a stamped high");
+  assert.equal(r.walk_away_threshold.hammer, base.walk_away_threshold.hammer, "walk-away unchanged by the floor pull-down");
+  assert.ok(Number(r.price_guidance.fair_price_low) <= Number(base.price_guidance.fair_price_low), "dealer low follows the floor down, never up");
+  assert.ok(/never the high/.test(r.price_guidance.pricing_reasoning), r.price_guidance.pricing_reasoning);
+  assert.ok(!/€1,000/.test(r.price_guidance.pricing_reasoning), "model prose quoting the old figure is dropped");
+  assert.notEqual(r.buy_decision.price_basis, "need_evidence");
+  assert.ok(!/need more evidence/i.test(JSON.stringify(r)), "verdict stays decisive");
 });
 
 console.log(`

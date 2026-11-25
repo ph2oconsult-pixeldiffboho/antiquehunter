@@ -280,34 +280,58 @@ export const TIGHTEN_CFG = {
   maxW: 0.5,
   /** Only lower the high when it sits at least this multiple of the target high. */
   onlyLowerHighIfAboveMult: 2,
+  /**
+   * Floor pull-down (mirror of the high trim): when the appraiser's low sits at least this multiple above the
+   * close comps' padded P10 (min(P10, 0.8 x median)), pull it down toward that floor by maxW. Only lowers the
+   * floor; the high and the walk-away are untouched by this step. 0 disables.
+   */
+  onlyLowerLowIfAboveMult: 2,
+  /**
+   * The floor pull-down still applies when the comps' IQR sits wholly below the appraiser's low (the high-trim and
+   * floor-raise keep requiring an overlap). The 2x gate and maxW 0.5 bound the move: the floor never drops below
+   * half the appraiser's low.
+   */
+  floorPullWithoutOverlap: true,
 };
 
 /**
- * Narrow [modelLow, modelHigh] toward the comps' spread. Never widens. Returns null when the
- * comps are too few or too dispersed, when they sit in a different quality tier, or when the
- * range is already as tight as the target.
+ * Narrow [modelLow, modelHigh] toward the comps' spread, and pull an appraiser's floor that sits far above the
+ * comps down toward them. The high is never raised and only trimmed when it sits >= 2x the comps' target high;
+ * the floor is raised toward the comps' padded P10, or lowered toward it when it sits >= 2x above it (both by
+ * maxW). `floorOnly` (a stamped piece with too few stamped comps, scored against unstamped type + period comps):
+ * only the floor pull-down applies; unstamped comps never raise the floor or cap the high of a stamped piece.
+ * Returns null when the comps are too few or too dispersed, when they sit in a pricier tier (or a cheaper one with
+ * no floor to pull), or when nothing moves.
  */
-export const tightenRange = (vals: number[], o: { modelLow: number; modelHigh: number }): { low: number; high: number; weight: number } | null => {
+export const tightenRange = (vals: number[], o: { modelLow: number; modelHigh: number; floorOnly?: boolean }): { low: number; high: number; weight: number; floorPulled: boolean } | null => {
   const C = TIGHTEN_CFG;
   if (!C.enabled || vals.length < C.minClose || !(o.modelLow > 0) || !(o.modelHigh > o.modelLow)) return null;
   const p25 = quantile(vals, 0.25), p75 = quantile(vals, 0.75), med = quantile(vals, 0.5);
   if (!(p25 > 0) || p75 < p25) return null;
   const disp = p75 / Math.max(1, p25);
   if (disp > C.maxDisp) return null;
-  if (C.requireOverlap && (p75 < o.modelLow || p25 > o.modelHigh)) return null;
   let tLo = Math.min(quantile(vals, C.loQ), med * C.lowPad);
   let tHi = Math.max(quantile(vals, C.hiQ) * C.highMult, med * C.highPad);
   if (tHi / Math.max(1, tLo) < C.minWidthRatio) tHi = Math.max(tHi, tLo * C.minWidthRatio);
+  const pullFloor = C.onlyLowerLowIfAboveMult > 0 && tLo > 0 && tLo < o.modelLow && o.modelLow + 1e-9 >= tLo * C.onlyLowerLowIfAboveMult;
+  // Comps pricier than the whole range: a description match cannot see quality, never raise toward them.
+  if (C.requireOverlap && p25 > o.modelHigh) return null;
+  // Comps wholly below the floor: only the (bounded) floor pull-down may act; no high trim from another tier.
+  const cheaperTier = C.requireOverlap && p75 < o.modelLow;
+  if (cheaperTier && !(pullFloor && C.floorPullWithoutOverlap)) return null;
+  const floorOnly = !!o.floorOnly || cheaperTier;
   const w = Math.max(0, Math.min(1, C.maxW));
   let low = o.modelLow, high = o.modelHigh;
-  if (tLo > o.modelLow) low = o.modelLow + w * (tLo - o.modelLow);
-  if (tHi < o.modelHigh && o.modelHigh + 1e-9 >= tHi * C.onlyLowerHighIfAboveMult) high = o.modelHigh + w * (tHi - o.modelHigh);
+  if (!floorOnly && tLo > o.modelLow) low = o.modelLow + w * (tLo - o.modelLow);
+  if (pullFloor) low = o.modelLow + w * (tLo - o.modelLow);
+  if (!floorOnly && tHi < o.modelHigh && o.modelHigh + 1e-9 >= tHi * C.onlyLowerHighIfAboveMult) high = o.modelHigh + w * (tHi - o.modelHigh);
   low = round(low); high = round(Math.max(low + 1, high));
-  // never widen after rounding
-  low = Math.max(low, round(o.modelLow));
+  // never raise the high; the floor only drops when the pull-down fired
   high = Math.min(high, round(o.modelHigh));
-  if (!(high > low) || (low <= round(o.modelLow) && high >= round(o.modelHigh))) return null;
-  return { low, high, weight: w };
+  if (!pullFloor) low = Math.max(low, round(o.modelLow));
+  else low = Math.min(low, round(o.modelLow));
+  if (!(high > low) || (low === round(o.modelLow) && high >= round(o.modelHigh))) return null;
+  return { low, high, weight: w, floorPulled: pullFloor && low < round(o.modelLow) };
 };
 
 export type SoldAnchorMode = 'anchored' | 'capped' | 'too_few' | 'none';
@@ -316,7 +340,11 @@ export interface SoldAnchor {
   basis: 'hammer' | 'all_in'; note: string; weight?: number;
   /** Close-comp values in the display currency (fee-adjusted), for a late tighten against the calibrated range. */
   tightenVals?: number[];
+  /** tightenVals are unstamped type + period comps of a stamped piece: they may only lower the floor. */
+  tightenFloorOnly?: boolean;
   tightened?: boolean;
+  /** The late tighten lowered the appraiser's floor toward the comps. */
+  floorPulled?: boolean;
 }
 
 /**
@@ -365,7 +393,11 @@ export const anchorOnSoldComps = (comps: SoldComp[], o: { pieces?: number; stamp
     // (a modern desk, a later utility piece) are a different quality tier and must not pull the range down.
     const marked = comps.filter(c => textHasStampMark(c.t));
     if (marked.length < MIN_ANCHOR_COMPS) {
-      return { ...base, medianHammerEur, n: marked.length, used: comps, mode: 'too_few', note: 'too_few_stamped' };
+      // Too few stamped comps to cap: the type + period comps may still pull a far-too-high floor down (floor only;
+      // they never cap the high of a stamped piece). Stricter count than the unstamped tighten (the unstamped cap's
+      // minClose, 6), so a handful of cheap size-matches cannot drag a stamped floor.
+      const floorVals = close0.length >= Math.max(TIGHTEN_CFG.minClose, SOLD_CFG.minClose) ? close0.map(c => o.eurTo(c.perPieceH * n * fee(c))) : undefined;
+      return { ...base, medianHammerEur, n: marked.length, used: comps, mode: 'too_few', note: 'too_few_stamped', ...(floorVals ? { tightenVals: floorVals, tightenFloorOnly: true } : {}) };
     }
     const mvals = marked.map(c => c.perPieceH * n * fee(c));
     const cap = o.eurTo(quantile(mvals, 0.75) * STAMP_CAP_MULT);
@@ -394,6 +426,20 @@ export const soldCompsProse = (a: SoldAnchor, o: { language: string; isAuction: 
   const fr = String(o.language || '').toLowerCase().startsWith('fr');
   const med = a.medianHammerEur ? o.fmt(a.medianHammerEur) : '';
   const basis = fr ? (o.isAuction ? 'au marteau' : 'frais inclus') : (o.isAuction ? 'hammer' : 'incl. buyer fees');
+  if (a.tightened && a.floorPulled) {
+    const k = a.tightenVals?.length ?? a.n;
+    const stampedFloor = !!a.tightenFloorOnly;
+    // An unstamped range first capped by the comps keeps that sentence; the floor sentence follows.
+    const capLead = a.mode === 'capped' && !o.stamped
+      ? (fr ? `Haut plafonné par ${a.n} ventes comparables (même type, époque/style, matériaux, taille). ` : `High capped by ${a.n} comparable sales (same type, period/style, materials, size). `)
+      : '';
+    return {
+      lead: capLead + (fr ? `Bas de fourchette abaissé vers ${k} ventes comparables proches (même type, origine et époque ; médiane ${med} au marteau, frais retirés) : le bas de l'expert était bien au-dessus. En ${basis}.${stampedFloor ? ` Pièce estampillée ou signée : ces ventes non estampillées abaissent seulement le bas, jamais le haut.` : ''}`
+               : `Low end lowered toward ${k} close comparable sales (same type, origin and period; median ${med} hammer, fees stripped): the appraiser's low sat well above them. Shown ${basis}.${stampedFloor ? ` Stamped or signed piece: these unstamped sales only lower the low end, never the high.` : ''}`),
+      note: fr ? `Confiance modérée : l'expert estimait plus haut que les ventes comparables ; vérifiez la qualité qui justifierait un prix proche du haut.`
+               : `Moderate confidence: the appraiser read this piece above its comparable sales; check the quality that would justify a price near the high end.`,
+    };
+  }
   if (a.tightened) return {
     lead: fr ? `Fourchette resserrée sur la dispersion de ${a.tightenVals?.length ?? a.n} ventes comparables proches (même type, origine et époque ; médiane ${med} au marteau, frais retirés), en ${basis}.`
              : `Range narrowed to the spread of ${a.tightenVals?.length ?? a.n} close comparable sales (same type, origin and period; median ${med} hammer, fees stripped), shown ${basis}.`,

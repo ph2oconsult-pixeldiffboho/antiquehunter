@@ -788,20 +788,30 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       if (Number(pgA.fair_price_low) > Number(pgA.fair_price_high)) pgA.fair_price_low = Math.round(lo * 1.3);
       if (Number(pgA.good_buy_below) > hi) pgA.good_buy_below = Math.round((lo + hi) / 2);
     }
-    // Dense close comps: narrow the (calibrated, possibly capped) range toward their spread. Never widens.
+    // Dense close comps: narrow the (calibrated, possibly capped) range toward their spread, and pull an appraiser's
+    // floor that sits far above them down toward them (stamped with too few stamped comps: floor only). Never raises
+    // the high; the walk-away follows the high, so a floor pull-down leaves it unchanged.
     if (sold?.tightenVals?.length && !anchor.applied) {
+      const lo0 = Number(pgA.estimated_market_range_low) || 0;
       const t = tightenRange(sold.tightenVals, {
-        modelLow: Number(pgA.estimated_market_range_low) || 0,
+        modelLow: lo0,
         modelHigh: Number(pgA.estimated_market_range_high) || 0,
+        floorOnly: !!sold.tightenFloorOnly,
       });
       if (t) {
         pgA.estimated_market_range_low = t.low; pgA.estimated_market_range_high = t.high;
         const fLo = Number(pgA.fair_price_low) || 0, fHi = Number(pgA.fair_price_high) || 0;
         if (fHi > t.high * 1.6) pgA.fair_price_high = Math.round(t.high * 1.6);
         if (fLo > Number(pgA.fair_price_high)) pgA.fair_price_low = Math.round(t.low * 1.3);
+        // Floor pulled down: the dealer-tier low follows by the same factor (code-computed, never raised).
+        if (t.floorPulled && lo0 > 0 && Number(pgA.fair_price_low) > 0) pgA.fair_price_low = Math.round(Math.min(Number(pgA.fair_price_low), Number(pgA.fair_price_low) * t.low / lo0));
         if (Number(pgA.good_buy_below) > t.high) pgA.good_buy_below = Math.round((t.low + t.high) / 2);
-        sold.tightened = true; sold.low = t.low; sold.high = t.high;
-        if (sold.tightenVals.length >= SOLD_AGREE_MIN) {
+        // Model prose that quotes the old floor would contradict the displayed range
+        const pr = String(pgA.pricing_reasoning || '');
+        if (t.floorPulled && mentionsPrice(pr)) pgA.pricing_reasoning = stripPriceSentences(pr);
+        sold.tightened = true; sold.floorPulled = t.floorPulled; sold.low = t.low; sold.high = t.high;
+        // Shown confidence rises only when the comps agree with the range (a pulled floor means they disagreed)
+        if (sold.tightenVals.length >= SOLD_AGREE_MIN && !t.floorPulled) {
           shownConfScore = Math.max(shownConfScore, sold.tightenVals.length >= 10 || hasPhotos ? 55 : 40);
           shownConfLabel = confidenceLabel(shownConfScore);
         }
@@ -1058,7 +1068,7 @@ export const postProcessAppraisal = (result: any, ctx: PostProcessContext) => {
       evidence_check: evidence,
       maker_attribution: maker ? { name: maker.name, status: maker.status, source: maker.source, stamp_answer: stampAnswer || null, model_evidence: item.item_summary?.maker?.evidence || null } : null,
       sold_comps: sold ? {
-        mode: soldComps === null || soldComps?.ok === false ? 'error' : (sold.tightened ? 'tightened' : sold.mode), n: sold.tightened ? (sold.tightenVals?.length ?? sold.n) : sold.n, basis: sold.basis, median_hammer_eur: sold.medianHammerEur || null,
+        mode: soldComps === null || soldComps?.ok === false ? 'error' : (sold.tightened ? (sold.floorPulled ? 'floor_lowered' : 'tightened') : sold.mode), n: sold.tightened ? (sold.tightenVals?.length ?? sold.n) : sold.n, basis: sold.basis, median_hammer_eur: sold.medianHammerEur || null,
         model_low: soldModel.low, model_high: soldModel.high, note: soldNote?.note || null, pool: soldComps?.pool || 0,
         list: sold.used.map(c => ({ url: c.u, title: c.t, hammer_eur: c.h, fee_pct: c.f ?? null, date: c.d, house: c.house || null, city: c.city || null, source: c.src, pieces: c.pieces, matched: c.matched })),
       } : null,

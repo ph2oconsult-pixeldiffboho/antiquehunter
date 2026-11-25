@@ -406,6 +406,7 @@
     "anchored": "Range computed from {{n}} comparable sales of the same type, period/style and materials (median {{median}} hammer).",
     "capped": "Stamp with no verified maker results: range capped from {{n}} comparable sales of the type (median {{median}} hammer).",
     "tightened": "Spanne an die Streuung von {{n}} nahen Vergleichsverkäufen desselben Typs, derselben Herkunft und Epoche angeglichen (Median {{median}} Zuschlag).",
+    "floor_lowered": "Untere Grenze in Richtung von {{n}} nahen Vergleichsverkäufen desselben Typs, derselben Herkunft und Epoche gesenkt (Median {{median}} Zuschlag): die Untergrenze des Gutachters lag deutlich darüber.",
     "hammer": "hammer (fees stripped)",
     "fees": "buyer's fees {{pct}}%",
     "source_note": "Real sold lots (Drouot, Auctionet; {{pool}} results, fees stripped), matched by type, period/style, materials, size and market. The app checks and caps the range against them in code; the appraiser only writes the notes."
